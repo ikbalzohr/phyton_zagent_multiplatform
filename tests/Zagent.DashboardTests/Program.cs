@@ -3,6 +3,7 @@ using Zagent.Core.Dashboard;
 using System.Text.Json.Nodes;
 using Zagent.Core.Manager;
 using Zagent.Shared;
+using Zagent.Shared.Installation;
 
 // Source authored first; execution is explicitly deferred to Windows.
 static void Check(bool ok, string name) { if (!ok) throw new Exception(name); }

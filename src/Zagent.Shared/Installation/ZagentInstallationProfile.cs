@@ -5,8 +5,12 @@ namespace Zagent.Shared.Installation;
 /// <summary>Local installation identity, distinct from the bound operator/device alias.</summary>
 public static class ZagentInstallationProfile
 {
-    public const string Master = "Primary";
-    public const string User = "Secondary";
+    public const string Primary = "Primary";
+    public const string Secondary = "Secondary";
+
+    // Compatibility names for existing installer callers; values remain neutral.
+    public const string Master = Primary;
+    public const string User = Secondary;
 
     public static string Normalize(string? role) =>
         (role ?? "").Trim().ToLowerInvariant() switch
