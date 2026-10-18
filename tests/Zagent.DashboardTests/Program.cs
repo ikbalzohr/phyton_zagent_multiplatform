@@ -26,8 +26,33 @@ Environment.SetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY", new string('s'
 Environment.SetEnvironmentVariable("ZAGENT_DEFAULT_WORKSPACE_ID", "workspace-1");
 InternalManagementChannel.ValidateProvisioning();
 Check(InternalManagementChannel.Canonicalize(JsonNode.Parse("{\"b\":2,\"a\":[true,null,1]}")) == "{\"a\":[true,null,1],\"b\":2}", "canonical JSON contract");
-var shared = JsonElement.Parse("{ \"a\": 1, \"z\": 2 }");
-Check(DashboardRevision.Profiles(shared) is not null, "snapshot revision available");
+var profilesSnapshot = JsonElement.Parse("""
+    {"profiles":[],"pendingApprovals":[],"defaultProfile":"workspace-1","capturedAtUtc":"2026-01-01T00:00:00Z"}
+    """);
+var revision = DashboardRevision.Profiles(profilesSnapshot);
+Check(!string.IsNullOrEmpty(revision), "snapshot revision available");
+Check(revision == DashboardRevision.Profiles(profilesSnapshot), "snapshot revision deterministic");
+var changedDefault = JsonElement.Parse("""
+    {"profiles":[],"pendingApprovals":[],"defaultProfile":"workspace-2"}
+    """);
+Check(revision != DashboardRevision.Profiles(changedDefault), "default profile mutation changes revision");
+var changedProfiles = JsonElement.Parse("""
+    {"profiles":[{"name":"workspace-1","mode":"read-only"}],"pendingApprovals":[],"defaultProfile":"workspace-1"}
+    """);
+Check(revision != DashboardRevision.Profiles(changedProfiles), "profile mutation changes revision");
+var changedApprovals = JsonElement.Parse("""
+    {"profiles":[],"pendingApprovals":[{"requestId":"approval-1","status":"pending"}],"defaultProfile":"workspace-1"}
+    """);
+Check(revision != DashboardRevision.Profiles(changedApprovals), "approval mutation changes revision");
+var changedCaptureTime = JsonElement.Parse("""
+    {"profiles":[],"pendingApprovals":[],"defaultProfile":"workspace-1","capturedAtUtc":"2026-01-02T00:00:00Z"}
+    """);
+Check(revision == DashboardRevision.Profiles(changedCaptureTime), "capture timestamp does not change revision");
+try {
+    DashboardRevision.Profiles(JsonElement.Parse("{}"));
+    throw new Exception("Accepted incomplete profile snapshot");
+}
+catch (KeyNotFoundException) { }
 Check(!DashboardSecurity.IsExpectedHost("evil.example:19443", options.Origin), "DNS rebinding rejected");
 Check(DashboardSecurity.IsExpectedHost("localhost:19443", options.Origin), "configured Host");
 Check(DashboardSecurity.Redact("Authorization: Bearer token12345 token=secret api_key=hidden").Contains("secret") == false, "redaction");
