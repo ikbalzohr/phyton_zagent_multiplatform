@@ -505,51 +505,6 @@ public sealed class FilesManagerReadModel
             cancellationToken);
     }
 
-    public async Task<ManagerOperationResult> SwitchSessionProfileAsync(
-        ManagerSessionProfileSwitchRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var sessionId = (request.SessionId ?? "").Trim();
-        var name = (request.Name ?? "").Trim();
-
-        if (string.IsNullOrWhiteSpace(sessionId))
-        {
-            return new ManagerOperationResult(
-                false,
-                "profiles.session_switch",
-                "",
-                "Select a Files session first.");
-        }
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return new ManagerOperationResult(
-                false,
-                "profiles.session_switch",
-                sessionId,
-                "Select a Files profile first.");
-        }
-
-        using var result = await CallToolForJsonAsync(
-            "files_session_switch",
-            new
-            {
-                session_id = sessionId,
-                profile_id = name
-            },
-            cancellationToken);
-
-        var payload = UnwrapData(result.RootElement);
-
-        return new ManagerOperationResult(
-            true,
-            "profiles.session_switch",
-            sessionId,
-            payload.ToString());
-    }
-
     private async Task<ManagerOperationResult> RunLocalProfileMutationAsync(
         string operation,
         string target,

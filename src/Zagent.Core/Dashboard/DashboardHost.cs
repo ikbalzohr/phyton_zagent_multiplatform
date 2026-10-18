@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Http.StaticFiles;
 using Microsoft.AspNetCore.Identity;
 using Zagent.Core.Manager;
 using Zagent.Shared;

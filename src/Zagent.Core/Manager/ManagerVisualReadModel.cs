@@ -121,13 +121,9 @@ public sealed class ManagerVisualReadModel
 
     private static ManagerVisualSnapshot Empty(string? error = null) =>
         new(
-            false,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null, null, 0, null, null, null, null, error);
+            Available: false, Id: null, Source: null, Kind: null, Label: null,
+            CapturedAtUtc: null, MimeType: null, Bytes: 0, DeviceId: null,
+            DeviceName: null, WorkspaceId: null, Sha256: null, Error: error);
 
     private static string? TryComputeOwnerHash(string? principalId, string? workspaceId)
     {

@@ -223,6 +223,38 @@ public sealed record ManagerMachineIdentitySnapshot(
 
 public sealed record ManagerMachineIdentityRenameRequest(string DeviceAlias);
 
+public sealed record ManagerIntegrationSnapshot(
+    string ChromeExtensionStatus,
+    string ChromeNativeBridgeStatus,
+    bool ChromeConnected,
+    bool ChromeAuthorized,
+    bool ChromeNativeAttached,
+    bool ChromeProfileBound,
+    string ChromeProfile,
+    string ArcMapDesktopStatus,
+    string ArcMapAddInStatus,
+    string ArcMapToolsStatus,
+    string ArcMapMcpStatus,
+    string ArcMapBridgeStatus,
+    string ArcMapCurrentMxdStatus,
+    DateTimeOffset CapturedAtUtc)
+{
+    public bool ChromePersistentConsent { get; init; }
+    public bool ChromeReconnectAvailable { get; init; }
+    public int ChromeApprovedTabCount { get; init; }
+    public IReadOnlyList<string> ChromeProfileOptions { get; init; } = Array.Empty<string>();
+}
+
+public sealed record ManagerIntegrationActionRequest(
+    string Action,
+    string? ChromeProfile = null);
+
+public sealed record ManagerIntegrationActionResult(
+    bool Success,
+    string Action,
+    string Message,
+    ManagerIntegrationSnapshot Snapshot);
+
 public sealed record ManagerOperationResult(bool Success, string Operation, string Target, string Message);
 
 public sealed record ManagerHealthSummary(

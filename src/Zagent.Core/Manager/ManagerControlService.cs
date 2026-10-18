@@ -134,10 +134,10 @@ public sealed class ManagerControlService
                     ManagerJson.ToElement(
                         _visual is null
                             ? new ManagerVisualSnapshot(
-                                false, null, null, null, null,
-                                null, null, null, 0,
-                                null, null, null, null,
-                                "Visual store unavailable.")
+                                Available: false, Id: null, Source: null, Kind: null, Label: null,
+                                CapturedAtUtc: null, MimeType: null, Bytes: 0, DeviceId: null,
+                                DeviceName: null, WorkspaceId: null, Sha256: null,
+                                Error: "Visual store unavailable.")
                             : await _visual.GetLatestAsync(
                                 cancellationToken)),
                 "lifecycle.agent" =>
@@ -186,12 +186,6 @@ public sealed class ManagerControlService
                     ManagerJson.ToElement(
                         await SwitchProfileAsync(
                             Require<ManagerProfileSwitchRequest>(
-                                request.Parameters),
-                            cancellationToken)),
-                "profiles.session_switch" =>
-                    ManagerJson.ToElement(
-                        await SwitchSessionProfileAsync(
-                            Require<ManagerSessionProfileSwitchRequest>(
                                 request.Parameters),
                             cancellationToken)),
                 "identity.snapshot" =>
@@ -1214,33 +1208,6 @@ public sealed class ManagerControlService
 
         return result;
     }
-
-    private async Task<ManagerOperationResult> SwitchSessionProfileAsync(
-        ManagerSessionProfileSwitchRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (_files is null)
-        {
-            return new ManagerOperationResult(
-                false,
-                "profiles.session_switch",
-                request.SessionId,
-                "Files profile service is unavailable.");
-        }
-
-        var result = await _files.SwitchSessionProfileAsync(
-            request,
-            cancellationToken);
-
-        _logs.Write(
-            result.Success ? "INFO" : "ERROR",
-            "Files",
-            "profiles.session_switch",
-            request.SessionId + " -> " + request.Name + ": " + result.Message);
-
-        return result;
-    }
-
 
     private async Task<ManagerIntegrationSnapshot> GetIntegrationsAsync(
         CancellationToken cancellationToken)
