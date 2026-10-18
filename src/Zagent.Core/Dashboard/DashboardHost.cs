@@ -91,7 +91,7 @@ public static class DashboardHost
             ctx.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
             ctx.Response.Headers.XContentTypeOptions = "nosniff";
             ctx.Response.Headers.XFrameOptions = "DENY";
-            if (!ctx.Request.IsHttps || !DashboardSecurity.IsExpectedHost(ctx.Request.Host.Value, options.Origin) ||
+            if (!ctx.Request.IsHttps || !DashboardSecurity.IsExpectedHost(ctx.Request.Host.Value ?? "", options.Origin) ||
                 ctx.Connection.RemoteIpAddress is not { } address || !IPAddress.IsLoopback(address)) {
                 ctx.Response.StatusCode = 403; return;
             }

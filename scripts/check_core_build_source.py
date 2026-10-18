@@ -82,5 +82,20 @@ check(not missing, "Manager type lexical audit: " + (", ".join(missing) if missi
 check('.RequireAuthorization("Operator").RequireRateLimiting("commands")' in host and
       'request.Action is not ("chrome.check" or "arcmap.check")' in host,
       "connection action allowlist and role/rate guards retained")
+lifecycle = read("src/Zagent.Core/Manager/ManagerCoreHost.cs")
+channel = read("src/Zagent.Core/Manager/InternalManagementChannel.cs")
+check("private readonly ManagerNamedPipeServer _pipeServer;" in lifecycle and
+      "ManagerNamedPipeServer pipeServer," in lifecycle and "_pipeServer = pipeServer;" in lifecycle,
+      "host owns the pipe passed to its constructor")
+check("add { ControlService.Shutdown.ShutdownRequested += value; }" in lifecycle and
+      "remove { ControlService.Shutdown.ShutdownRequested -= value; }" in lifecycle and
+      "OnPipeShutdown" not in lifecycle,
+      "shutdown event forwards to coordinator without recursion or missing callback")
+check("pipe.Start();" in lifecycle, "maintenance pipe starts after provisioning validation")
+check('parameters["arguments"]?.DeepClone().AsObject() ?? new JsonObject()' in channel,
+      "tool arguments null handling uses one evaluation")
+check('ctx.Request.Host.Value ?? ""' in host, "missing HTTP Host is rejected as empty")
+check("if (_routerManager is null || _tunnel is null ||" in control,
+      "router snapshot guards nullable tunnel reader")
 print("Source-only result: " + ("FAIL" if failures else "PASS") + "; Windows compilation and runtime remain unverified.")
 sys.exit(1 if failures else 0)

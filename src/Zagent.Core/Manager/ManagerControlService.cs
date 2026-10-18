@@ -673,7 +673,7 @@ public sealed class ManagerControlService
     private async Task<ManagerRouterSnapshot> BuildRouterSnapshotAsync(
         CancellationToken cancellationToken)
     {
-        if (_routerManager is null ||
+        if (_routerManager is null || _tunnel is null ||
             !IsAgentDesiredRunning("system.tunnel"))
         {
             return new ManagerRouterSnapshot(

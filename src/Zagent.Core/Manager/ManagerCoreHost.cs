@@ -35,16 +35,19 @@ public sealed record ManagerCoreHostOptions(
 public sealed class ManagerCoreHost : IAsyncDisposable
 {
     private readonly NativeAgentSupervisor _supervisor;
+    private readonly ManagerNamedPipeServer _pipeServer;
     private int _disposed;
     private readonly object _stopSync = new();
     private Task? _stopTask;
 
     private ManagerCoreHost(
         NativeAgentSupervisor supervisor,
+        ManagerNamedPipeServer pipeServer,
         ManagerControlService controlService,
         ManagerCoreHostOptions options)
     {
         _supervisor = supervisor;
+        _pipeServer = pipeServer;
         ControlService = controlService;
         Options = options;
     }
@@ -54,12 +57,10 @@ public sealed class ManagerCoreHost : IAsyncDisposable
     public ManagerCoreHostOptions Options { get; }
 
     public bool IsStopping => _stopTask is not null;
-    private bool _shutdownWired;
-    private void OnShutdownRequested(object? sender, EventArgs args) => ShutdownRequested?.Invoke(this, args);
     public event EventHandler? ShutdownRequested
     {
-        add { ShutdownRequested += value; if (!_shutdownWired) { _shutdownWired = true; ControlService.Shutdown.ShutdownRequested += OnShutdownRequested; } }
-        remove { ShutdownRequested -= value; }
+        add { ControlService.Shutdown.ShutdownRequested += value; }
+        remove { ControlService.Shutdown.ShutdownRequested -= value; }
     }
 
     public static async Task<ManagerCoreHost> CreateAsync(
@@ -818,7 +819,7 @@ public sealed class ManagerCoreHost : IAsyncDisposable
 
             InternalManagementChannel.ValidateProvisioning();
             var host = new ManagerCoreHost(supervisor, pipe, control, options);
-            host.ShutdownRequested += host.OnPipeShutdown;
+            pipe.Start();
             return host;
         }
         catch
@@ -838,7 +839,7 @@ public sealed class ManagerCoreHost : IAsyncDisposable
     {
         await ControlService.StopForShutdownAsync();
         await _pipeServer.DisposeAsync();
-        ShutdownRequested -= OnPipeShutdown;
+
         await _supervisor.StopAllAsync();
     }
 

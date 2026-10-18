@@ -35,7 +35,7 @@ public static class InternalManagementChannel
                 var body = JsonNode.Parse(await request.Content.ReadAsStringAsync(cancellationToken))!;
                 if (body["method"]?.GetValue<string>() == "tools/call" && body["params"] is JsonObject parameters) {
                     var tool = parameters["name"]!.GetValue<string>();
-                    var arguments = parameters["arguments"] is null ? new JsonObject() : parameters["arguments"].DeepClone()!.AsObject();
+                    var arguments = parameters["arguments"]?.DeepClone().AsObject() ?? new JsonObject();
                     var profile = arguments["profile_id"]?.GetValue<string>() ?? arguments["name"]?.GetValue<string>() ?? "appBridge";
                     var context = new JsonObject {
                         ["context_version"] = 1, ["principal_id"] = "windows-management:" + Environment.UserDomainName + "/" + Environment.UserName,
