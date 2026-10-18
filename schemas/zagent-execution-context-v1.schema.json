@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zagent:execution-context:v1",
+  "title": "Zagent trusted internal execution context v1",
+  "description": "Only authoritative after X-Zagent-Internal-Token validation on loopback. Not client MCP metadata. Installation-wide write lock is conservative shared-domain MVP.",
+  "type": "object",
+  "properties": {
+    "principal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "workspace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "installation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "policy_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "required_scope": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "public_tool": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "context_version": {
+      "const": 1
+    },
+    "deadline": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "effective_resources": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "resource_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["files", "browser", "arcmap"]
+          },
+          "profile_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "required": ["resource_id", "kind"],
+        "additionalProperties": false
+      }
+    },
+    "effective_access": {
+      "const": "write"
+    }
+  },
+  "required": [
+    "principal_id",
+    "workspace_id",
+    "device_id",
+    "installation_id",
+    "request_id",
+    "trace_id",
+    "task_id",
+    "operation_id",
+    "policy_revision",
+    "required_scope",
+    "public_tool",
+    "context_version",
+    "deadline",
+    "scopes",
+    "effective_resources",
+    "effective_access"
+  ],
+  "additionalProperties": false
+}

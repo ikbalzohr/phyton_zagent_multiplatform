@@ -1,0 +1,8 @@
+@page
+@{
+    Layout = null;
+}
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Zagent · Sign in</title><link rel="stylesheet" href="/dashboard.css" /></head>
+<body class="login"><main><h1>Zagent UI1</h1><p>Private local management · sign in with the account provisioned by the Windows owner.</p>
+@if (Request.Query.ContainsKey("failed")) { <p role="alert">Sign-in failed. Check the account and password.</p> }
+<form method="post" action="/auth/login">@Html.AntiForgeryToken()<label>Account<input name="account" autocomplete="username" required maxlength="128" /></label><label>Password<input type="password" name="password" autocomplete="current-password" required maxlength="256" /></label><button type="submit">Sign in</button></form><p class="muted">No default credentials. Enrollment and recovery are offline-only.</p></main></body></html>

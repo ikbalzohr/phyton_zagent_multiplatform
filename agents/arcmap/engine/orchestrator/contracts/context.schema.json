@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zagent://arcmap/orchestrator/context.schema.json",
+  "title": "Zagent ArcMap Context DTO",
+  "type": "object",
+  "required": ["schema_version", "available", "collected_at", "source"],
+  "properties": {
+    "schema_version": {"const": "2.0"},
+    "available": {"type": "boolean"},
+    "collected_at": {"type": "number"},
+    "source": {"const": "arcmap-live-readonly"},
+    "errors": {"type": "array", "items": {"type": "object"}},
+    "ping": {"type": ["object", "null"]},
+    "status": {"type": ["object", "null"]},
+    "map": {"type": ["object", "null"]},
+    "layers": {"type": ["object", "array", "null"]},
+    "layout": {"type": ["object", "array", "null"]},
+    "dataframe": {"type": ["object", "null"]},
+    "document_revision": {"type": ["string", "number", "object", "null"]},
+    "fingerprint": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

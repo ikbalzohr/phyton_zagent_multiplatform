@@ -1,0 +1,8 @@
+{
+  "name": "Template Profile Pemantauan Lingkungan",
+  "profile_key": "Pemantauan Lingkungan",
+  "source_reference_mxd": "PETA A4 IPR 01 USAHA BARU SEJAHTERA - PEMANTAUAN LINGKUNGAN.mxd",
+  "status": "reference_profile_pending_live_extraction",
+  "naming_rule": "Profile name follows the MXD suffix after ' - '.",
+  "notes": "Layout/symbology details should be extracted live from the reference MXD in ArcMap before production use."
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "product_line": "zagent-mcp-v1",
+  "suite_version": "1.0.0",
+  "status": "PENDING_WINDOWS_DISCOVERY_RECONCILIATION",
+  "historical_inventory": "docs/history/capability-inventory-baseline-222341c.json",
+  "required_agents": [
+    "files",
+    "web",
+    "arcmap",
+    "tunnel"
+  ],
+  "catalog_policy": {
+    "source": "per-agent runtime-tools.snapshot.json generated from candidate on Windows",
+    "require_unique_tool_names": true,
+    "require_schema_comparison": true,
+    "fixed_historical_total_is_acceptance": false
+  },
+  "evidence": []
+}

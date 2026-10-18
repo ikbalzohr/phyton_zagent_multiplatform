@@ -1,0 +1,721 @@
+{
+  "schema_version": "2.0",
+  "profile_version": "o13.0",
+  "primitives": [
+    {
+      "name": "orchestrator.validate_goal",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "low"
+    },
+    {
+      "name": "orchestrator.resolve_strategy",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "low"
+    },
+    {
+      "name": "orchestrator.file_worker_probe",
+      "kind": "internal",
+      "lane": "file_worker",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "runtime_probe",
+        "evidence": "ArcGISProcessFileWorker.probe"
+      },
+      "runtime": {
+        "process": "arcgis_python27_worker",
+        "bitness": "32"
+      },
+      "licenses": [
+        "ArcGIS Desktop 10.6.1"
+      ],
+      "extensions": [],
+      "reconciliation_probe": "repeat_worker_probe",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcgis_file_worker",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_ping",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_get_status",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_inspect_current_map",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_list_layers",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_list_layout_elements",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_get_dataframe_state",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "arcmap_validate_map_recipe",
+      "kind": "mcp",
+      "lane": "live",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "read",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "baseline_registry_verified",
+        "evidence": "o0_baseline_124.json"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "orchestrator.prepare_strategy_a",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "low"
+    },
+    {
+      "name": "orchestrator.execute_strategy_a",
+      "kind": "internal",
+      "lane": "live",
+      "effect_class": "live_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "postcondition_and_receipt",
+      "rollback_coverage": "checkpoint_required",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "orchestrator.prepare_strategy_b",
+      "kind": "internal",
+      "lane": "file_worker",
+      "effect_class": "file_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "isolated_file_worker",
+        "bitness": "probe_required"
+      },
+      "licenses": [
+        "probe_required"
+      ],
+      "extensions": [
+        "probe_required"
+      ],
+      "reconciliation_probe": "postcondition_and_receipt",
+      "rollback_coverage": "checkpoint_required",
+      "resource_scope": "run_workspace_and_dataset_paths",
+      "estimated_cost_class": "high"
+    },
+    {
+      "name": "orchestrator.prepare_strategy_c",
+      "kind": "internal",
+      "lane": "file_worker",
+      "effect_class": "file_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "isolated_file_worker",
+        "bitness": "probe_required"
+      },
+      "licenses": [
+        "probe_required"
+      ],
+      "extensions": [
+        "probe_required"
+      ],
+      "reconciliation_probe": "postcondition_and_receipt",
+      "rollback_coverage": "checkpoint_required",
+      "resource_scope": "run_workspace_and_dataset_paths",
+      "estimated_cost_class": "high"
+    },
+    {
+      "name": "orchestrator.prepare_layout_only",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "low"
+    },
+    {
+      "name": "orchestrator.final_validate",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "low"
+    },
+    {
+      "name": "orchestrator.publish",
+      "kind": "internal",
+      "lane": "file_worker",
+      "effect_class": "publish",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "unit_contract"
+      },
+      "runtime": {
+        "process": "isolated_file_worker",
+        "bitness": "probe_required"
+      },
+      "licenses": [
+        "probe_required"
+      ],
+      "extensions": [
+        "probe_required"
+      ],
+      "reconciliation_probe": "artifact_and_publish_journal",
+      "rollback_coverage": "backup_or_version_policy",
+      "resource_scope": "run_workspace_and_dataset_paths",
+      "estimated_cost_class": "high"
+    },
+    {
+      "name": "orchestrator.compile_cartographic_spec",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": true,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "implementation"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "revalidate_context",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "low"
+    },
+    {
+      "name": "orchestrator.create_persistent_mxd_checkpoint",
+      "kind": "internal",
+      "lane": "live",
+      "effect_class": "live_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "implementation"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "persistent_checkpoint_exists",
+      "rollback_coverage": "persistent_mxd_checkpoint",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "orchestrator.execute_strategy_d",
+      "kind": "internal",
+      "lane": "live",
+      "effect_class": "live_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "implementation"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "cartographic_program_receipt",
+      "rollback_coverage": "persistent_mxd_checkpoint",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "high"
+    },
+    {
+      "name": "orchestrator.cartographic_visual_qa",
+      "kind": "internal",
+      "lane": "pure",
+      "effect_class": "read",
+      "dry_run_eligible": false,
+      "idempotency_class": "pure",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "implementation"
+      },
+      "runtime": {
+        "process": "python3_mcp",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "visual_qa_report",
+      "rollback_coverage": "not_required",
+      "resource_scope": "orchestrator_run",
+      "estimated_cost_class": "medium"
+    },
+    {
+      "name": "orchestrator.cartographic_bounded_repair",
+      "kind": "internal",
+      "lane": "live",
+      "effect_class": "live_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "implementation"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "repair_receipt",
+      "rollback_coverage": "persistent_mxd_checkpoint",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "high"
+    },
+    {
+      "name": "orchestrator.save_current_mxd_in_place",
+      "kind": "internal",
+      "lane": "live",
+      "effect_class": "live_write",
+      "dry_run_eligible": false,
+      "idempotency_class": "reconcile_required",
+      "input_schema": {
+        "type": "object"
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "availability": {
+        "status": "source_declared",
+        "evidence": "implementation"
+      },
+      "runtime": {
+        "process": "arcmap_live_adapter",
+        "bitness": "not_applicable"
+      },
+      "licenses": [],
+      "extensions": [],
+      "reconciliation_probe": "saved_document_identity",
+      "rollback_coverage": "persistent_mxd_checkpoint",
+      "resource_scope": "arcmap_document_revision",
+      "estimated_cost_class": "medium"
+    }
+  ],
+  "facades": [
+    {
+      "name": "arcmap_goal_build_map",
+      "effect_class": "mode_dependent",
+      "requires_authoritative_owner": true,
+      "durable_runtime_required_for_write": true
+    },
+    {
+      "name": "arcmap_goal_plan",
+      "effect_class": "read",
+      "requires_authoritative_owner": false,
+      "durable_runtime_required_for_write": false
+    },
+    {
+      "name": "arcmap_goal_validate",
+      "effect_class": "read",
+      "requires_authoritative_owner": false,
+      "durable_runtime_required_for_write": false
+    },
+    {
+      "name": "arcmap_goal_execute",
+      "effect_class": "plan_dependent",
+      "requires_authoritative_owner": true,
+      "durable_runtime_required_for_write": true
+    },
+    {
+      "name": "arcmap_goal_status",
+      "effect_class": "read",
+      "requires_authoritative_owner": true,
+      "durable_runtime_required_for_write": false
+    },
+    {
+      "name": "arcmap_goal_resume",
+      "effect_class": "control",
+      "requires_authoritative_owner": true,
+      "durable_runtime_required_for_write": true
+    },
+    {
+      "name": "arcmap_goal_cancel",
+      "effect_class": "control",
+      "requires_authoritative_owner": true,
+      "durable_runtime_required_for_write": true
+    },
+    {
+      "name": "arcmap_goal_report",
+      "effect_class": "read",
+      "requires_authoritative_owner": true,
+      "durable_runtime_required_for_write": false
+    }
+  ],
+  "cartographic_orchestrator": {
+    "strategy": "D_CURRENT_MXD_IN_PLACE_CARTOGRAPHY",
+    "capability_manifest": "orchestrator/cartography/capability_manifest.json",
+    "capability_count": 17,
+    "status": "CODE_IMPLEMENTED_NOT_TESTED",
+    "public_tool_delta": 0
+  }
+}

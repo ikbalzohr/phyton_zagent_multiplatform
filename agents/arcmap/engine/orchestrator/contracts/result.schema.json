@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zagent://arcmap/orchestrator/result.schema.json",
+  "title": "Zagent ArcMap Orchestrator Result",
+  "type": "object",
+  "required": [
+    "ok",
+    "status"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "PREFLIGHT",
+        "QUEUED",
+        "RUNNING",
+        "VALIDATING",
+        "STAGING",
+        "STAGING_READY",
+        "STAGED",
+        "PUBLISHING",
+        "PUBLISHED",
+        "SUCCEEDED",
+        "BLOCKED",
+        "WAITING_FOR_REVIEW",
+        "REPAIRING",
+        "CANCEL_REQUESTED",
+        "RECONCILING",
+        "FAILED",
+        "CANCELLED",
+        "ROLLED_BACK",
+        "RECOVERY_REQUIRED",
+        "ARTIFACT_INVALID",
+        "PUBLISH_PARTIAL",
+        "INVALID",
+        "NOT_IMPLEMENTED",
+        "TEMPLATE_ONLY"
+      ]
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plan_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plan_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "errors": {
+      "type": "array"
+    },
+    "warnings": {
+      "type": "array"
+    },
+    "blockers": {
+      "type": "array"
+    },
+    "artifacts": {
+      "type": "array"
+    },
+    "data": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "strategy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "project_root": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "document_path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "checkpoint_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "checkpoint_mxd": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "specification": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "cartographic_metrics": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "visual_qa": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "repair_receipts": {
+      "type": "array"
+    },
+    "save": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "artifact_gate": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "publish": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "acceptance": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

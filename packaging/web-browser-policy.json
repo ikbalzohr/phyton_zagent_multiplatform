@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "product": "Zagent Web",
+  "browser_policy": {
+    "google_chrome": {
+      "mode": "external_installed_browser",
+      "supported": true,
+      "bundled": false,
+      "preferred_runtime": "native_attach + Chrome Bridge/CDP"
+    },
+    "chromium": {
+      "supported": false,
+      "bundled": false,
+      "install_download_allowed": false,
+      "fallback_allowed": false
+    },
+    "firefox": {
+      "supported": false,
+      "bundled": false,
+      "install_download_allowed": false
+    },
+    "webkit": {
+      "supported": false,
+      "bundled": false,
+      "install_download_allowed": false
+    }
+  },
+  "packaging_exclusions": [
+    "playwright-browsers-*/chromium-*",
+    "playwright-browsers-*/chromium_headless_shell-*",
+    "playwright-browsers-*/firefox-*",
+    "playwright-browsers-*/webkit-*",
+    "playwright-browsers-*/winldd-*"
+  ],
+  "note": "Zagent Web is Chrome-only. Playwright's internal chromium API is retained only to control external Google Chrome via channel=chrome or CDP. FFmpeg remains bundled for Chrome video recording.",
+  "runtime_helpers": {
+    "ffmpeg": {
+      "bundled": true,
+      "reason": "Required by Playwright video recording so Chrome video capability is preserved."
+    }
+  }
+}

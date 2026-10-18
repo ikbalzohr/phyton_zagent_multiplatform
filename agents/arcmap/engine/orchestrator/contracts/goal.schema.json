@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zagent://arcmap/orchestrator/goal.schema.json",
+  "title": "Zagent ArcMap Goal",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "goal_type",
+    "raw_goal",
+    "target_mode"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "goal_type": {
+      "enum": [
+        "build_map",
+        "layout_only"
+      ]
+    },
+    "language": {
+      "type": "string",
+      "default": "id"
+    },
+    "raw_goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "interpreted_goal": {
+      "type": "string"
+    },
+    "target_mode": {
+      "enum": [
+        "CURRENT",
+        "CURRENT_IN_PLACE",
+        "TEMPLATE",
+        "NEW_DOCUMENT"
+      ]
+    },
+    "data_root": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "template_mxd": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target_disposable": {
+      "type": "boolean",
+      "default": false
+    },
+    "required_layer_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "map_type": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "style_profile": {
+      "type": [
+        "string",
+        "object",
+        "null"
+      ]
+    },
+    "recipe": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "profile": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "company_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "blank_seed_mxd": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "arcgis_desktop_root": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "aoi": {
+      "type": [
+        "object",
+        "string",
+        "null"
+      ]
+    },
+    "crs": {
+      "type": [
+        "object",
+        "string",
+        "null"
+      ]
+    },
+    "datum": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "units": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "accuracy_policy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "source_policy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "paper": {
+          "const": "A4"
+        },
+        "orientation": {
+          "enum": [
+            "portrait",
+            "landscape"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "formats": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "PDF",
+              "PNG"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "dpi": {
+          "type": "integer",
+          "minimum": 72,
+          "maximum": 2400
+        },
+        "save_mxd": {
+          "type": "boolean"
+        },
+        "output_dir": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "overwrite_policy": {
+          "enum": [
+            "deny",
+            "version",
+            "overwrite"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "save_policy": {
+      "enum": [
+        "none",
+        "copy",
+        "overwrite"
+      ]
+    },
+    "dry_run": {
+      "type": "boolean",
+      "default": true
+    },
+    "max_repair_cycles": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3,
+      "default": 3
+    },
+    "deadline_seconds": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "budget": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "accepted_warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptance_rules": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "source_edit_policy": {
+      "enum": [
+        "read_only",
+        "working_copy",
+        "in_place"
+      ],
+      "default": "read_only"
+    },
+    "cartographic_profile": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "profile_overrides": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "reference_analysis": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "datasets": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "dataset_samples": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "administrative_location": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "project_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "year": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1900,
+      "maximum": 2200
+    },
+    "spatial_reference": {
+      "type": [
+        "object",
+        "string",
+        "null"
+      ]
+    },
+    "persistence": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "visual_feedback": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "reference_image": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ignore_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cartographic_notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dataframe_state": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "project_root": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ignore_datasets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_frame": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "feature_counts": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": [
+          "integer",
+          "number"
+        ]
+      }
+    },
+    "output_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "discovery_skip_dirs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "max_discovery_items": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "visual_preview_dpi": {
+      "type": "integer",
+      "minimum": 72,
+      "maximum": 600
+    },
+    "visual_feedback_by_cycle": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "work_on_active_mxd": {
+      "type": "boolean"
+    },
+    "reference_policy": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "cartographic_preset": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

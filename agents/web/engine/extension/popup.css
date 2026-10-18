@@ -1,0 +1,14 @@
+:root{font:13px/1.5 system-ui,sans-serif;color:#ecf1fa;background:#111929}
+*{box-sizing:border-box}
+body{width:330px;margin:0}
+main{padding:22px}
+h1{font-size:18px;line-height:1.3;margin:0 0 12px}
+#profile{color:#9cbbec;overflow-wrap:anywhere}
+#status{font-weight:700}
+#notice{font-size:11px;color:#b2c0d3;line-height:1.55;margin:16px 0}
+.actions{display:flex;gap:10px}
+button{flex:1;padding:12px;border:1px solid #58657a;border-radius:10px;background:#243248;color:inherit;font-weight:700;cursor:pointer}
+button.primary{background:#96e8ca;border-color:#96e8ca;color:#112d25}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible{outline:2px solid #9ad8ff;outline-offset:3px}
+#error{color:#ffb4ad;overflow-wrap:anywhere;font-size:12px}

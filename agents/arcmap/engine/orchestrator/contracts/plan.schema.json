@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zagent://arcmap/orchestrator/plan.schema.json",
+  "title": "Zagent ArcMap Execution Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_id", "plan_hash", "strategy", "goal", "nodes", "blockers"],
+  "properties": {
+    "schema_version": {"const": "2.0"},
+    "plan_id": {"type": "string"},
+    "plan_hash": {"type": "string"},
+    "strategy": {"enum": ["A_EXISTING_MXD", "B_TEMPLATE_DATA", "C_BLANK_DATA", "D_LAYOUT_ONLY", "D_CURRENT_MXD_IN_PLACE_CARTOGRAPHY"]},
+    "goal": {"type": "object"},
+    "context_fingerprint": {"type": ["string", "null"]},
+    "tool_manifest_hash": {"type": "string"},
+    "profile_version": {"type": "string"},
+    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "blockers": {"type": "array", "items": {"type": "object"}},
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["step_id", "action", "dependencies", "lane", "effect_class", "dry_run_eligible"],
+        "properties": {
+          "step_id": {"type": "string"},
+          "action": {"type": "string"},
+          "arguments": {"type": "object"},
+          "dependencies": {"type": "array", "items": {"type": "string"}},
+          "lane": {"enum": ["pure", "live", "file_worker"]},
+          "effect_class": {"enum": ["read", "live_write", "file_write", "save", "export", "publish"]},
+          "dry_run_eligible": {"type": "boolean"},
+          "preconditions": {"type": "array"},
+          "postconditions": {"type": "array"},
+          "resource_set": {"type": "array"},
+          "timeout_seconds": {"type": "integer", "minimum": 1},
+          "retry_class": {"type": "string"},
+          "evidence": {"type": "array"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

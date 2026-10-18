@@ -1,0 +1,14 @@
+{
+  "stop_on_error": false,
+  "jobs": [
+    {
+      "template_mxd": "<select-template-mxd>",
+      "data_root": "D:\\PROYEK\\MEGA_MUJUR\\DATA",
+      "output_dir": "D:\\PROYEK\\MEGA_MUJUR\\OUTPUT",
+      "recipe": "config/recipes/peta_administrasi_a4.example.json",
+      "profile": "config/profiles/administrasi_a4.json",
+      "base_name": "PETA_A4_MEGA_MUJUR_ADMINISTRASI",
+      "save_mxd": true
+    }
+  ]
+}

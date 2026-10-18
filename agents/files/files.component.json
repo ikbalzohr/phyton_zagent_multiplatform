@@ -1,0 +1,98 @@
+{
+    "schema_version":  "1.0",
+    "id":  "files.service",
+    "product":  "Zagent Files",
+    "version": "1.0.0",
+    "baseline":  {
+                     "source_component":  "Files 3.2.0",
+                     "frozen_baseline":  "_baseline_private\\files-3.2.0",
+                     "baseline_sha256":  "fe20d1144ea78ef7f3ce65aae6cb1ff37fb5819366bb30bcff01f4ae772dc2a2"
+                 },
+    "fingerprint_status":"BASELINE_VALUES_RETAINED_RECOMPUTE_BEFORE_RELEASE",
+    "engine":  {
+                   "relative_path":  "agents\\files\\engine",
+                   "runtime":  "Python 3.11",
+                   "entrypoint":  "app.core.run_mcp",
+                   "source_files_in_fingerprint":  16,
+                   "aggregate_sha256":  "c7cba73fe1fdbc5bf4b4c4735b97567c5d8a3b03861da099558439eb46b9466d",
+                   "mutable_state_in_source_root":  false,
+                   "path_source_of_truth":  "app.paths"
+               },
+    "lifecycle":  {
+                      "owner":  "Zagent Core / NativeAgentSupervisor",
+                      "process_id":  "files.service",
+                      "auto_restart":  true,
+                      "max_restart_attempts":  3,
+                      "job_object_owned":  true
+                  },
+    "paths":  {
+                  "engine_root_env":  "ZAGENT_FILES_ENGINE_ROOT",
+                  "data_root_env":  "ZAGENT_FILES_DATA_ROOT",
+                  "config_root_env":  "ZAGENT_FILES_CONFIG_DIR",
+                  "runtime_root_env":  "ZAGENT_FILES_RUNTIME_DIR",
+                  "log_root_env":  "ZAGENT_FILES_LOG_DIR",
+                  "backup_root_env":  "ZAGENT_FILES_BACKUP_ROOT",
+                  "update_state_root_env":  "ZAGENT_FILES_UPDATE_STATE_ROOT",
+                  "production_default_profile":  "\u003cInstallRoot\u003e\\workspace"
+              },
+    "profiles":  {
+                     "model":  "approved sandbox profiles",
+                     "default_install_profile":  "pre-authorized by installer/Core",
+                     "permission_escalation":  "explicit local approval required",
+                     "session_scoped": false,
+                     "workspace_principal_scoped": true,
+                     "durable_session_recovery":  true,
+                     "global_default_scope":  "new sessions only",
+                     "existing_session_root_sticky":  true,
+                     "explicit_session_switch":  true
+                 },
+    "command_layer":  {
+                          "version":  "3.1.3",
+                          "metadata_namespace":  "zagent.*",
+                          "process_env_namespace":  "ZAGENT_*",
+                          "powershell_policy":  "deny-list plus executable allow-list",
+                          "command_cancel":  true,
+                          "managed_process_control": false,
+                          "public_command_execution": false,
+                          "process_start_stop_race_fix":  "CIM visibility retry for newly started managed processes"
+                      },
+    "updates":  {
+                    "staging_owner":  "Zagent Files",
+                    "validation_owner":  "Zagent Files",
+                    "apply_rollback_owner":  "Zagent Core",
+                    "broker":  "FilesUpdateRequestProcessor",
+                    "request_state":  "data\\updates\\requests",
+                    "backup_and_rollback":  true,
+                    "engine_self_restart_disabled":  true
+                },
+    "public_tools":  {
+                         "count":  71,
+                         "snapshot":  "agents\\files\\runtime-tools.snapshot.json",
+                         "capability_registry_count":  71,
+                         "naming":  "public MCP files_*; internal capability files.*"
+                     },
+    "baseline_integration":  {
+                        "tunnel_service_id":  "zagent_files",
+                        "tunnel_namespace":  "files",
+                        "routed_tool_count_with_tunnel_management":  79,
+                        "tunnel_to_files_ping":  "PASS"
+                    },
+    "validation": {"status":"NOT_RUN", "reason":"Tests/build/runtime explicitly deferred to Windows"},
+    "execution_context": {"version":1,"internal_channel":"X-Zagent-Internal-Token / ZAGENT_INTERNAL_TOKEN", "public_metadata_is_authority":false},
+    "baseline_validation":  {
+                       "files_tests":  "18/18 PASS",
+                       "session_profile_sync_regression":  "PASS",
+                       "tunnel_files_integration":  "1/1 PASS",
+                       "release_build":  "PASS_0_WARNINGS_0_ERRORS",
+                       "python_compile":  "PASS",
+                       "legacy_branding_source_hits":  0
+                   },
+    "production_packaging_note":  "Bundle/manage a Python 3.11 runtime plus Files Python dependencies; do not depend on legacy ZohrFiles .venv on target PCs.",
+    "upgrade_profile_preservation":  {
+                                         "status":  "ZA-BUG-012_RESOLVED_SOURCE_RC4_VALIDATION_PENDING",
+                                         "preserves_authorized_profiles":  true,
+                                         "preserves_active_profile":  true,
+                                         "rejects_unapproved_profile_promotion":  true,
+                                         "regression":  "PASS_CONFIGURATION_WRITER_PROFILE_PRESERVATION"
+                                     }
+}

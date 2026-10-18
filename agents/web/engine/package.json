@@ -1,0 +1,37 @@
+{
+  "name": "zagent-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Zagent Web - Google Chrome automation through native Chrome Bridge, CDP, and managed Chrome launch paths",
+  "engines": {
+    "node": ">=20.18.0 <27"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start:prod": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "bridge:pair": "node scripts/bridge-pair.mjs",
+    "bridge:test": "node --import tsx --test tests/bridge.test.ts tests/bridge-wait-flow.test.ts tests/extension.test.mjs tests/gate.test.ts tests/native-attach-coordinator.test.ts tests/popup.test.mjs",
+    "bridge:build": "npm run build && node scripts/extension-build.mjs",
+    "runtime:install-ffmpeg": "playwright-core install ffmpeg",
+    "visual:frame:smoke": "tsx tests/visual-frame-smoke.manual.ts",
+    "regression:test": "node --import tsx --test tests/execution-context.test.ts tests/bridge.test.ts tests/bridge-wait-flow.test.ts tests/bridge-idempotent-request.test.ts tests/extension.test.mjs tests/extension-priority-queue.test.mjs tests/pair-accept-priority.test.mjs tests/gate.test.ts tests/tools-regression.test.ts tests/native-attach-coordinator.test.ts tests/native-chrome-cdp-validation.test.ts tests/popup.test.mjs tests/zagent-adaptation.test.ts tests/visual-store.test.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/node": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "pixelmatch": "^7.1.0",
+    "playwright-core": "1.63.0",
+    "pngjs": "^7.0.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.0"
+  }
+}

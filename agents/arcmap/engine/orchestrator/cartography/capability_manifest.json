@@ -1,0 +1,214 @@
+{
+  "schema_version": "1.0",
+  "capability_set": "Zagent ArcMap Orchestrator Cartography O13",
+  "strategy": "D_CURRENT_MXD_IN_PLACE_CARTOGRAPHY",
+  "implementation_status": "CODE_IMPLEMENTED_NOT_TESTED",
+  "public_mcp_tool_count_change": 0,
+  "public_mcp_registry_target": 132,
+  "profiles": [
+    "administration_a4_landscape",
+    "administration_a4_portrait",
+    "location_a4_landscape",
+    "thematic_a4_landscape",
+    "simple_a4_landscape"
+  ],
+  "presets": [
+    "administration_reference_a4",
+    "administration_a4",
+    "location_a4",
+    "thematic_a4"
+  ],
+  "persistence_flow": [
+    "CURRENT MXD active in project root",
+    "persistent recovery checkpoint",
+    "compose in CURRENT",
+    "visual QA",
+    "bounded repair <= 3 cycles",
+    "render staging PDF/PNG",
+    "artifact gate",
+    "save same CURRENT MXD path",
+    "publish to Hasil Peta",
+    "cartographic acceptance"
+  ],
+  "coverage": [
+    {
+      "id": 1,
+      "capability": "Cartographic Layout Composer",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/layout.py",
+        "cartography/service.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 2,
+      "capability": "Dynamic creation of layout elements",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "arcmap_bridge/features/cartographic_program.py",
+        "stage3/bridge.py"
+      ]
+    },
+    {
+      "id": 3,
+      "capability": "Inset map orchestration",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/insets.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 4,
+      "capability": "Automatic grid/graticule",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/scale_grid.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 5,
+      "capability": "Dynamic scale engine",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/scale_grid.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 6,
+      "capability": "Label placement and collision management",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/labels.py",
+        "cartography/label_collision.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 7,
+      "capability": "Symbology reasoner and visual hierarchy",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/symbology.py",
+        "cartography/profiles.py",
+        "cartography/semantics.py"
+      ]
+    },
+    {
+      "id": 8,
+      "capability": "Reference-image driven target",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/reference.py",
+        "cartography/reference_contract.py",
+        "cartography/reference_adapter.py",
+        "cartography/visual_inspector.py"
+      ]
+    },
+    {
+      "id": 9,
+      "capability": "Cartographic visual QA",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/visual_qa.py",
+        "cartography/vision_feedback.py",
+        "cartography/visual_inspector.py"
+      ]
+    },
+    {
+      "id": 10,
+      "capability": "Bounded visual repair",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/repair.py",
+        "arcmap_bridge/features/cartographic_program.py",
+        "executor/strategy_d.py"
+      ]
+    },
+    {
+      "id": 11,
+      "capability": "CURRENT MXD in-place strategy",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "executor/strategy_d.py",
+        "compiler/compiler.py",
+        "workflow_live_adapter.py",
+        "workflow_executor.py",
+        "workflow_runtime.py"
+      ]
+    },
+    {
+      "id": 12,
+      "capability": "Semantic project/dataset interpretation",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/discovery.py",
+        "cartography/semantics.py",
+        "cartography/intent.py"
+      ]
+    },
+    {
+      "id": 13,
+      "capability": "Administrative location reasoning",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/administration.py",
+        "cartography/semantics.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 14,
+      "capability": "CRS and provenance metadata block generator",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/metadata.py",
+        "arcmap_bridge/features/cartographic_program.py"
+      ]
+    },
+    {
+      "id": 15,
+      "capability": "Template-independent cartographic production",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/service.py",
+        "arcmap_bridge/features/cartographic_program.py",
+        "executor/strategy_d.py"
+      ]
+    },
+    {
+      "id": 16,
+      "capability": "Cartographic style/profile/preset system",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/profiles.py",
+        "cartography/profile_selector.py",
+        "cartography/presets.py"
+      ]
+    },
+    {
+      "id": 17,
+      "capability": "Final cartographic visual acceptance gate",
+      "status": "IMPLEMENTED",
+      "sources": [
+        "cartography/acceptance.py",
+        "executor/strategy_d.py",
+        "reporting/report.py"
+      ]
+    }
+  ],
+  "known_deferred_bugs": [
+    "BUG-ARCMAP-STAGE2-001: Stage2 ArcGIS 10.6 Layer double-wrapping",
+    "BUG-ARCMAP-STAGE2-002: Stage2 discover_data MCP wrapper failure while direct engine succeeds"
+  ],
+  "validation_state": {
+    "unit_tests": "NOT_RUN_BY_USER_REQUEST",
+    "integration_tests": "NOT_RUN_BY_USER_REQUEST",
+    "live_arcmap_test": "NOT_RUN_BY_USER_REQUEST",
+    "regression_test": "NOT_RUN_BY_USER_REQUEST",
+    "build": "NOT_RUN_BY_USER_REQUEST"
+  }
+}

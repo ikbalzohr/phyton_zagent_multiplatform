@@ -1,0 +1,31 @@
+{
+  "name": "Administrasi_A4_Mega_Mujur_Reference",
+  "description": "Profile Stage 2 yang sesuai dengan struktur layout template administrasi yang sedang dipakai pada pengujian CV Mega Mujur.",
+  "required_layout_elements": [
+    "Legend",
+    "North Arrow",
+    "Double Alternating Scale Bar",
+    "Layers",
+    "New Data Frame",
+    "New Data Frame 2"
+  ],
+  "layout": {
+    "text_items": [
+      {
+        "index": 19,
+        "type": "TEXT_ELEMENT",
+        "value": "PETA {map_type}",
+        "font_size": 13
+      }
+    ]
+  },
+  "legend": {
+    "name": "Legend",
+    "title": " ",
+    "auto_add": true,
+    "columns": 1,
+    "max_columns": 3,
+    "allow_expand_height": true,
+    "expand_step": 0.3
+  }
+}

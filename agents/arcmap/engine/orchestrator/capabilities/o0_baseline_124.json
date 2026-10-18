@@ -1,0 +1,3378 @@
+{
+  "schema_version": "o0.1",
+  "source": "installed-runtime",
+  "count": 124,
+  "tools": [
+    {
+      "name": "arcmap_add_layer",
+      "description": "Add a layer to CURRENT MXD without saving it.",
+      "parameters": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "position": {
+            "default": "AUTO_ARRANGE",
+            "title": "Position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "arcmap_add_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "c87eff47ee68f483b8daba79edc97d78683c617c25eae8ab660eabf6b235fffc"
+    },
+    {
+      "name": "arcmap_add_temporary_layer",
+      "description": "Add a session-scoped temporary layer that can only be removed with its returned token.",
+      "parameters": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "position": {
+            "default": "AUTO_ARRANGE",
+            "title": "Position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "arcmap_add_temporary_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "c6b5ecdaa64d31d9ad07f531a841c2539363086a62d367f53b445a955351bda5"
+    },
+    {
+      "name": "arcmap_agent_safety_status",
+      "description": "Return Zagent ArcMap safety policy. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_agent_safety_statusArguments",
+        "type": "object"
+      },
+      "schema_sha256": "51acafbc8185f52b13711ecfd39aa7db2593d3779c38f9ebb51ae7616c8fa4df"
+    },
+    {
+      "name": "arcmap_apply_layout_recipe",
+      "description": "Apply multiple layout updates as one reversible live batch.",
+      "parameters": {
+        "properties": {
+          "updates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Updates",
+            "type": "array"
+          },
+          "atomic": {
+            "default": true,
+            "title": "Atomic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "updates"
+        ],
+        "title": "arcmap_apply_layout_recipeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "5a120094540581c3edfb81af6be9289c8c4965f221c18127d3406ecea558feb7"
+    },
+    {
+      "name": "arcmap_apply_map_recipe",
+      "description": "Apply a reversible full-map recipe. On atomic failure, live state and captured styles are restored.",
+      "parameters": {
+        "properties": {
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          },
+          "atomic": {
+            "default": true,
+            "title": "Atomic",
+            "type": "boolean"
+          },
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recipe"
+        ],
+        "title": "arcmap_apply_map_recipeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6c2f0ba0b9e2483592d8d5789772054a7169d1ad2bedfb174afe564c350616a0"
+    },
+    {
+      "name": "arcmap_apply_symbology_from_layer",
+      "description": "Apply symbology from a .lyr file to a target layer live.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "source_layer_file": {
+            "title": "Source Layer File",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "source_layer_file"
+        ],
+        "title": "arcmap_apply_symbology_from_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "34dc2d530cb080713958d94b0f585e5c3f6791847d78f78641fab899bc5e5684"
+    },
+    {
+      "name": "arcmap_buffer",
+      "description": "Run ArcGIS Buffer. Blocked by default until geoprocessing is enabled.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "distance": {
+            "title": "Distance",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "dissolve_option": {
+            "default": "NONE",
+            "title": "Dissolve Option",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "output_path",
+          "distance"
+        ],
+        "title": "arcmap_bufferArguments",
+        "type": "object"
+      },
+      "schema_sha256": "f6b53eb8dee791e533eaa4f1b7946913dbd13579e85b720423449460b25d8fea"
+    },
+    {
+      "name": "arcmap_capture_layer_style",
+      "description": "Capture layer symbology into a session-owned .lyr snapshot under Work. Does not save MXD.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_capture_layer_styleArguments",
+        "type": "object"
+      },
+      "schema_sha256": "569c4fd2a0f39c8b1aeb143283b35e283af8022d9120dc5b0f44b4481caeade5"
+    },
+    {
+      "name": "arcmap_clear_selection",
+      "description": "Clear feature selection on a layer.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_clear_selectionArguments",
+        "type": "object"
+      },
+      "schema_sha256": "976d6fe7b63c327b8b6c8e2d42df6e2d0daf356c41873d04c6587f9e27953de2"
+    },
+    {
+      "name": "arcmap_clip",
+      "description": "Run ArcGIS Clip. Blocked by default until geoprocessing is enabled.",
+      "parameters": {
+        "properties": {
+          "input_layer": {
+            "title": "Input Layer",
+            "type": "string"
+          },
+          "clip_layer": {
+            "title": "Clip Layer",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input_layer",
+          "clip_layer",
+          "output_path"
+        ],
+        "title": "arcmap_clipArguments",
+        "type": "object"
+      },
+      "schema_sha256": "c5170d0ac88641906b65aa7fa4908dd5802200b6986dd4cd97be61a92956dee0"
+    },
+    {
+      "name": "arcmap_compare_layer_extents",
+      "description": "Compare two layer bounding boxes and overlap ratios. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_a": {
+            "title": "Layer A",
+            "type": "string"
+          },
+          "layer_b": {
+            "title": "Layer B",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_a",
+          "layer_b"
+        ],
+        "title": "arcmap_compare_layer_extentsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "d592258e843bbf1ae79899fac2aa6687a2146702b108bfe6ec205f1f7f5f6b20"
+    },
+    {
+      "name": "arcmap_create_file_gdb",
+      "description": "Create a File Geodatabase. Blocked while geoprocessing is disabled.",
+      "parameters": {
+        "properties": {
+          "out_folder": {
+            "title": "Out Folder",
+            "type": "string"
+          },
+          "gdb_name": {
+            "title": "Gdb Name",
+            "type": "string"
+          },
+          "version": {
+            "default": "CURRENT",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "out_folder",
+          "gdb_name"
+        ],
+        "title": "arcmap_create_file_gdbArguments",
+        "type": "object"
+      },
+      "schema_sha256": "d70b72acfb583219a7353e6126408503b20775588debf497b0e74337b7326d0a"
+    },
+    {
+      "name": "arcmap_delete_style_snapshot",
+      "description": "Delete only a session-owned style snapshot file.",
+      "parameters": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "arcmap_delete_style_snapshotArguments",
+        "type": "object"
+      },
+      "schema_sha256": "834fb994b2ae9bd8047daa9eaa24caa086097e64d23d153f214fddf23302f326"
+    },
+    {
+      "name": "arcmap_dissolve",
+      "description": "Run ArcGIS Dissolve. Blocked by default until geoprocessing is enabled.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "dissolve_fields": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Dissolve Fields",
+            "type": "array"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "output_path"
+        ],
+        "title": "arcmap_dissolveArguments",
+        "type": "object"
+      },
+      "schema_sha256": "0461adc694a3250c7ae484b977fe04d79ab8128473747b3a888b7eb1e89cb15b"
+    },
+    {
+      "name": "arcmap_erase_features",
+      "description": "Erase features to a new dataset. Blocked while geoprocessing is disabled.",
+      "parameters": {
+        "properties": {
+          "input_layer": {
+            "title": "Input Layer",
+            "type": "string"
+          },
+          "erase_layer": {
+            "title": "Erase Layer",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input_layer",
+          "erase_layer",
+          "output_path"
+        ],
+        "title": "arcmap_erase_featuresArguments",
+        "type": "object"
+      },
+      "schema_sha256": "532f928565277d058ed630d5ba7aac49d838f35b8db5a69004d6725c99806e26"
+    },
+    {
+      "name": "arcmap_export_bundle",
+      "description": "Export PDF/PNG/JPEG as one bundle without saving the MXD.",
+      "parameters": {
+        "properties": {
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "base_name": {
+            "title": "Base Name",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 400,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "jpeg_quality": {
+            "default": 90,
+            "title": "Jpeg Quality",
+            "type": "integer"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          },
+          "include_pdf": {
+            "default": true,
+            "title": "Include Pdf",
+            "type": "boolean"
+          },
+          "include_png": {
+            "default": true,
+            "title": "Include Png",
+            "type": "boolean"
+          },
+          "include_jpeg": {
+            "default": false,
+            "title": "Include Jpeg",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_dir",
+          "base_name"
+        ],
+        "title": "arcmap_export_bundleArguments",
+        "type": "object"
+      },
+      "schema_sha256": "69c7a1b26d9f63bb6806ec3c2fe6a0e49b0257cfde415400b2ff00df6266bdd1"
+    },
+    {
+      "name": "arcmap_export_data_driven_pages_pdf",
+      "description": "Export Data Driven Pages to PDF when DDP is enabled.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "page_range_type": {
+            "default": "ALL",
+            "title": "Page Range Type",
+            "type": "string"
+          },
+          "page_range_string": {
+            "default": "",
+            "title": "Page Range String",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_export_data_driven_pages_pdfArguments",
+        "type": "object"
+      },
+      "schema_sha256": "9ebb9acffc6be7585f2272f9900524aa5e03c7496d123b6a1f7da2c2dbbe3c63"
+    },
+    {
+      "name": "arcmap_export_jpeg",
+      "description": "Export CURRENT layout to JPEG. Does not save MXD.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 400,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "jpeg_quality": {
+            "default": 90,
+            "title": "Jpeg Quality",
+            "type": "integer"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_export_jpegArguments",
+        "type": "object"
+      },
+      "schema_sha256": "3e06756f05c13567949392791fd72d06beb12d3ae11cd0e5dd50cf31265cdb3a"
+    },
+    {
+      "name": "arcmap_export_pdf",
+      "description": "Export CURRENT layout to PDF. Does not save MXD.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 400,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_export_pdfArguments",
+        "type": "object"
+      },
+      "schema_sha256": "97ef1d9c4d40ad6931808d3107ade70749062efb6711f62102a8ecbd342104ff"
+    },
+    {
+      "name": "arcmap_export_png",
+      "description": "Export CURRENT layout to PNG. Does not save MXD.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 400,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_export_pngArguments",
+        "type": "object"
+      },
+      "schema_sha256": "a7457bb2a5411cab43ec456a2cbef8db8ba7058049d2bf095e5265f010291fe3"
+    },
+    {
+      "name": "arcmap_export_preflight",
+      "description": "Validate an export path and report broken sources/page state without exporting.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_export_preflightArguments",
+        "type": "object"
+      },
+      "schema_sha256": "44f3d2b3a2a060914eaebfde8ad6d1adb064fbc18b1d788228870697e94cb31d"
+    },
+    {
+      "name": "arcmap_export_tiff",
+      "description": "Export CURRENT layout to TIFF without saving MXD.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 400,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "overwrite": {
+            "default": false,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_export_tiffArguments",
+        "type": "object"
+      },
+      "schema_sha256": "d4cff534244b1d9426c149df1e6070a611ffea36752cec12fe2b884f4c8f031c"
+    },
+    {
+      "name": "arcmap_get_active_dataframe",
+      "description": "Return the currently active ArcMap data frame. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_active_dataframeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "763c4f90fbcb3f68acfd64deab06a1d8a45f0c7968227844725a555072c45d3b"
+    },
+    {
+      "name": "arcmap_get_agent_context",
+      "description": "Return a compact current-map context bundle for planning GIS workflows.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_agent_contextArguments",
+        "type": "object"
+      },
+      "schema_sha256": "e54d2aa56362041a88d203c7f67913f11d8dc99a918f5cfbe21b2833acd906f8"
+    },
+    {
+      "name": "arcmap_get_broken_data_sources",
+      "description": "List broken data sources in CURRENT MXD. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_broken_data_sourcesArguments",
+        "type": "object"
+      },
+      "schema_sha256": "7d88c7d4f770e46c316d6a3879253bbdb93d1d2122db7131235b0f48ff061236"
+    },
+    {
+      "name": "arcmap_get_capability_matrix",
+      "description": "Return Grand Plan L0-L9 capability status and current safety locks.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_capability_matrixArguments",
+        "type": "object"
+      },
+      "schema_sha256": "25f88e09657fe0aa2874fa29ebf9def63713ece7e1e2a4c0fb2cbf0cb6d73c73"
+    },
+    {
+      "name": "arcmap_get_data_driven_pages_state",
+      "description": "Read Data Driven Pages status and current page information.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_data_driven_pages_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "ca22f7d42abdc8c080853b79a066bb6c9f47e36463727b455b4dfaf0e5fa5167"
+    },
+    {
+      "name": "arcmap_get_dataframe_state",
+      "description": "Read scale, extent, center, rotation and spatial reference for a CURRENT MXD data frame.",
+      "parameters": {
+        "properties": {
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_get_dataframe_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "ef93fa3c0e0dcdcd3a5032820042a571794f5f6ef7330e07ac3b49149f201b9d"
+    },
+    {
+      "name": "arcmap_get_feature_count",
+      "description": "Count features with an optional SQL where clause. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "where_clause": {
+            "default": "",
+            "title": "Where Clause",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_feature_countArguments",
+        "type": "object"
+      },
+      "schema_sha256": "7ac0d5e79ee30c63b439d8ba5c5ec2539f46345c0cd85e73bcff1dd98e552a9c"
+    },
+    {
+      "name": "arcmap_get_field_statistics",
+      "description": "Compute count/min/max/sum/mean for a numeric field. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "field_name": {
+            "title": "Field Name",
+            "type": "string"
+          },
+          "where_clause": {
+            "default": "",
+            "title": "Where Clause",
+            "type": "string"
+          },
+          "max_rows": {
+            "default": 100000,
+            "title": "Max Rows",
+            "type": "integer"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "field_name"
+        ],
+        "title": "arcmap_get_field_statisticsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "8f05ca842ea5ee44691c329d3eae296abdb716ca8c5e48bc9d54e73a6c1729da"
+    },
+    {
+      "name": "arcmap_get_geometry_summary",
+      "description": "Summarize feature geometry, total area/length and extent. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "where_clause": {
+            "default": "",
+            "title": "Where Clause",
+            "type": "string"
+          },
+          "max_features": {
+            "default": 100000,
+            "title": "Max Features",
+            "type": "integer"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_geometry_summaryArguments",
+        "type": "object"
+      },
+      "schema_sha256": "0bb20bb0e53301331cafa30dd92a0f8872240fcb8f8d5688827c76e89f1c678d"
+    },
+    {
+      "name": "arcmap_get_label_state",
+      "description": "Read label visibility and label class expressions without changing the MXD.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_label_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "8429e92103dc45a8768726be6ee7df54a564a9f71d8911a85fe35b6a404b53f7"
+    },
+    {
+      "name": "arcmap_get_layer_capabilities",
+      "description": "Inspect ArcMap layer capabilities supported by the live layer.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_layer_capabilitiesArguments",
+        "type": "object"
+      },
+      "schema_sha256": "cd69233b318219e8e2e4f4d89a46186032ebec9ad12027c43a80ddb9e6e56fcf"
+    },
+    {
+      "name": "arcmap_get_layer_extent",
+      "description": "Read a layer extent and center without changing the map.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_layer_extentArguments",
+        "type": "object"
+      },
+      "schema_sha256": "195f48f66ea73c7eea20ca5a8bcb1192bd038a4982357c70b7cb1cdf91f07c4f"
+    },
+    {
+      "name": "arcmap_get_layer_order",
+      "description": "Read the flattened ArcMap layer order for a data frame.",
+      "parameters": {
+        "properties": {
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_get_layer_orderArguments",
+        "type": "object"
+      },
+      "schema_sha256": "b34defcf6a2231473c9746ee0d2de54d3a12d1beb0c5c868f4ab2b990eee69fb"
+    },
+    {
+      "name": "arcmap_get_layer_state",
+      "description": "Read live layer visibility, data source, definition query, label state and scale constraints.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_layer_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "cb60e314ee67d867a498a060d96418920141759937df50064a6cf1caed00640c"
+    },
+    {
+      "name": "arcmap_get_layout_element_state",
+      "description": "Read one layout element by index or unique name/type selector.",
+      "parameters": {
+        "properties": {
+          "index": {
+            "default": -1,
+            "title": "Index",
+            "type": "integer"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "element_type": {
+            "default": "",
+            "title": "Element Type",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_get_layout_element_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "94ded4665c9b756d303bba9aeca7dd1d537da79aff015fce58e586a16ba7414f"
+    },
+    {
+      "name": "arcmap_get_layout_manifest",
+      "description": "Read page size and all layout element states with stable in-session indices.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_layout_manifestArguments",
+        "type": "object"
+      },
+      "schema_sha256": "72571ec838f8d6dc363f3af5595d06cbf4fc10df4dd2b52693601180f4e75c45"
+    },
+    {
+      "name": "arcmap_get_map_recipe_schema",
+      "description": "Return the safe full-map recipe schema and allowed reversible actions.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_map_recipe_schemaArguments",
+        "type": "object"
+      },
+      "schema_sha256": "8a136fe6c7493ee3e03ee6b3b95dcfd9584bb7c4c43ce6649278b4e2c99f61ab"
+    },
+    {
+      "name": "arcmap_get_renderer_capabilities",
+      "description": "Inspect renderer type and writable symbology properties. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_renderer_capabilitiesArguments",
+        "type": "object"
+      },
+      "schema_sha256": "7c2a21322bcdffe56214dcfc6e8c2ec78dd96d24016fe91c7fae2d71676b87a6"
+    },
+    {
+      "name": "arcmap_get_selection_state",
+      "description": "Read selected feature OIDs and selection count.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_selection_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "bf0051e0b9c3f0876dd64e1219b97657cf5278279ae4e2c9b301fd5a533c9bed"
+    },
+    {
+      "name": "arcmap_get_status",
+      "description": "Return CURRENT MXD status. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_get_statusArguments",
+        "type": "object"
+      },
+      "schema_sha256": "73f54d23d918cd2cd8521f60934af2cf998f0ee5f0884ac942859dc3370859db"
+    },
+    {
+      "name": "arcmap_get_symbology_state",
+      "description": "Read serializable ArcMap 10.x symbology metadata without changing the layer.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_get_symbology_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6fafb74f970aa0f3b5f7b60e39c5c7f48204c14dd5c272329228da0f7a5fe62d"
+    },
+    {
+      "name": "arcmap_get_unique_values",
+      "description": "Return unique attribute values with a bounded result size. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "field_name": {
+            "title": "Field Name",
+            "type": "string"
+          },
+          "where_clause": {
+            "default": "",
+            "title": "Where Clause",
+            "type": "string"
+          },
+          "limit": {
+            "default": 100,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "field_name"
+        ],
+        "title": "arcmap_get_unique_valuesArguments",
+        "type": "object"
+      },
+      "schema_sha256": "9af8ec77e5592c3ea9f5cd5bb66131a8915da8aa337a78596c79aa12b1ddbb83"
+    },
+    {
+      "name": "arcmap_gp_preflight",
+      "description": "Validate a geoprocessing request without running it. Read only.",
+      "parameters": {
+        "properties": {
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "layers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "output_path": {
+            "default": "",
+            "title": "Output Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "title": "arcmap_gp_preflightArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6d285c08f18c0cab1d5ed59f37554631441d0118912ea563ab546dc1061313ae"
+    },
+    {
+      "name": "arcmap_inspect_current_map",
+      "description": "Inspect data frames, layers and basic CURRENT MXD state.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_inspect_current_mapArguments",
+        "type": "object"
+      },
+      "schema_sha256": "419d6280bea2f984eab51adaf27b6f590c7cc5671853d007a76ea31ef6d25c9f"
+    },
+    {
+      "name": "arcmap_intersect",
+      "description": "Run ArcGIS Intersect. Blocked by default until geoprocessing is enabled.",
+      "parameters": {
+        "properties": {
+          "layers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layers",
+          "output_path"
+        ],
+        "title": "arcmap_intersectArguments",
+        "type": "object"
+      },
+      "schema_sha256": "92bbe41907f4cf5ba878753c5a31bc63ce1f78f2839e0282f15ebf65efa722b4"
+    },
+    {
+      "name": "arcmap_list_fields",
+      "description": "List layer fields and basic field metadata. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_list_fieldsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "84cf14d7d1d0a96a18d3d94545b520aadc865ca7e6294309fbcbd970e2d000f4"
+    },
+    {
+      "name": "arcmap_list_layers",
+      "description": "List layers, visibility, data source and data frame.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_list_layersArguments",
+        "type": "object"
+      },
+      "schema_sha256": "5bd25eb43b0a6617d462dfcf0896475933fcfe63c3d17bb04cbbd7fef2936a92"
+    },
+    {
+      "name": "arcmap_list_layout_elements",
+      "description": "List all layout elements and positions.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_list_layout_elementsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "0ea6f3143e111f0351a8a5eab854459315dc1c7964b173f2f94925aee456d0d7"
+    },
+    {
+      "name": "arcmap_list_layout_text",
+      "description": "List text elements in the active ArcMap layout.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_list_layout_textArguments",
+        "type": "object"
+      },
+      "schema_sha256": "a06c6c36d29ce43c6acee702cc920e9d2de6155c8a80230b37d21d4a4165af95"
+    },
+    {
+      "name": "arcmap_list_style_snapshots",
+      "description": "List session-owned style snapshots. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_list_style_snapshotsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "b774f1bf09a2bc0596002c7d717d78b0088a0eabd692256d2361756421d93d4a"
+    },
+    {
+      "name": "arcmap_list_temporary_layers",
+      "description": "List temporary layers created by the L3 session manager. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_list_temporary_layersArguments",
+        "type": "object"
+      },
+      "schema_sha256": "0219ec828dd7bf5c3a2c44b3891d70332725346efe351fab531380d9e5ea81e5"
+    },
+    {
+      "name": "arcmap_merge_layers",
+      "description": "Merge layers to a new dataset. Blocked while geoprocessing is disabled.",
+      "parameters": {
+        "properties": {
+          "layers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layers",
+          "output_path"
+        ],
+        "title": "arcmap_merge_layersArguments",
+        "type": "object"
+      },
+      "schema_sha256": "3cc892fca919c9e66d23f50af74d176d38801e41be7708dc1fed593a8de5a46c"
+    },
+    {
+      "name": "arcmap_move_layer",
+      "description": "Move one layer BEFORE or AFTER another layer in the same data frame. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "reference_layer": {
+            "title": "Reference Layer",
+            "type": "string"
+          },
+          "position": {
+            "default": "BEFORE",
+            "title": "Position",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "reference_layer"
+        ],
+        "title": "arcmap_move_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "690e9ae3e5ea60d32d6f745782111eb2e5262cf459d9d838663ceb66abf5c339"
+    },
+    {
+      "name": "arcmap_near",
+      "description": "Run Near analysis. Blocked by default until geoprocessing is enabled.",
+      "parameters": {
+        "properties": {
+          "input_layer": {
+            "title": "Input Layer",
+            "type": "string"
+          },
+          "near_layer": {
+            "title": "Near Layer",
+            "type": "string"
+          },
+          "search_radius": {
+            "default": "",
+            "title": "Search Radius",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input_layer",
+          "near_layer"
+        ],
+        "title": "arcmap_nearArguments",
+        "type": "object"
+      },
+      "schema_sha256": "4361d28c8d07f0c44d0780e6330c6b8f043e7cfeb75be4c1787900bc3426a751"
+    },
+    {
+      "name": "arcmap_ping",
+      "description": "Check ArcMap 10.6.1, live bridge connectivity, and current MCP/Stage 2 tool counts.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_pingArguments",
+        "type": "object"
+      },
+      "schema_sha256": "501bb52812ad78af7464d0b4efa9112d31e7a501c606cf220bb0f90f8599fbf1"
+    },
+    {
+      "name": "arcmap_project_features",
+      "description": "Project features to a new output dataset. Blocked while geoprocessing is disabled.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "target_spatial_reference": {
+            "title": "Target Spatial Reference",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "output_path",
+          "target_spatial_reference"
+        ],
+        "title": "arcmap_project_featuresArguments",
+        "type": "object"
+      },
+      "schema_sha256": "95fd75561698d510ecd9a2da93953adec753ef531d431fa610e72eec72bfd692"
+    },
+    {
+      "name": "arcmap_query_features",
+      "description": "Read a bounded set of feature attributes and optional centroid/extent geometry.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "fields": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "where_clause": {
+            "default": "",
+            "title": "Where Clause",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "include_geometry": {
+            "default": false,
+            "title": "Include Geometry",
+            "type": "boolean"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_query_featuresArguments",
+        "type": "object"
+      },
+      "schema_sha256": "d374de9743e8836528a5024fb75dc3ae4c0645992fa291d303e0f163b4ed61e4"
+    },
+    {
+      "name": "arcmap_refresh",
+      "description": "Refresh ArcMap Active View and TOC.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_refreshArguments",
+        "type": "object"
+      },
+      "schema_sha256": "05233eeb2ec716fde7b777620f5e78d5e0bf6fcbf89facf57ee1ca6427622a7b"
+    },
+    {
+      "name": "arcmap_remove_layer",
+      "description": "Remove a layer from CURRENT MXD. Blocked by default as destructive.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_remove_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "a44ff45d6e061266db082b2a766e2c336567bcc6474aac8672c96c0f238c9576"
+    },
+    {
+      "name": "arcmap_remove_temporary_layer",
+      "description": "Remove only a temporary layer created by arcmap_add_temporary_layer. Generic removal stays blocked.",
+      "parameters": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "arcmap_remove_temporary_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "1743ed7fffc2f524ee83140fb2836733252615c7d738216049f7d4b721665815"
+    },
+    {
+      "name": "arcmap_rename_layer",
+      "description": "Rename one live layer in CURRENT MXD without saving.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "new_name": {
+            "title": "New Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "new_name"
+        ],
+        "title": "arcmap_rename_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "1a96035d5227468534fc679fd4c702b58a20702cc4c08d1c595875f56b7c2605"
+    },
+    {
+      "name": "arcmap_replace_data_source",
+      "description": "Replace a layer data source live without saving the MXD.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "workspace_path": {
+            "title": "Workspace Path",
+            "type": "string"
+          },
+          "workspace_type": {
+            "title": "Workspace Type",
+            "type": "string"
+          },
+          "dataset_name": {
+            "default": "",
+            "title": "Dataset Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "validate": {
+            "default": true,
+            "title": "Validate",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "layer_name",
+          "workspace_path",
+          "workspace_type"
+        ],
+        "title": "arcmap_replace_data_sourceArguments",
+        "type": "object"
+      },
+      "schema_sha256": "0821c9ae38324655c5ee96dd901a0ce37a40bc35dfadf511a237c4388b63b80f"
+    },
+    {
+      "name": "arcmap_restore_layer_style",
+      "description": "Restore symbology from a prior style snapshot. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "layer_name": {
+            "default": "",
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "arcmap_restore_layer_styleArguments",
+        "type": "object"
+      },
+      "schema_sha256": "52de4bf52f5641544ae8933fb487b269338dcb2b8324da6fc53fd1b15326eb69"
+    },
+    {
+      "name": "arcmap_restore_snapshot",
+      "description": "Restore a prior live-session snapshot. Never saves the MXD; Safe Mode live-write guard applies.",
+      "parameters": {
+        "properties": {
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id"
+        ],
+        "title": "arcmap_restore_snapshotArguments",
+        "type": "object"
+      },
+      "schema_sha256": "c9e14ed3efe7d90f90e088b8f06d3d45d17b9460e97c7a398dbceb2dba0f25f2"
+    },
+    {
+      "name": "arcmap_rollback_map_recipe",
+      "description": "Rollback a prior successful map-recipe run, including captured symbology.",
+      "parameters": {
+        "properties": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "arcmap_rollback_map_recipeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "da9a3327133689a6e5e9b74a34ad8f9770a11630284d931828ec4fe6231815ab"
+    },
+    {
+      "name": "arcmap_save_current_map",
+      "description": "Explicitly save CURRENT MXD. Blocked by default in Safe Mode.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_save_current_mapArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6c0169de265b94e00192957f29faf8cd992a691460bb4298a8f93b719ad87be1"
+    },
+    {
+      "name": "arcmap_select_by_attribute",
+      "description": "Select features by SQL attribute query.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "where_clause": {
+            "title": "Where Clause",
+            "type": "string"
+          },
+          "selection_type": {
+            "default": "NEW_SELECTION",
+            "title": "Selection Type",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "where_clause"
+        ],
+        "title": "arcmap_select_by_attributeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "d1fcc2720c57a0e6b0ef691068f9cf7881edc2e023c824ec7904f5b12bade40d"
+    },
+    {
+      "name": "arcmap_select_by_location",
+      "description": "Select features by spatial relationship. Reversible live selection; MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "target_layer": {
+            "title": "Target Layer",
+            "type": "string"
+          },
+          "select_layer": {
+            "title": "Select Layer",
+            "type": "string"
+          },
+          "overlap_type": {
+            "default": "INTERSECT",
+            "title": "Overlap Type",
+            "type": "string"
+          },
+          "search_distance": {
+            "default": "",
+            "title": "Search Distance",
+            "type": "string"
+          },
+          "selection_type": {
+            "default": "NEW_SELECTION",
+            "title": "Selection Type",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_layer",
+          "select_layer"
+        ],
+        "title": "arcmap_select_by_locationArguments",
+        "type": "object"
+      },
+      "schema_sha256": "7667c7a3b30b35d8229544fee8350783bbe12fda18809037bcc757e3821db709"
+    },
+    {
+      "name": "arcmap_set_class_breaks",
+      "description": "Set manual breaks on an existing graduated renderer.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "field_name": {
+            "title": "Field Name",
+            "type": "string"
+          },
+          "break_values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Break Values",
+            "type": "array"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "field_name",
+          "break_values"
+        ],
+        "title": "arcmap_set_class_breaksArguments",
+        "type": "object"
+      },
+      "schema_sha256": "e8f28570da18a256eac0835cf3594711cfcf9957098edcace178d41af5d05a65"
+    },
+    {
+      "name": "arcmap_set_definition_query",
+      "description": "Set a layer definition query live. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "definition_query": {
+            "title": "Definition Query",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "definition_query"
+        ],
+        "title": "arcmap_set_definition_queryArguments",
+        "type": "object"
+      },
+      "schema_sha256": "32870198c45ccc570bc12ca0953a3d2dfa2f39eee23751c7f9357899d49b77b4"
+    },
+    {
+      "name": "arcmap_set_label_class",
+      "description": "Edit one label class live, including expression and SQL filter.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "class_index": {
+            "default": 0,
+            "title": "Class Index",
+            "type": "integer"
+          },
+          "expression": {
+            "default": null,
+            "title": "Expression",
+            "type": "string"
+          },
+          "sql_query": {
+            "default": null,
+            "title": "Sql Query",
+            "type": "string"
+          },
+          "show_class_labels": {
+            "default": null,
+            "title": "Show Class Labels",
+            "type": "boolean"
+          },
+          "expression_parser": {
+            "default": null,
+            "title": "Expression Parser",
+            "type": "string"
+          },
+          "show_labels": {
+            "default": null,
+            "title": "Show Labels",
+            "type": "boolean"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_set_label_classArguments",
+        "type": "object"
+      },
+      "schema_sha256": "fc94da05af59d534e36c85eef5770428ff83263b1594f60017752763a7fb63b8"
+    },
+    {
+      "name": "arcmap_set_label_expression",
+      "description": "Set the first label class expression for a layer live.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "expression": {
+            "title": "Expression",
+            "type": "string"
+          },
+          "expression_parser": {
+            "default": "PYTHON",
+            "title": "Expression Parser",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "expression"
+        ],
+        "title": "arcmap_set_label_expressionArguments",
+        "type": "object"
+      },
+      "schema_sha256": "5ea09b7f99cfab72e4343571cd03b6295d8be7bac2fdf7e7c6be3ef5e4935cfc"
+    },
+    {
+      "name": "arcmap_set_layer_scale_range",
+      "description": "Set live layer min/max scale. Use 0 for no limit. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "min_scale": {
+            "default": 0.0,
+            "title": "Min Scale",
+            "type": "number"
+          },
+          "max_scale": {
+            "default": 0.0,
+            "title": "Max Scale",
+            "type": "number"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_set_layer_scale_rangeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "3c389a7f3953ce9b95f8264c8708d1e4d6b3c16e6472ccc21ed95dd3ec9ce015"
+    },
+    {
+      "name": "arcmap_set_layer_transparency",
+      "description": "Set live layer transparency from 0 to 100 without saving.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "transparency": {
+            "title": "Transparency",
+            "type": "integer"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "transparency"
+        ],
+        "title": "arcmap_set_layer_transparencyArguments",
+        "type": "object"
+      },
+      "schema_sha256": "fad8e218b6206a2d3074cf15a79450e849e5439618f2cec1a60c857c84c36808"
+    },
+    {
+      "name": "arcmap_set_layer_visibility",
+      "description": "Change layer visibility live. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "visible": {
+            "default": false,
+            "title": "Visible",
+            "type": "boolean"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_set_layer_visibilityArguments",
+        "type": "object"
+      },
+      "schema_sha256": "dc8961ed6a924ac3397bcb42e4fd4c97bed15f395ff132b832768e6a3afb42c6"
+    },
+    {
+      "name": "arcmap_set_layout_element_position",
+      "description": "Move/resize a named layout element live.",
+      "parameters": {
+        "properties": {
+          "element_name": {
+            "title": "Element Name",
+            "type": "string"
+          },
+          "x": {
+            "default": null,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "default": null,
+            "title": "Y",
+            "type": "number"
+          },
+          "width": {
+            "default": null,
+            "title": "Width",
+            "type": "number"
+          },
+          "height": {
+            "default": null,
+            "title": "Height",
+            "type": "number"
+          }
+        },
+        "required": [
+          "element_name"
+        ],
+        "title": "arcmap_set_layout_element_positionArguments",
+        "type": "object"
+      },
+      "schema_sha256": "cd0777cc761e678d46461796e2f7f5384d1ab5401fb50c388533e909fa9ed84d"
+    },
+    {
+      "name": "arcmap_set_layout_element_state",
+      "description": "Edit position/size and text properties of one layout element live.",
+      "parameters": {
+        "properties": {
+          "index": {
+            "default": -1,
+            "title": "Index",
+            "type": "integer"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "element_type": {
+            "default": "",
+            "title": "Element Type",
+            "type": "string"
+          },
+          "x": {
+            "default": null,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "default": null,
+            "title": "Y",
+            "type": "number"
+          },
+          "width": {
+            "default": null,
+            "title": "Width",
+            "type": "number"
+          },
+          "height": {
+            "default": null,
+            "title": "Height",
+            "type": "number"
+          },
+          "text": {
+            "default": null,
+            "title": "Text",
+            "type": "string"
+          },
+          "font_size": {
+            "default": null,
+            "title": "Font Size",
+            "type": "number"
+          }
+        },
+        "title": "arcmap_set_layout_element_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "5ae2287a71aada128c6eba18be8a68ce6aa25d099e76e084e4bd0d4471341700"
+    },
+    {
+      "name": "arcmap_set_layout_text",
+      "description": "Change a layout text element by name or index. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "element_name": {
+            "default": "",
+            "title": "Element Name",
+            "type": "string"
+          },
+          "index": {
+            "default": -1,
+            "title": "Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "arcmap_set_layout_textArguments",
+        "type": "object"
+      },
+      "schema_sha256": "cc512398a0276de6559b57494117caf2ab154ae84e0036d629302a1731d9b519"
+    },
+    {
+      "name": "arcmap_set_map_scale",
+      "description": "Set map scale for a data frame live.",
+      "parameters": {
+        "properties": {
+          "scale": {
+            "title": "Scale",
+            "type": "number"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scale"
+        ],
+        "title": "arcmap_set_map_scaleArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6848a37ccdf0539e760f6befd3a37072de19e08b82075068fefdcc1f7c94a1c1"
+    },
+    {
+      "name": "arcmap_set_title",
+      "description": "Change the primary map title live. Does not save the MXD.",
+      "parameters": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "arcmap_set_titleArguments",
+        "type": "object"
+      },
+      "schema_sha256": "34590bac8db5437e1cabf95d00eb2f6f047c5cb2e6ab1f4e5bec53e1d7298522"
+    },
+    {
+      "name": "arcmap_set_unique_value_field",
+      "description": "Change the value field of an existing UNIQUE_VALUES renderer.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "field_name": {
+            "title": "Field Name",
+            "type": "string"
+          },
+          "refresh_values": {
+            "default": true,
+            "title": "Refresh Values",
+            "type": "boolean"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name",
+          "field_name"
+        ],
+        "title": "arcmap_set_unique_value_fieldArguments",
+        "type": "object"
+      },
+      "schema_sha256": "c83259349184e94cee46177f1ef195393868c86a907813085a5202fe2fc29a2c"
+    },
+    {
+      "name": "arcmap_snapshot_state",
+      "description": "Capture reversible live state in the current ArcMap bridge session without saving the MXD.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_snapshot_stateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "db14c8dcec4479080492e4fd090d50064e109b76fd263d5b571310043a08051a"
+    },
+    {
+      "name": "arcmap_spatial_join",
+      "description": "Run Spatial Join. Blocked by default until geoprocessing is enabled.",
+      "parameters": {
+        "properties": {
+          "target_layer": {
+            "title": "Target Layer",
+            "type": "string"
+          },
+          "join_layer": {
+            "title": "Join Layer",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "match_option": {
+            "default": "INTERSECT",
+            "title": "Match Option",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_layer",
+          "join_layer",
+          "output_path"
+        ],
+        "title": "arcmap_spatial_joinArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6dff369fd71db769e4de309fb5b7803e1eda1adfbbd4bb7e9f18b83aa259cfd8"
+    },
+    {
+      "name": "arcmap_stage2_batch_build",
+      "description": "Run multiple Stage 2 production jobs from one JSON job file.",
+      "parameters": {
+        "properties": {
+          "job_file": {
+            "title": "Job File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_file"
+        ],
+        "title": "arcmap_stage2_batch_buildArguments",
+        "type": "object"
+      },
+      "schema_sha256": "432eca1ff80037f510323d1e593d1cae86e8ed7217b859370452981e6e68f263"
+    },
+    {
+      "name": "arcmap_stage2_build_a4",
+      "description": "Build a complete A4 map from template MXD + data folder, QA it, and export production outputs.",
+      "parameters": {
+        "properties": {
+          "template_mxd": {
+            "title": "Template Mxd",
+            "type": "string"
+          },
+          "data_root": {
+            "title": "Data Root",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Profile",
+            "type": "object"
+          },
+          "company_name": {
+            "default": "",
+            "title": "Company Name",
+            "type": "string"
+          },
+          "map_type": {
+            "default": "",
+            "title": "Map Type",
+            "type": "string"
+          },
+          "base_name": {
+            "default": "",
+            "title": "Base Name",
+            "type": "string"
+          },
+          "snapshot_root": {
+            "default": "",
+            "title": "Snapshot Root",
+            "type": "string"
+          },
+          "save_mxd": {
+            "default": true,
+            "title": "Save Mxd",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "template_mxd",
+          "data_root",
+          "output_dir",
+          "recipe"
+        ],
+        "title": "arcmap_stage2_build_a4Arguments",
+        "type": "object"
+      },
+      "schema_sha256": "82c197ddd54e7a1fc43c48828bc117f14dbb627f905d97251cf827fcfa0eee0f"
+    },
+    {
+      "name": "arcmap_stage2_discover_data",
+      "description": "Discover supported GIS datasets under a production data folder.",
+      "parameters": {
+        "properties": {
+          "data_root": {
+            "title": "Data Root",
+            "type": "string"
+          },
+          "max_items": {
+            "default": 10000,
+            "title": "Max Items",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data_root"
+        ],
+        "title": "arcmap_stage2_discover_dataArguments",
+        "type": "object"
+      },
+      "schema_sha256": "066e3ff8edb3a7ac61d45af6e04c2f749f224780ad177552df623b789a2dbc95"
+    },
+    {
+      "name": "arcmap_stage2_generic_gp",
+      "description": "Run an installed ArcPy geoprocessing function through the guarded generic runner.",
+      "parameters": {
+        "properties": {
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          },
+          "args": {
+            "default": null,
+            "items": {},
+            "title": "Args",
+            "type": "array"
+          },
+          "kwargs": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Kwargs",
+            "type": "object"
+          },
+          "allow_destructive": {
+            "default": false,
+            "title": "Allow Destructive",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "title": "arcmap_stage2_generic_gpArguments",
+        "type": "object"
+      },
+      "schema_sha256": "3ee8697ea3a33121c9c60897a9a67703c134fe43aa12ec872644850a1c2e4129"
+    },
+    {
+      "name": "arcmap_stage2_list_checkpoints",
+      "description": "List persistent Stage 2 MXD checkpoints for a production job.",
+      "parameters": {
+        "properties": {
+          "snapshot_root": {
+            "title": "Snapshot Root",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_root",
+          "job_id"
+        ],
+        "title": "arcmap_stage2_list_checkpointsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "f303bf25bb553f7d83443562038d72c95626b77e8cf852d8241de646d48e41c8"
+    },
+    {
+      "name": "arcmap_stage2_preview_match",
+      "description": "Preview automatic matching between recipe layer slots and discovered datasets.",
+      "parameters": {
+        "properties": {
+          "data_root": {
+            "title": "Data Root",
+            "type": "string"
+          },
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          },
+          "max_items": {
+            "default": 10000,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "min_score": {
+            "default": 0.62,
+            "title": "Min Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "data_root",
+          "recipe"
+        ],
+        "title": "arcmap_stage2_preview_matchArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6839e5b44850c57c45d39a7d34f039af1ebb62867acaad3418350cbf31c51780"
+    },
+    {
+      "name": "arcmap_stage2_restore_checkpoint",
+      "description": "Restore a persistent full-MXD checkpoint to a target MXD path.",
+      "parameters": {
+        "properties": {
+          "checkpoint_mxd": {
+            "title": "Checkpoint Mxd",
+            "type": "string"
+          },
+          "target_mxd": {
+            "title": "Target Mxd",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkpoint_mxd",
+          "target_mxd"
+        ],
+        "title": "arcmap_stage2_restore_checkpointArguments",
+        "type": "object"
+      },
+      "schema_sha256": "7b17e07fd92341658c5dce5dffc0c4b1ed3b4587362d3dc15a498e5b2f9e7cba"
+    },
+    {
+      "name": "arcmap_stage2_validate_template",
+      "description": "Validate an A4 template MXD and layout elements required by a Stage 2 profile.",
+      "parameters": {
+        "properties": {
+          "template_mxd": {
+            "title": "Template Mxd",
+            "type": "string"
+          },
+          "profile": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Profile",
+            "type": "object"
+          }
+        },
+        "required": [
+          "template_mxd"
+        ],
+        "title": "arcmap_stage2_validate_templateArguments",
+        "type": "object"
+      },
+      "schema_sha256": "b4300186848e1a68e62772f6316c77c6bf3943059a49b31c2b902cef9965279d"
+    },
+    {
+      "name": "arcmap_stage3_add_dataset_auto",
+      "description": "Add SHP, raster, layer file, or geodatabase dataset to the current map.",
+      "parameters": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "dataframe_name": {
+            "default": "",
+            "title": "Dataframe Name",
+            "type": "string"
+          },
+          "layer_name": {
+            "default": "",
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "position": {
+            "default": "TOP",
+            "title": "Position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "arcmap_stage3_add_dataset_autoArguments",
+        "type": "object"
+      },
+      "schema_sha256": "b4ab08e44e4a480431536a1ebca58daddcb2a59de052ca93cfe28668c915c977"
+    },
+    {
+      "name": "arcmap_stage3_blank_init",
+      "description": "Initialize the CURRENT ArcMap document as a clean Stage 3 workspace.",
+      "parameters": {
+        "properties": {
+          "clear_layers": {
+            "default": true,
+            "title": "Clear Layers",
+            "type": "boolean"
+          },
+          "dataframe_name": {
+            "default": "Layers",
+            "title": "Dataframe Name",
+            "type": "string"
+          },
+          "document_title": {
+            "default": "",
+            "title": "Document Title",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_stage3_blank_initArguments",
+        "type": "object"
+      },
+      "schema_sha256": "8084859d05989647f92d753e1e0e90f1577a8930da7a50051283ee9a71e9d63a"
+    },
+    {
+      "name": "arcmap_stage3_build_blank_a4",
+      "description": "Build an A4 map from the CURRENT blank document and optional raw-data folder.",
+      "parameters": {
+        "properties": {
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "base_name": {
+            "default": "ZAGENT_STAGE3_MAP",
+            "title": "Base Name",
+            "type": "string"
+          },
+          "data_root": {
+            "default": "",
+            "title": "Data Root",
+            "type": "string"
+          },
+          "orientation": {
+            "default": "landscape",
+            "title": "Orientation",
+            "type": "string"
+          },
+          "title": {
+            "default": "PETA",
+            "title": "Title",
+            "type": "string"
+          },
+          "spatial_reference": {
+            "default": "",
+            "title": "Spatial Reference",
+            "type": "string"
+          },
+          "scale": {
+            "default": 0.0,
+            "title": "Scale",
+            "type": "number"
+          },
+          "include_legend": {
+            "default": true,
+            "title": "Include Legend",
+            "type": "boolean"
+          },
+          "include_north_arrow": {
+            "default": true,
+            "title": "Include North Arrow",
+            "type": "boolean"
+          },
+          "include_scale_bar": {
+            "default": true,
+            "title": "Include Scale Bar",
+            "type": "boolean"
+          },
+          "save_mxd": {
+            "default": true,
+            "title": "Save Mxd",
+            "type": "boolean"
+          },
+          "export_pdf": {
+            "default": true,
+            "title": "Export Pdf",
+            "type": "boolean"
+          },
+          "export_png": {
+            "default": true,
+            "title": "Export Png",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_dir"
+        ],
+        "title": "arcmap_stage3_build_blank_a4Arguments",
+        "type": "object"
+      },
+      "schema_sha256": "398f586843cdd7750a037156cfe9429e152a9bd6aced7d1db62c1796d1ddb166"
+    },
+    {
+      "name": "arcmap_stage3_build_no_data_a4",
+      "description": "Build and export an A4 layout even when no GIS dataset is available.",
+      "parameters": {
+        "properties": {
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "base_name": {
+            "default": "ZAGENT_STAGE3_EMPTY_MAP",
+            "title": "Base Name",
+            "type": "string"
+          },
+          "orientation": {
+            "default": "landscape",
+            "title": "Orientation",
+            "type": "string"
+          },
+          "title": {
+            "default": "PETA",
+            "title": "Title",
+            "type": "string"
+          },
+          "subtitle": {
+            "default": "",
+            "title": "Subtitle",
+            "type": "string"
+          },
+          "save_mxd": {
+            "default": true,
+            "title": "Save Mxd",
+            "type": "boolean"
+          },
+          "export_pdf": {
+            "default": true,
+            "title": "Export Pdf",
+            "type": "boolean"
+          },
+          "export_png": {
+            "default": true,
+            "title": "Export Png",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "output_dir"
+        ],
+        "title": "arcmap_stage3_build_no_data_a4Arguments",
+        "type": "object"
+      },
+      "schema_sha256": "654de7f94c11d6874171a52513b8d9aa7db97e9c52f32b534be30a52275d0793"
+    },
+    {
+      "name": "arcmap_stage3_create_featureclass",
+      "description": "Create a new feature class for POINT, POLYLINE, or POLYGON geometry.",
+      "parameters": {
+        "properties": {
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "geometry_type": {
+            "title": "Geometry Type",
+            "type": "string"
+          },
+          "spatial_reference": {
+            "default": "",
+            "title": "Spatial Reference",
+            "type": "string"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fields"
+          }
+        },
+        "required": [
+          "workspace",
+          "name",
+          "geometry_type"
+        ],
+        "title": "arcmap_stage3_create_featureclassArguments",
+        "type": "object"
+      },
+      "schema_sha256": "76b47e140efec48e46c1af60ebacbe887af8311dd61c05e63d6ce454cda80e96"
+    },
+    {
+      "name": "arcmap_stage3_create_geometry_features",
+      "description": "Create geometry from JSON-like point/path/ring coordinate definitions.",
+      "parameters": {
+        "properties": {
+          "out_featureclass": {
+            "title": "Out Featureclass",
+            "type": "string"
+          },
+          "geometry_type": {
+            "title": "Geometry Type",
+            "type": "string"
+          },
+          "features": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "spatial_reference": {
+            "default": "EPSG:4326",
+            "title": "Spatial Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "out_featureclass",
+          "geometry_type",
+          "features"
+        ],
+        "title": "arcmap_stage3_create_geometry_featuresArguments",
+        "type": "object"
+      },
+      "schema_sha256": "41c20c501bc5ead70c6056cb5b6bc5f4a43edcba9fa9eb719a29a80354e9c0be"
+    },
+    {
+      "name": "arcmap_stage3_create_legend",
+      "description": "Create a legend linked to the active data frame.",
+      "parameters": {
+        "properties": {
+          "name": {
+            "default": "ZAGENT_LEGEND",
+            "title": "Name",
+            "type": "string"
+          },
+          "x_frac": {
+            "default": 0.78,
+            "title": "X Frac",
+            "type": "number"
+          },
+          "y_frac": {
+            "default": 0.2,
+            "title": "Y Frac",
+            "type": "number"
+          },
+          "width_frac": {
+            "default": 0.2,
+            "title": "Width Frac",
+            "type": "number"
+          },
+          "height_frac": {
+            "default": 0.42,
+            "title": "Height Frac",
+            "type": "number"
+          },
+          "title": {
+            "default": "LEGENDA",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_stage3_create_legendArguments",
+        "type": "object"
+      },
+      "schema_sha256": "92beb200a78a6fadcc6a26741020323825bc6a1e44f9991e4ade12de94b029c0"
+    },
+    {
+      "name": "arcmap_stage3_create_neatline",
+      "description": "Create an outer layout neatline.",
+      "parameters": {
+        "properties": {
+          "name": {
+            "default": "ZAGENT_NEATLINE",
+            "title": "Name",
+            "type": "string"
+          },
+          "margin_frac": {
+            "default": 0.02,
+            "title": "Margin Frac",
+            "type": "number"
+          },
+          "line_width": {
+            "default": 1.0,
+            "title": "Line Width",
+            "type": "number"
+          }
+        },
+        "title": "arcmap_stage3_create_neatlineArguments",
+        "type": "object"
+      },
+      "schema_sha256": "44c7f39a92a10fd6ab45983bde7090183f65e626cea8008bce0d4687cf7838c7"
+    },
+    {
+      "name": "arcmap_stage3_create_north_arrow",
+      "description": "Create a north arrow in the layout.",
+      "parameters": {
+        "properties": {
+          "name": {
+            "default": "ZAGENT_NORTH_ARROW",
+            "title": "Name",
+            "type": "string"
+          },
+          "x_frac": {
+            "default": 0.92,
+            "title": "X Frac",
+            "type": "number"
+          },
+          "y_frac": {
+            "default": 0.82,
+            "title": "Y Frac",
+            "type": "number"
+          },
+          "size_frac": {
+            "default": 0.08,
+            "title": "Size Frac",
+            "type": "number"
+          }
+        },
+        "title": "arcmap_stage3_create_north_arrowArguments",
+        "type": "object"
+      },
+      "schema_sha256": "e20dfc4693b6a1118b2d47e08b67eb9ddba525844f6b1bd6463280000467dc6b"
+    },
+    {
+      "name": "arcmap_stage3_create_scale_bar",
+      "description": "Create a scale bar in the layout.",
+      "parameters": {
+        "properties": {
+          "name": {
+            "default": "ZAGENT_SCALE_BAR",
+            "title": "Name",
+            "type": "string"
+          },
+          "x_frac": {
+            "default": 0.38,
+            "title": "X Frac",
+            "type": "number"
+          },
+          "y_frac": {
+            "default": 0.06,
+            "title": "Y Frac",
+            "type": "number"
+          },
+          "width_frac": {
+            "default": 0.26,
+            "title": "Width Frac",
+            "type": "number"
+          },
+          "units": {
+            "default": "meters",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_stage3_create_scale_barArguments",
+        "type": "object"
+      },
+      "schema_sha256": "63bba4c596f9597d9f2d1df558782c7b32765f13b4ab7c719e26d12de21be4cd"
+    },
+    {
+      "name": "arcmap_stage3_create_text",
+      "description": "Create a new layout text element at a relative page position.",
+      "parameters": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "name": {
+            "default": "ZAGENT_TEXT",
+            "title": "Name",
+            "type": "string"
+          },
+          "x_frac": {
+            "default": 0.5,
+            "title": "X Frac",
+            "type": "number"
+          },
+          "y_frac": {
+            "default": 0.95,
+            "title": "Y Frac",
+            "type": "number"
+          },
+          "font_size": {
+            "default": 14.0,
+            "title": "Font Size",
+            "type": "number"
+          },
+          "bold": {
+            "default": false,
+            "title": "Bold",
+            "type": "boolean"
+          },
+          "anchor": {
+            "default": "CENTER",
+            "title": "Anchor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "arcmap_stage3_create_textArguments",
+        "type": "object"
+      },
+      "schema_sha256": "111c81dbc5c74191bd0342ddefdb56cde75e5c756c2a7caf57a35005aa502045"
+    },
+    {
+      "name": "arcmap_stage3_create_xy_featureclass",
+      "description": "Create a persistent feature class from X/Y coordinates in CSV or DBF.",
+      "parameters": {
+        "properties": {
+          "csv_path": {
+            "title": "Csv Path",
+            "type": "string"
+          },
+          "out_featureclass": {
+            "title": "Out Featureclass",
+            "type": "string"
+          },
+          "x_field": {
+            "title": "X Field",
+            "type": "string"
+          },
+          "y_field": {
+            "title": "Y Field",
+            "type": "string"
+          },
+          "spatial_reference": {
+            "default": "EPSG:4326",
+            "title": "Spatial Reference",
+            "type": "string"
+          },
+          "z_field": {
+            "default": "",
+            "title": "Z Field",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csv_path",
+          "out_featureclass",
+          "x_field",
+          "y_field"
+        ],
+        "title": "arcmap_stage3_create_xy_featureclassArguments",
+        "type": "object"
+      },
+      "schema_sha256": "faff7cdb9f96f327262591dddb6799508295aff2f3a37f5ccb72fdfccbb9ad0a"
+    },
+    {
+      "name": "arcmap_stage3_ensure_dataframe",
+      "description": "Ensure a usable data frame exists and optionally apply a spatial reference.",
+      "parameters": {
+        "properties": {
+          "name": {
+            "default": "Layers",
+            "title": "Name",
+            "type": "string"
+          },
+          "spatial_reference": {
+            "default": "",
+            "title": "Spatial Reference",
+            "type": "string"
+          },
+          "activate": {
+            "default": true,
+            "title": "Activate",
+            "type": "boolean"
+          }
+        },
+        "title": "arcmap_stage3_ensure_dataframeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "500c4db33e3c2250df0bba58f2a16677df552f34f4035bc2bdf36d67727f1247"
+    },
+    {
+      "name": "arcmap_stage3_export_current",
+      "description": "Export the current layout to PDF, PNG, JPEG, or TIFF.",
+      "parameters": {
+        "properties": {
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "format": {
+            "default": "PDF",
+            "title": "Format",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 400,
+            "title": "Resolution",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "output_path"
+        ],
+        "title": "arcmap_stage3_export_currentArguments",
+        "type": "object"
+      },
+      "schema_sha256": "5edb622422c63855d855e459ffbd24c8e5d39a293eade27dc79b3636c92644dc"
+    },
+    {
+      "name": "arcmap_stage3_health",
+      "description": "Check Stage 3 bridge installation, ArcObjects layout backend, and current document readiness.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_stage3_healthArguments",
+        "type": "object"
+      },
+      "schema_sha256": "253f63b3989a9c044aa2e9a839017ea81ab87fc3f42b18d682a93a4187be8ced"
+    },
+    {
+      "name": "arcmap_stage3_ingest_folder",
+      "description": "Discover and optionally add supported GIS datasets from a folder tree.",
+      "parameters": {
+        "properties": {
+          "data_root": {
+            "title": "Data Root",
+            "type": "string"
+          },
+          "recursive": {
+            "default": true,
+            "title": "Recursive",
+            "type": "boolean"
+          },
+          "add_to_map": {
+            "default": true,
+            "title": "Add To Map",
+            "type": "boolean"
+          },
+          "max_items": {
+            "default": 500,
+            "title": "Max Items",
+            "type": "integer"
+          },
+          "dataframe_name": {
+            "default": "",
+            "title": "Dataframe Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_root"
+        ],
+        "title": "arcmap_stage3_ingest_folderArguments",
+        "type": "object"
+      },
+      "schema_sha256": "eb794253ba9e7a1d1e05a267a6528e56cc6c0081a4b5cb6abebb600d31c7f5a8"
+    },
+    {
+      "name": "arcmap_stage3_restore_checkpoint",
+      "description": "Restore a Stage 3 MXD checkpoint to a target path.",
+      "parameters": {
+        "properties": {
+          "checkpoint_mxd": {
+            "title": "Checkpoint Mxd",
+            "type": "string"
+          },
+          "target_mxd": {
+            "default": "",
+            "title": "Target Mxd",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkpoint_mxd"
+        ],
+        "title": "arcmap_stage3_restore_checkpointArguments",
+        "type": "object"
+      },
+      "schema_sha256": "8f142aeb436ce2b6a0e1166a41e2e6860200c89491104d4e70b3760ca9a90f93"
+    },
+    {
+      "name": "arcmap_stage3_save_checkpoint",
+      "description": "Persist a full-MXD Stage 3 checkpoint to disk.",
+      "parameters": {
+        "properties": {
+          "snapshot_root": {
+            "title": "Snapshot Root",
+            "type": "string"
+          },
+          "label": {
+            "default": "checkpoint",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_root"
+        ],
+        "title": "arcmap_stage3_save_checkpointArguments",
+        "type": "object"
+      },
+      "schema_sha256": "218d6b5f6effe5b9db3725c3598dcea1bc5fd80d4fe18d14c4add0d48c9960c4"
+    },
+    {
+      "name": "arcmap_stage3_set_extent_auto",
+      "description": "Set the active data frame extent to all visible layers with optional padding.",
+      "parameters": {
+        "properties": {
+          "padding_percent": {
+            "default": 5.0,
+            "title": "Padding Percent",
+            "type": "number"
+          },
+          "dataframe_name": {
+            "default": "",
+            "title": "Dataframe Name",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_stage3_set_extent_autoArguments",
+        "type": "object"
+      },
+      "schema_sha256": "f0573033c70c9f75900d8cd3630a9acb639047168fa9f84507c17ae8c2c76bcb"
+    },
+    {
+      "name": "arcmap_stage3_set_page_a4",
+      "description": "Configure the current layout page for A4 portrait or landscape.",
+      "parameters": {
+        "properties": {
+          "orientation": {
+            "default": "landscape",
+            "title": "Orientation",
+            "type": "string"
+          },
+          "units": {
+            "default": "centimeters",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_stage3_set_page_a4Arguments",
+        "type": "object"
+      },
+      "schema_sha256": "5b0dfdf101a46955ddd637e10d97a7dba4283d5d934b78333cab3a7f0e1912b9"
+    },
+    {
+      "name": "arcmap_toggle_labels",
+      "description": "Enable or disable labels for a layer live.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "show": {
+            "default": true,
+            "title": "Show",
+            "type": "boolean"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_toggle_labelsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "c3ee82d1d8d8687416a62d2b55cffe4bdd484c1f74ce86cf2c2d05a959702359"
+    },
+    {
+      "name": "arcmap_union_layers",
+      "description": "Union polygon layers to a new dataset. Blocked while geoprocessing is disabled.",
+      "parameters": {
+        "properties": {
+          "layers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "join_attributes": {
+            "default": "ALL",
+            "title": "Join Attributes",
+            "type": "string"
+          },
+          "cluster_tolerance": {
+            "default": "",
+            "title": "Cluster Tolerance",
+            "type": "string"
+          },
+          "gaps": {
+            "default": "GAPS",
+            "title": "Gaps",
+            "type": "string"
+          }
+        },
+        "required": [
+          "layers",
+          "output_path"
+        ],
+        "title": "arcmap_union_layersArguments",
+        "type": "object"
+      },
+      "schema_sha256": "bb0623eb9f18370d950808a9fc7304d93ce5aa87a58671f5648d87e82cfcbcc2"
+    },
+    {
+      "name": "arcmap_validate_data_source",
+      "description": "Validate a layer data source or explicit dataset path. Read only.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "default": "",
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "path": {
+            "default": "",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_validate_data_sourceArguments",
+        "type": "object"
+      },
+      "schema_sha256": "2c110e1c118fa0bd6de96014f9cd7b6f67fb4c7bbcaa7d2ba89586df1f8bb721"
+    },
+    {
+      "name": "arcmap_validate_layout_bounds",
+      "description": "Check layout elements against page bounds. Read only.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_validate_layout_boundsArguments",
+        "type": "object"
+      },
+      "schema_sha256": "408127872b623a31e42e49e4f1e40dcfa432e8d9f9290fa54f5b5084597f9bf2"
+    },
+    {
+      "name": "arcmap_validate_map_recipe",
+      "description": "Validate a full-map recipe without changing ArcMap.",
+      "parameters": {
+        "properties": {
+          "recipe": {
+            "additionalProperties": true,
+            "title": "Recipe",
+            "type": "object"
+          }
+        },
+        "required": [
+          "recipe"
+        ],
+        "title": "arcmap_validate_map_recipeArguments",
+        "type": "object"
+      },
+      "schema_sha256": "25e5fe5bd62dbedee4bdcbf6ec041994c32cd980cb197bbb57b1ad6fc6ab18a9"
+    },
+    {
+      "name": "arcmap_visual_latest",
+      "description": "Return the newest artifact in the shared Zagent visual store.",
+      "parameters": {
+        "properties": {},
+        "title": "arcmap_visual_latestArguments",
+        "type": "object"
+      },
+      "schema_sha256": "a5ff4dc171783328d69bcc568c35ab7b9ad8b974eef3497d54f8792e1ed51133"
+    },
+    {
+      "name": "arcmap_visual_list",
+      "description": "List recent shared visual artifacts without returning image bytes.",
+      "parameters": {
+        "properties": {
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "arcmap_visual_listArguments",
+        "type": "object"
+      },
+      "schema_sha256": "e82d4eb629d64b32f1fdb32ccfe274810ebcd3f15fd3f62fc4816a2de2b8845f"
+    },
+    {
+      "name": "arcmap_visual_prune",
+      "description": "Prune old shared visual artifacts by count and optional age.",
+      "parameters": {
+        "properties": {
+          "max_artifacts": {
+            "default": 200,
+            "title": "Max Artifacts",
+            "type": "integer"
+          },
+          "max_age_hours": {
+            "default": 0.0,
+            "title": "Max Age Hours",
+            "type": "number"
+          }
+        },
+        "title": "arcmap_visual_pruneArguments",
+        "type": "object"
+      },
+      "schema_sha256": "6689ece6c7e14061ef5d2b882c87d1858bdd0fd2d06c519305b63d448f073f76"
+    },
+    {
+      "name": "arcmap_visual_snapshot",
+      "description": "Export CURRENT layout to PNG and publish it to the shared Zagent visual store.",
+      "parameters": {
+        "properties": {
+          "name": {
+            "default": "arcmap",
+            "title": "Name",
+            "type": "string"
+          },
+          "resolution": {
+            "default": 200,
+            "title": "Resolution",
+            "type": "integer"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_visual_snapshotArguments",
+        "type": "object"
+      },
+      "schema_sha256": "b34008ad29d4864fc48473db6435d1f2c978e12fc83577522b7466d5dba8311a"
+    },
+    {
+      "name": "arcmap_window_capture",
+      "description": "",
+      "parameters": {
+        "properties": {
+          "confirm_current_arcmap_window": {
+            "default": false,
+            "title": "Confirm Current Arcmap Window",
+            "type": "boolean"
+          },
+          "name": {
+            "default": "arcmap-window",
+            "title": "Name",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "title": "arcmap_window_captureArguments",
+        "type": "object"
+      },
+      "schema_sha256": "7b87912360b4ce645d66f3d4ac12b02b88c1ee358f702dbb56117fb39fb1a6a2"
+    },
+    {
+      "name": "arcmap_zoom_to_layer",
+      "description": "Zoom active map to a layer extent. MXD remains unsaved.",
+      "parameters": {
+        "properties": {
+          "layer_name": {
+            "title": "Layer Name",
+            "type": "string"
+          },
+          "data_frame": {
+            "default": "",
+            "title": "Data Frame",
+            "type": "string"
+          },
+          "scale_factor": {
+            "default": 1.0,
+            "title": "Scale Factor",
+            "type": "number"
+          }
+        },
+        "required": [
+          "layer_name"
+        ],
+        "title": "arcmap_zoom_to_layerArguments",
+        "type": "object"
+      },
+      "schema_sha256": "420a0b42bfcb79e2ea6df4dcde19598d13fbb9e70af2ad7b891bf42e147f8de7"
+    }
+  ],
+  "catalog_sha256": "450400ea41380ae933d0f962bd32aa091cd0dc9462a564cb1198d0240303819e"
+}

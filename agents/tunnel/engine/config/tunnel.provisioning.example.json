@@ -1,0 +1,95 @@
+{
+  "router": {
+    "host": "127.0.0.1",
+    "port": 18810,
+    "mcp_path": "/mcp",
+    "log_level": "info"
+  },
+  "security": {
+    "allow_local_upstreams_only": true,
+    "allowed_hosts": [
+      "127.0.0.1",
+      "::1",
+      "localhost"
+    ],
+    "allow_http": true
+  },
+  "resource_server": {
+    "resource_uri": "https://resource.example/mcp",
+    "issuer": "https://issuer.example",
+    "authorization_servers": [
+      "https://issuer.example"
+    ],
+    "introspection_endpoint": "https://issuer.example/oauth/introspect",
+    "introspection_client_id": "zagent-resource-server",
+    "introspection_secret_env": "ZAGENT_OAUTH_INTROSPECTION_SECRET",
+    "workspace_id": "workspace-provisioned",
+    "policy_revision": "1",
+    "scopes_supported": [
+      "zagent:read",
+      "files:read",
+      "files:write",
+      "web:control",
+      "arcmap:inspect",
+      "arcmap:execute",
+      "artifacts:read"
+    ],
+    "grants": {}
+  },
+  "tool_policy": {
+    "zagent_task_submit": {
+      "scope": "zagent:read"
+    },
+    "zagent_task_status": {
+      "scope": "zagent:read"
+    },
+    "zagent_task_result": {
+      "scope": "zagent:read"
+    },
+    "zagent_task_list": {
+      "scope": "zagent:read"
+    },
+    "zagent_task_cancel": {
+      "scope": "zagent:read"
+    },
+    "zagent_artifact_read": {
+      "scope": "artifacts:read"
+    },
+    "zagent_workflow_status": {
+      "scope": "arcmap:inspect"
+    },
+    "zagent_workflow_report": {
+      "scope": "arcmap:inspect"
+    },
+    "zagent_workflow_cancel": {
+      "scope": "arcmap:execute"
+    },
+    "files_stat": {
+      "scope": "files:read"
+    },
+    "files_read": {
+      "scope": "files:read"
+    },
+    "arcmap_ping": {
+      "scope": "arcmap:inspect"
+    },
+    "arcmap_goal_plan": {
+      "scope": "arcmap:inspect"
+    },
+    "arcmap_goal_validate": {
+      "scope": "arcmap:inspect"
+    },
+    "arcmap_goal_execute": {
+      "scope": "arcmap:execute"
+    }
+  },
+  "workflow_policy": {
+    "allowed_strategies": []
+  },
+  "artifact_roots": [],
+  "allowed_origins": [],
+  "orchestration": {
+    "workers": 8,
+    "fast_lane_workers": 2
+  }
+}

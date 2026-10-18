@@ -1,0 +1,513 @@
+{
+  "schema_version": "1.0",
+  "project": "Zohr System Agent",
+  "product": "Zagent",
+  "generation": "v3",
+  "phase": "v3 Point 6 - Local Identity Authority + Approval Wait Window",
+  "generated_at": "2026-10-02",
+  "path_contract": {
+    "development_source": "D:\\3-Ikbalzohr\\Agent\\appBridge\\production\\Zagent\\v3",
+    "production_install": "<user-selected base folder>\\Zagent Master or Zagent User",
+    "default_data_root": "<InstallRoot>\\data",
+    "default_files_profile": "<InstallRoot>\\workspace",
+    "current_developer_files_profile": "D:\\3-Ikbalzohr\\Agent",
+    "custom_data_root_supported": true,
+    "custom_files_profile_supported": true
+  },
+  "components": {
+    "tunnel": {
+      "canonical_version": "4.1.0-zagent.3",
+      "baseline_version": "4.1.0",
+      "source": "agents\\tunnel\\engine",
+      "frozen_baseline": "_baseline_private\\tunnel-4.1.0",
+      "engine_fingerprint": {
+        "files": 8,
+        "aggregate_sha256": "7f27560e94f24a6394572fd61c92628e906650d9a45c8324c24e6b6f5f6f56a5",
+        "method": "sha256(sorted filename:file_sha256 lines)"
+      },
+      "transport": {
+        "path": "agents\\tunnel\\transport\\tunnel-client.exe",
+        "sha256": "fcc85a69ec0ad82518e4f8964f60c45e31787957782a0fc9c1b0c44e82d61b9b"
+      },
+      "migration_status": "ZAGENT_INTEGRATED",
+      "process_model": [
+        "system.tunnel.router",
+        "system.tunnel.transport"
+      ],
+      "credential_policy": "Secrets are stored only as a Windows DPAPI CurrentUser encrypted payload and injected into tunnel-client only through child-process environment; never plaintext in tunnel.json, logs, or command line.",
+      "external_control_plane_handshake": "LOCAL_SINGLE_DEVICE_AUTHORITY; shared gateway/global multi-device authority moved to Zagent Cloud"
+    },
+    "files": {
+      "canonical_version": "3.3.0-v3",
+      "baseline_version": "3.2.0",
+      "source": "agents\\files\\engine",
+      "frozen_baseline": "_baseline_private\\files-3.2.0",
+      "engine_fingerprint": {
+        "files": 16,
+        "aggregate_sha256": "c7cba73fe1fdbc5bf4b4c4735b97567c5d8a3b03861da099558439eb46b9466d"
+      },
+      "migration_status": "ZAGENT_INTEGRATED",
+      "process_model": [
+        "files.service"
+      ],
+      "runtime": "Python 3.11 / FastMCP",
+      "public_tools": 71,
+      "capability_registry_entries": 71,
+      "command_layer_version": "3.1.3",
+      "metadata_namespace": "zagent.*",
+      "mutable_paths": "Core-injected ZAGENT_FILES_* paths",
+      "profile_policy": "approved sandbox profiles; explicit approval for additional access",
+      "update_policy": "stage/validate in Files; apply/rollback owned by Zagent Core Update Broker",
+      "production_runtime_dependency": "Independent bundled/managed Python 3.11 runtime required; no dependency on legacy ZohrFiles .venv"
+    },
+    "web": {
+      "canonical_version": "2.2.10-zagent.1",
+      "baseline_version": "2.2.10",
+      "chrome_bridge_version": "1.4.0",
+      "source": "agents\\web\\engine",
+      "frozen_baseline": "_baseline_private\\web-2.2.10",
+      "engine_fingerprint": {
+        "files": 49,
+        "aggregate_sha256": "77e4fc2d6ca30396a840bd9d94cf92cdc3b5e7d9cba5835512345345903aa563"
+      },
+      "migration_status": "ZAGENT_INTEGRATED",
+      "process_model": [
+        "web.service"
+      ],
+      "runtime": "Node.js / TypeScript / Playwright",
+      "runtime_compatibility": ">=20.18 <27",
+      "public_tools": 151,
+      "capability_registry_entries": 151,
+      "default_runtime_mode": "native_attach",
+      "default_session_isolation": "tabs",
+      "browser_ownership": "real Google Chrome is external and not owned/killed by Zagent",
+      "bridge_policy": "profile-bound explicit Pair + time-limited explicit Approve; fail-closed before authorization",
+      "bridge_default_endpoint": "http://127.0.0.3:19030/bridge/",
+      "bridge_endpoint_override": "chrome.storage.local:zagentBridgeBase",
+      "mutable_paths": "Core-injected ZAGENT_WEB_* paths",
+      "production_runtime_dependency": "Independent bundled/managed Node.js runtime + production dependencies; preserve Playwright managed fallback."
+    },
+    "manager": {
+      "canonical_version": "1.0.18",
+      "source": "D:\\3-Ikbalzohr\\Agent\\ZohrManager\\v1",
+      "baseline": "_baseline_private\\manager-1.0.18",
+      "fingerprint": {
+        "files": 11,
+        "bytes": 351573,
+        "aggregate_sha256": "f5879182013b47215e348e58d70f3f759c0dce23e61287bc633f3d94c1a8c21c"
+      },
+      "evidence": [
+        "README title=Zohr Manager v1.0.18"
+      ],
+      "migration_status": "FROZEN_AS_CAPABILITY_REFERENCE"
+    },
+    "arcmap": {
+      "canonical_version": "3.0.1-zagent.1",
+      "canonical_stage": "Stage 3",
+      "source": "agents\\arcmap\\engine",
+      "frozen_baseline": "_baseline_private\\arcmap-3.0.0",
+      "baseline_sha256": "4365fc59d9ad87b31d0d991bc51d90c99e8df51057047ed4bca95501cfb6864a",
+      "migration_status": "ZAGENT_INTEGRATED",
+      "public_tools": 160,
+      "capability_registry_entries": 160,
+      "stage2_tools": 8,
+      "stage3_tools": 20,
+      "mcp_runtime": "Python 3.11.9",
+      "desktop_runtime": "ArcMap Desktop 10.6.1 / Python 2.7 external",
+      "process_model": [
+        "arcmap.mcp"
+      ],
+      "arcmap_desktop_owned_by_zagent": false,
+      "exclusive_bridge_ownership": true,
+      "default_endpoint": "http://127.0.0.3:18840/mcp",
+      "default_export_formats": [
+        "PDF",
+        "PNG"
+      ],
+      "default_export_dpi": 400,
+      "default_output_folder": "Hasil Peta",
+      "arcobjects_layout_backend": true,
+      "arcobjects_active_application_backend": "win32com:esriFramework.AppRef",
+      "owner_heartbeat_publication": "MoveFileExW atomic replace",
+      "owner_read_lock_policy": "retry transient sharing locks before unhealthy verdict",
+      "timing_chain": "PASS_FULL_CHAIN",
+      "timing_poll_interval_ms": 500,
+      "arcobjects_pagelayout_backend": "comtypes:esriFramework.AppRef+IApplication+IMxDocument+IPageLayout+IPage",
+      "engine_sha256": "03b7b5007356c48e825238f87690b5fc39c79dcd60c535912433fe389842e496",
+      "engine_fingerprint": {
+        "schema_version": "2.0",
+        "files": 119,
+        "aggregate_sha256": "03b7b5007356c48e825238f87690b5fc39c79dcd60c535912433fe389842e496",
+        "method": "sha256(sorted case-insensitive relative_path:file_sha256 lines; slash=/; utf8-no-bom; LF; no-final-newline)",
+        "self_referential_metadata_excluded": true,
+        "stage3_bridge_sha256": "553741d0f8c31693b1bade71f3fbf8ec7ebec1df637403eb49a8dbd3f9141586"
+      },
+      "live_desktop_validation": "PASS_2026-10-03_PID_5676_REAL_MXD",
+      "known_bug_regression_gate": "ZA-BUG-006 PASS; ZA-BUG-007 PASS; ZA-BUG-008 PASS; ZA-BUG-009 PASS; ZA-BUG-010 PASS; ZA-BUG-011 PASS; ZA-BUG-012 PASS; STEP12_WINDOW_CAPTURE_PASS; STEP15_RECOVERY_HARDENING_PASS",
+      "window_capture": "PASS_REAL_ARCMAP_WINDOW_PRINTWINDOW",
+      "visual_feedback_loop": "PASS_BEFORE_CHANGE_AFTER_ROLLBACK_RESTORED"
+    }
+  },
+  "runtime_snapshot": {
+    "tunnel_version": "4.1.0-zagent.3",
+    "router_tools": 24,
+    "files_tools": 71,
+    "web_tools": 151,
+    "connected_total_tools": 398,
+    "arcmap_runtime": "online",
+    "arcmap_tools": 160
+  },
+  "computer_vision_feedback_loop": {
+    "status": "ARCMAP_STEP13_LIVE_PASS_SOURCE_NOT_BUNDLED",
+    "completed_at": "2026-10-01",
+    "shared_visual_root": "<DataRoot>\\visual",
+    "web_tools": [
+      "web_visual_snapshot",
+      "web_visual_latest",
+      "web_visual_list",
+      "web_visual_ingest",
+      "web_visual_prune",
+      "web_visual_frame_extract",
+      "web_visual_act_and_observe",
+      "web_visual_store_status"
+    ],
+    "arcmap_tools": [
+      "arcmap_visual_snapshot",
+      "arcmap_visual_latest",
+      "arcmap_visual_list",
+      "arcmap_visual_prune",
+      "arcmap_window_capture"
+    ],
+    "manager_live_visual_viewer": true,
+    "mcp_image_content": true,
+    "device_session_provenance": true,
+    "retention_cleanup": true,
+    "video_frame_extraction": "PASS_REAL_CHROME_WEBM_TO_PNG_TO_MCP_IMAGE",
+    "observe_reason_act_observe": "PASS_MANAGED_CHROME_E2E",
+    "live_arcmap_current_mxd": "PASS_REAL_ARCMAP_WINDOW_CAPTURE_AND_REVERSIBLE_FEEDBACK_LOOP",
+    "validation": {
+      "web_npm_regression": "32/32 PASS",
+      "web_runtime_tests": "14/14 PASS",
+      "arcmap_runtime_tests": "26/26 PASS",
+      "manager_tests": "19/19 PASS",
+      "agent_integration": "370 TOOLS ROUTER_DISCOVERY PASS",
+      "dotnet_build": "PASS_0_WARNINGS_0_ERRORS"
+    }
+  },
+  "plugin_access_guard": {
+    "status": "IMPLEMENTED_TESTED_SOURCE_NOT_PROMOTED",
+    "completed_at": "2026-10-01",
+    "mode": "manager-approval",
+    "enforcement": "mandatory",
+    "durable_store": true,
+    "states": [
+      "PENDING",
+      "APPROVED",
+      "DENIED",
+      "REVOKED"
+    ],
+    "management_tools": [
+      "zagent_access_bootstrap",
+      "zagent_access_status",
+      "zagent_access_request",
+      "zagent_access_request_status",
+      "zagent_access_wait",
+      "zagent_access_revoke",
+      "zagent_access_dev_grant_create",
+      "zagent_access_dev_grant_get"
+    ],
+    "identity_bootstrap_tool": "zagent_identity_bootstrap",
+    "local_manager_approval": true,
+    "remote_self_approval": false,
+    "dev_requires_production_grant": true,
+    "recommended_plugin_failover_metadata": false,
+    "validation": {
+      "python_full_suite": "29/29 PASS",
+      "access_unit": "10/10 PASS",
+      "access_router_integration": "2/2 PASS",
+      "manager_tests": "17/17 PASS",
+      "setup_tests": "10/10 PASS",
+      "dotnet_build": "PASS - 0 warnings / 0 errors"
+    },
+    "cross_plugin_fallback": false,
+    "approval_wait_window": {
+      "status": "IMPLEMENTED_TESTED_SOURCE_NOT_PROMOTED",
+      "max_seconds": 60,
+      "poll_interval_seconds": "1-2",
+      "same_request_id": true,
+      "timeout_error": "APPROVAL_TIMEOUT"
+    }
+  },
+  "toolchain_snapshot": {
+    "node": "24.19.0",
+    "npm": "10.9.0",
+    "git": "2.47.0.windows.1",
+    "global_python": "2.7.5 (do not use for Zagent modern runtime)",
+    "dotnet_runtimes": [
+      "6.0.35",
+      "8.0.10"
+    ],
+    "dotnet_sdk": "10.0.401 portable",
+    "windows_sdk": "PRESENT",
+    "signtool": "PRESENT in Windows SDK, not on PATH",
+    "wix_v7": "MISSING"
+  },
+  "freeze_policy": {
+    "baseline_is_reference_only": true,
+    "no_secrets_copied_intentionally": true,
+    "excluded_live_state": [
+      ".venv",
+      "node_modules",
+      "logs",
+      "runtime DB/state",
+      ".env"
+    ],
+    "legacy_delete_gate": "Do not delete old agent folders until Phase 0 acceptance confirms all required capabilities/configuration are preserved."
+  },
+  "phase0_result": "PASS",
+  "phase0_completed_at": "2026-09-26",
+  "phase1_prerequisites": {
+    "dotnet_10_sdk": "PRESENT_10.0.401_PORTABLE_VERIFIED",
+    "wix_v7": "NOT_REQUIRED_FOR_CURRENT_SINGLE_EXE_BUNDLE_PATH",
+    "windows_sdk": "PRESENT",
+    "signtool": "PRESENT_NOT_ON_PATH",
+    "dotnet_root": "D:\\3-Ikbalzohr\\Agent\\appBridge\\toolchain\\dotnet10",
+    "dotnet_executable": "D:\\3-Ikbalzohr\\Agent\\appBridge\\toolchain\\dotnet10\\dotnet.exe",
+    "dotnet_smoke_build": "PASS"
+  },
+  "phase1": {
+    "result": "PASS",
+    "completed_at": "2026-09-26",
+    "core_version": "0.1.0-dev.1",
+    "solution": "Zagent.slnx",
+    "sdk": "10.0.401",
+    "source_aggregate_sha256": "96bd66d0d8722ff5691528c1f621ae54dfeef770ec2b66831130cea448d8b644",
+    "validation": {
+      "debug_build": "PASS_0_WARNINGS_0_ERRORS",
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_12_OF_12",
+      "core_self_test": "PASS",
+      "status_json": "PASS"
+    }
+  },
+  "current_phase": "Phase 9 - DEV Hardening & Live Plugin Acceptance",
+  "phase2": {
+    "result": "PASS",
+    "corrected_install_path_model": true,
+    "completed_at": "2026-09-26",
+    "core_version": "0.2.0-dev.1",
+    "source_aggregate_sha256": "7ff4778eacf015260b821c21149c1a28d7a4dc3e54277d8abea0436e71ce03dc",
+    "install_path_policy": {
+      "install_root": "exact user-selected folder",
+      "forced_suffix": false,
+      "default_data_root": "<InstallRoot>\\data",
+      "default_files_profile": "<InstallRoot>\\workspace",
+      "custom_data_root_supported": true,
+      "custom_files_profile_supported": true
+    },
+    "current_developer_example": {
+      "install_root": "D:\\3-Ikbalzohr\\Agent\\ZohrSystem\\Zagent\\v2",
+      "files_default_profile": "D:\\3-Ikbalzohr\\Agent\\appBridge",
+      "data_root": "D:\\3-Ikbalzohr\\Agent\\ZohrSystem\\Zagent\\v2\\data"
+    },
+    "validation": {
+      "debug_build": "PASS_0_WARNINGS_0_ERRORS",
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_24_OF_24"
+    }
+  },
+  "phase3": {
+    "result": "PASS",
+    "completed_at": "2026-09-26",
+    "core_version": "0.3.0-dev.1",
+    "source_aggregate_sha256": "72c9dd5bfa3c2e1331967c683d76b2aad0ad9bbfdff284efd34ba1db6a937d52",
+    "validation": {
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_24_OF_24",
+      "supervisor_tests": "PASS_10_OF_10",
+      "core_self_test": "PASS",
+      "ten_cycle_orphan_test": "PASS",
+      "descendant_crash_cleanup": "PASS"
+    }
+  },
+  "phase4": {
+    "result": "PASS",
+    "completed_at": "2026-09-26",
+    "core_version": "0.4.0-dev.1",
+    "tunnel_version": "4.1.0-zagent.1",
+    "source_aggregate_sha256": "ce9c7baf44fa84165d53cba5366cd8ae7e8d08d5464700e6c63b814dcf078831",
+    "validation": {
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_24_OF_24",
+      "supervisor_tests": "PASS_10_OF_10",
+      "tunnel_tests": "PASS_5_OF_5",
+      "core_self_test": "PASS",
+      "python_compile": "PASS",
+      "legacy_branding_source_hits": 0,
+      "external_transport_handshake": "DEFERRED_DURING_LEGACY_COEXISTENCE"
+    }
+  },
+  "phase5": {
+    "result": "PASS",
+    "completed_at": "2026-09-26",
+    "core_version": "0.5.0-dev.1",
+    "files_version": "3.2.0-zagent.1",
+    "source_aggregate_sha256": "e2d0d990a723fb271a36259e9690d316af4688b2963461c5e8e9c05b56319465",
+    "files_engine_sha256": "c7cba73fe1fdbc5bf4b4c4735b97567c5d8a3b03861da099558439eb46b9466d",
+    "validation": {
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_24_OF_24",
+      "supervisor_tests": "PASS_10_OF_10",
+      "tunnel_tests": "PASS_5_OF_5",
+      "files_tests": "PASS_17_OF_17",
+      "agent_integration_tests": "PASS_1_OF_1",
+      "files_runtime_tools": 68,
+      "tunnel_files_routed_tools": 76,
+      "core_self_test": "PASS",
+      "python_compile": "PASS",
+      "legacy_branding_source_hits": 0,
+      "update_broker_apply_rollback": "PASS"
+    }
+  },
+  "zagent_runtime_validation": {
+    "phase5": {
+      "files_tools": 68,
+      "tunnel_management_tools": 8,
+      "tunnel_files_total_tools": 76,
+      "tunnel_to_files_ping": "PASS"
+    },
+    "phase6": {
+      "files_tools": 68,
+      "web_tools": 143,
+      "tunnel_management_tools": 8,
+      "tunnel_files_web_total_tools": 219,
+      "files_ping": "PASS",
+      "web_ping": "PASS",
+      "user_chrome_attached_during_acceptance": false
+    },
+    "phase7": {
+      "files_tools": 68,
+      "web_tools": 143,
+      "arcmap_tools": 119,
+      "tunnel_management_tools": 8,
+      "total_tools": 338,
+      "arcmap_mcp": "PASS",
+      "arcmap_bridge_state_during_test": "OFFLINE_EXTERNAL_ARCMAP_NOT_RUNNING",
+      "live_arcmap_desktop_test": false
+    }
+  },
+  "phase6": {
+    "result": "PASS",
+    "completed_at": "2026-09-26",
+    "core_version": "0.6.0-dev.1",
+    "web_version": "2.2.10-zagent.1",
+    "chrome_bridge_version": "1.3.3",
+    "source_aggregate_sha256": "8b16819b8a322d1f84975c885317b55bed251c6c7f9c18a266bacadf79508302",
+    "web_engine_sha256": "77e4fc2d6ca30396a840bd9d94cf92cdc3b5e7d9cba5835512345345903aa563",
+    "validation": {
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_24_OF_24",
+      "supervisor_tests": "PASS_10_OF_10",
+      "tunnel_tests": "PASS_5_OF_5",
+      "files_tests": "PASS_17_OF_17",
+      "web_tests": "PASS_10_OF_10",
+      "web_npm_regression": "PASS_23_OF_23",
+      "agent_integration_tests": "PASS_1_OF_1",
+      "web_typecheck": "PASS",
+      "chrome_bridge_build": "PASS",
+      "total_routed_tools": 219,
+      "legacy_branding_source_hits": 0,
+      "core_self_test": "PASS"
+    },
+    "packaging_pending": [
+      "Bundle/manage compatible Node.js runtime and Web production dependencies.",
+      "Include/install Playwright browser payload so managed-browser fallback remains available.",
+      "Package/install Zagent Chrome Bridge and propagate alternate bridge endpoint when port preflight does not use 18830."
+    ]
+  },
+  "phase7": {
+    "result": "PASS_IMPLEMENTATION_LIVE_DESKTOP_PENDING",
+    "completed_at": "2026-09-26",
+    "core_version": "0.7.0-dev.1",
+    "arcmap_version": "3.0.0-zagent.1",
+    "source_aggregate_sha256": "a9fbf2ec1174a07e7d2941158459ddde3b4a62dae0bf52948cc228c6d92f9d6a",
+    "validation": {
+      "release_build": "PASS_0_WARNINGS_0_ERRORS",
+      "architecture_tests": "PASS_24_OF_24",
+      "supervisor_tests": "PASS_10_OF_10",
+      "tunnel_tests": "PASS_5_OF_5",
+      "files_tests": "PASS_17_OF_17",
+      "web_tests": "PASS_10_OF_10",
+      "web_npm_regression": "PASS_23_OF_23",
+      "arcmap_tests": "PASS_9_OF_9",
+      "platform_integration": "PASS_338_OF_338",
+      "python3_compile": "PASS",
+      "python27_compile": "PASS",
+      "legacy_identifier_hits": 0,
+      "live_current_mxd": "NOT_RUN_ARCMAP_EXE_NOT_RUNNING"
+    }
+  },
+  "v3_point4_zisb": {
+    "status": "CANARY_READY_LOCAL_EXACT_TARGET",
+    "phases": {
+      "I0": "COMPLETE",
+      "I1": "COMPLETE",
+      "I2": "LOCAL_CHALLENGE_PROOF_COMPLETE; REMOTE_MULTI_DEVICE_REGISTRY_PENDING_CONTROL_PLANE",
+      "I3": "COMPLETE",
+      "I4": "COMPLETE_LOCAL_FAIL_CLOSED",
+      "I5": "DEV_PLUGIN_SKILL_CONTRACT_ACTIVE; PRODUCTION_SKILL_RELEASE_NOT_EDITABLE_FROM_CURRENT_PLUGIN_CREATOR",
+      "I6": "COMPLETE",
+      "I7": "MIGRATION_IMPLEMENTED; PRODUCTION_DEVICE_ID_PRESERVATION_CANARY_REQUIRED",
+      "I8": "LOCAL_MATRIX_PASS; REMOTE_MULTI_DEVICE_CASES_PENDING_SECOND_DEVICE",
+      "I9": "READY_FOR_SINGLE_DEVICE_PRODUCTION_CANARY"
+    },
+    "tools": 7,
+    "routed_tool_total": 348,
+    "target_validation": "mandatory-session-binding",
+    "no_silent_fallback": true,
+    "success_invariant": "executed_on == target_device_id",
+    "production_canary_target": "Harry laptop"
+  },
+  "identity_local_authority": {
+    "status": "IMPLEMENTED_TESTED_SOURCE_NOT_PROMOTED",
+    "authority_model": "single-device-local-authority",
+    "multi_chat": true,
+    "global_multi_device_authority": false,
+    "cross_device_relay": false,
+    "shared_gateway_scope": "Zagent Cloud",
+    "inventory_scope": "local-device-only",
+    "operator_alias_must_equal_device_alias": true,
+    "mismatch_error": "OPERATOR_DEVICE_ALIAS_MISMATCH",
+    "bound_zagent_session_exclusive": true,
+    "try_plugin_on_bound_zagent_session": "FORBIDDEN",
+    "zagent_to_try_fallback": "DISABLED",
+    "approval_wait_window": {
+      "tool": "zagent_access_wait",
+      "max_seconds": 60,
+      "poll_interval_seconds": "1-2",
+      "same_request_id": true,
+      "timeout_error": "APPROVAL_TIMEOUT"
+    },
+    "expected_routed_tool_total": 369,
+    "validation": {
+      "python_full_suite": "29/29 PASS",
+      "identity_local_contract": "14/14 PASS",
+      "local_no_relay_contract": "3/3 PASS",
+      "plugin_access_unit": "10/10 PASS",
+      "plugin_access_router_integration": "2/2 PASS",
+      "dotnet_tunnel_tests": "5/5 PASS",
+      "agent_integration": "369/369 TOOLS PASS",
+      "manager_tests": "17/17 PASS",
+      "architecture_tests": "25/25 PASS",
+      "setup_tests": "10/10 PASS",
+      "dotnet_release_build": "PASS - 0 warnings / 0 errors"
+    }
+  },
+  "release_state": {
+    "source_updated": true,
+    "bundle_rebuilt_after_point6": false,
+    "production_promotion_performed": false,
+    "installed_production_changed": true,
+    "note": "RC3 Production upgrade installed ZA-BUG-011 successfully. ZA-BUG-012 Files profile-preservation fix validated in source; RC4 build pending."
+  }
+}

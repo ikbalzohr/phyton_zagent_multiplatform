@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zagent Chrome Bridge</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <h1>Zagent Chrome Bridge</h1>
+    <p id="profile">Memeriksa profil Chrome...</p>
+    <p id="status" role="status" aria-live="polite">Menghubungkan...</p>
+    <p id="notice">Satu persetujuan memberikan Zagent akses berkelanjutan ke semua tab dan jendela biasa di profil Chrome ini, termasuk tab baru. Izin berlaku sampai Anda menekan Disconnect. Tab Incognito dan halaman internal Chrome tidak termasuk.</p>
+    <div class="actions">
+      <button id="approve" class="primary" disabled>Approve</button>
+      <button id="disconnect" disabled>Disconnect</button>
+    </div>
+    <p id="error" role="alert"></p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

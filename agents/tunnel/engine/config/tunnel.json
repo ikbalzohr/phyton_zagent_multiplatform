@@ -1,0 +1,28 @@
+{
+  "router": {
+    "host": "127.0.0.1",
+    "port": 18810,
+    "mcp_path": "/mcp",
+    "log_level": "info"
+  },
+  "security": {
+    "allow_local_upstreams_only": true,
+    "allowed_hosts": [
+      "127.0.0.1",
+      "::1",
+      "localhost"
+    ],
+    "allow_http": true
+  },
+  "resource_server": {},
+  "tool_policy": {},
+  "workflow_policy": {
+    "allowed_strategies": []
+  },
+  "artifact_roots": [],
+  "allowed_origins": [],
+  "orchestration": {
+    "workers": 8,
+    "fast_lane_workers": 2
+  }
+}

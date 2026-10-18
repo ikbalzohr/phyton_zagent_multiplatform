@@ -1,0 +1,23 @@
+@page
+@using Zagent.Shared
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zagent UI1</title><link rel="stylesheet" href="/dashboard.css" /><script defer src="/dashboard.js"></script></head>
+<body><aside><div class="brand">Z<span>agent</span><small>CORE1 / UI1 · @ZagentProductInfo.UiVersion</small></div>
+<nav aria-label="Management"><a href="#overview">Overview</a><a href="#agents">Agents</a><a href="#workspaces">Workspaces &amp; approvals</a><a href="#connections">Connections</a><a href="#jobs">Jobs &amp; workflows</a><a href="#artifacts">Artifacts</a><a href="#logs">Logs</a><a href="#settings">Settings</a></nav>
+<p class="boundary">Private management plane<br />Windows per-user desktop<br />Remote access OFF</p></aside>
+<main><header><div><small>INSTALLATION CONTROL</small><h1 id="heading">Overview</h1></div><button id="logout" class="secondary">Sign out</button></header>
+<p id="freshness" role="status">Waiting for an authenticated snapshot…</p><p id="notice" role="status"></p>
+<section id="overview" class="page"><div class="toolbar"><button data-runtime="startAll">Start all agents</button><button data-runtime="stopAll" class="secondary">Stop all agents</button><button id="shutdown" class="danger">Stop Core</button></div><p class="muted">Closing this tab does not stop Core or its agents. Stop Core also disconnects this dashboard; restart from the Windows shortcut.</p><div id="overview-content"></div></section>
+<section id="agents" class="page" hidden><p class="muted">State is observed by the existing Core supervisor. MCP readiness does not imply ArcMap desktop/CURRENT readiness.</p><div id="agents-content"></div><h2>Capabilities</h2><div id="capabilities-content"></div></section>
+<section id="workspaces" class="page" hidden><p class="muted">Installation workspace and approved Files roots. Approving browser consent is only possible in the browser extension.</p><form id="profile-form" class="form-row"><label>Profile name<input name="name" required maxlength="100" /></label><label>Approved root<input name="root" required /></label><label>Access<select name="mode"><option value="read-only">Read only</option><option value="read-write">Read/write</option></select></label><button type="submit">Add profile</button></form><div id="workspaces-content"></div></section>
+<section id="connections" class="page" hidden><div class="toolbar"><button data-integration="chrome.check">Check browser</button><button data-integration="arcmap.check">Check ArcMap</button></div><div id="connections-content"></div><h2>MCP routes</h2><div id="routes-content"></div></section>
+<section id="jobs" class="page" hidden><p class="muted">Cancel is a cooperative request, not proof of rollback. Unknown outcomes require reconciliation; the dashboard never auto-replays jobs.</p><div id="jobs-content"></div><h2>Workflow evidence</h2><form id="workflow-form" class="form-row"><label>Principal ID<input name="principalId" required /></label><label>Run ID (optional)<input name="runId" /></label><button type="submit">Read journal</button></form><div id="workflows-content"></div></section>
+<section id="artifacts" class="page" hidden><p class="muted">Downloads require a workspace-scoped manifest, recent capture and matching SHA-256. No filesystem paths or active HTML previews are served.</p><div id="artifacts-content"></div></section>
+<section id="logs" class="page" hidden><p class="muted">Bounded operational log, not a conversation history. Sensitive values are redacted.</p><div id="logs-content"></div></section>
+<section id="settings" class="page" hidden><p class="muted">Credentials and TLS are provisioned offline by the Windows account owner; no password, token or enrollment endpoint is exposed here.</p><div id="settings-content"></div></section>
+<noscript>JavaScript is required for live management data. No cached or sample status is shown.</noscript>
+</main></body></html>

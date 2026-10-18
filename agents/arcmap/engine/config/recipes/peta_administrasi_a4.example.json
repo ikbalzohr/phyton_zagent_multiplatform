@@ -1,0 +1,76 @@
+{
+  "name": "peta_administrasi_a4",
+  "map_type": "ADMINISTRASI",
+  "data_frame": "Layers",
+  "require_a4": true,
+  "fail_on_missing_required": true,
+  "fail_on_qa": true,
+  "min_match_score": 0.62,
+  "layers": [
+    {
+      "name": "BATAS_DESA",
+      "layer": "BATAS DESA",
+      "dataset": "BATAS_DESA_PL",
+      "aliases": ["batas_desa", "desa", "batasdesa"],
+      "patterns": ["batas.*desa", "desa.*polygon"],
+      "required": true,
+      "shape_type": "Polygon",
+      "mode": "replace_or_add",
+      "visible": true,
+      "labels": {
+        "show": true,
+        "expression": "[DESA]"
+      }
+    },
+    {
+      "name": "JALAN",
+      "layer": "JALAN",
+      "dataset": "JALAN_LN",
+      "aliases": ["jalan", "roads", "jaringan_jalan"],
+      "patterns": ["jalan", "road"],
+      "required": false,
+      "shape_type": "Polyline",
+      "mode": "replace_or_add",
+      "visible": true
+    },
+    {
+      "name": "SUNGAI",
+      "layer": "SUNGAI DAN ALIRAN AIR",
+      "dataset": "SUNGAI_LN",
+      "aliases": ["sungai", "aliranair", "river"],
+      "patterns": ["sungai", "aliran.*air"],
+      "required": false,
+      "shape_type": "Polyline",
+      "mode": "replace_or_add",
+      "visible": true
+    }
+  ],
+  "layer_order": [
+    "JALAN",
+    "SUNGAI DAN ALIRAN AIR",
+    "BATAS DESA"
+  ],
+  "extent": {
+    "layer": "BATAS DESA",
+    "factor": 1.08,
+    "nice_scale": true
+  },
+  "legend": {
+    "name": "Legend",
+    "title": " ",
+    "items": [
+      "BATAS DESA",
+      "JALAN",
+      "SUNGAI DAN ALIRAN AIR"
+    ],
+    "columns": 1,
+    "max_columns": 3,
+    "allow_expand_height": true,
+    "show_feature_count": false
+  },
+  "export": {
+    "formats": ["PDF", "PNG"],
+    "resolution": 400
+  },
+  "allow_custom_export": false
+}

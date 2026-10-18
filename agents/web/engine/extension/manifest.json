@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Zagent Chrome Bridge",
+  "version": "1.4.0",
+  "minimum_chrome_version": "120",
+  "description": "Profile-bound pairing and user-scoped authorization bridge for Zagent Web native Chrome automation.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "debugger",
+    "identity",
+    "identity.email"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://127.0.0.3/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Zagent Chrome Bridge",
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src http://127.0.0.1:* http://127.0.0.3:*"
+  }
+}

@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Zagent.Core/Zagent.Core.csproj" />
+    <Project Path="src/Zagent.Bundle/Zagent.Bundle.csproj" />
+    <Project Path="src/Zagent.Setup/Zagent.Setup.csproj" />
+    <Project Path="src/Zagent.Shared/Zagent.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Zagent.DashboardTests/Zagent.DashboardTests.csproj" />
+    <Project Path="tests/Zagent.ManagerFeatureTests/Zagent.ManagerFeatureTests.csproj" />
+    <Project Path="tests/Zagent.ArcMapWorkflowUnitTests/Zagent.ArcMapWorkflowUnitTests.csproj" />
+    <Project Path="tests/Zagent.AgentIntegrationTests/Zagent.AgentIntegrationTests.csproj" />
+    <Project Path="tests/Zagent.ArchitectureTests/Zagent.ArchitectureTests.csproj" />
+    <Project Path="tests/Zagent.ArcMapTests/Zagent.ArcMapTests.csproj" />
+    <Project Path="tests/Zagent.FilesTests/Zagent.FilesTests.csproj" />
+    <Project Path="tests/Zagent.ManagerTests/Zagent.ManagerTests.csproj" />
+    <Project Path="tests/Zagent.SetupTests/Zagent.SetupTests.csproj" />
+    <Project Path="tests/Zagent.SupervisorTests/Zagent.SupervisorTests.csproj" />
+    <Project Path="tests/Zagent.TestChild/Zagent.TestChild.csproj" />
+    <Project Path="tests/Zagent.TunnelTests/Zagent.TunnelTests.csproj" />
+    <Project Path="tests/Zagent.WebTests/Zagent.WebTests.csproj" />
+  </Folder>
+</Solution>

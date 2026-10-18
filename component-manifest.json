@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0",
+  "product": "Zagent",
+  "generation": "v1",
+  "product_line": "zagent-mcp-v1",
+  "suite_version": "1.0.0",
+  "release_status": "SOURCE_INTEGRATION_NOT_ACCEPTED",
+  "baseline_commit": "222341c3840b4048b8f19c534e8619fbc6a711f0",
+  "historical_inventory": "docs/history/component-manifest-baseline-222341c.json",
+  "path_contract": {
+    "development_source": "<SourceRoot>",
+    "production_install": "<user-selected InstallRoot>",
+    "default_data_root": "<InstallRoot>\\data",
+    "default_files_profile": "<InstallRoot>\\workspace",
+    "custom_data_root_supported": true,
+    "custom_files_profile_supported": true
+  },
+  "components": {
+    "core": {
+      "product_line": "zagent-core-v1",
+      "canonical_version": "1.0.0",
+      "source": "src/Zagent.Core",
+      "baseline_product_version": "0.9.0"
+    },
+    "ui": {
+      "product_line": "zagent-ui-v1",
+      "canonical_version": "1.0.0",
+      "source": "src/Zagent.Core",
+      "baseline_product_version": "WPF Manager reference only"
+    },
+    "tunnel": {
+      "product_line": "zagent-tunnel-v1",
+      "canonical_version": "1.0.0",
+      "source": "agents/tunnel/engine",
+      "baseline_product_version": "4.1.0-zagent.3"
+    },
+    "files": {
+      "product_line": "zagent-files-v1",
+      "canonical_version": "1.0.0",
+      "source": "agents/files/engine",
+      "baseline_product_version": "3.3.0-v3"
+    },
+    "web": {
+      "product_line": "zagent-web-v1",
+      "canonical_version": "1.0.0",
+      "source": "agents/web/engine",
+      "baseline_product_version": "2.2.10-zagent.1"
+    },
+    "arcmap": {
+      "product_line": "zagent-arcmap-v1",
+      "canonical_version": "1.0.0",
+      "source": "agents/arcmap/engine",
+      "baseline_product_version": "3.0.1-zagent.1"
+    }
+  },
+  "management": {
+    "ui": "web-only",
+    "host": "Core",
+    "entrypoint": "Zagent.Core.exe --dashboard",
+    "remote_enabled": false,
+    "browser_close_stops_core": false
+  },
+  "migration": {
+    "mode": "offline-single-product-cutover",
+    "semver_cross_product_line_comparison": false,
+    "backup_required": true,
+    "legacy_runtime_mode": false
+  },
+  "validation": {
+    "windows_build": "NOT_RUN",
+    "windows_tests": "NOT_RUN",
+    "installer_acceptance": "NOT_RUN",
+    "client_interoperability": "NOT_RUN",
+    "arcmap_live": "NOT_RUN",
+    "release_promotion": "BLOCKED_PENDING_EVIDENCE"
+  }
+}

@@ -1,0 +1,196 @@
+{
+  "schema_version": "1.0",
+  "id": "arcmap.service",
+  "product": "Zagent ArcMap",
+  "version": "1.0.0",
+  "baseline": {
+    "canonical_stage": "Stage 3",
+    "frozen_baseline": "_baseline_private\\arcmap-3.0.0",
+    "frozen_files": 115,
+    "baseline_sha256": "4365fc59d9ad87b31d0d991bc51d90c99e8df51057047ed4bca95501cfb6864a",
+    "historical_version_conflict": [
+      "0.1.1-integration-safe",
+      "2.0.0",
+      "2.1.0",
+      "3.0.0"
+    ],
+    "canonical_reason": "Frozen Stage 3 baseline 124 tools; Orchestrator +8 to 132; Native Layer Properties +6, Existing Grid/Graticule +6, Smart Corner +7 to 151; ARC-05..10 +9 to 160."
+  },
+  "fingerprint_status":"BASELINE_VALUES_RETAINED_RECOMPUTE_BEFORE_RELEASE",
+    "engine": {
+    "relative_path": "agents\\arcmap\\engine",
+    "legacy_identifier_hits": 0,
+    "pycache_remaining": 0,
+    "pyc_remaining": 0,
+    "live_bridge_sha256": "7474b493f0adbcef6e2d6f78ccb19d9c3b55d4400742a47548fd6a346a3f3d20",
+    "runner_sha256": "f5cf6a4593bb2cd8a0b6cc339c8121acf87fc92f840b8b33eefbe0dc90bdadb1",
+    "ipc_client_sha256": "c8df0a2db6bc24ce47dd2b5620655da46c9e30ed971b7730b4aecefd12248146",
+    "request_context_sha256": "d38a3d304f697b5c8708911169353dd7eb32673ac89f1c026e430e22009da66e",
+    "source_files_in_fingerprint": 119,
+    "aggregate_sha256": "03b7b5007356c48e825238f87690b5fc39c79dcd60c535912433fe389842e496",
+    "fingerprint_schema": "2.0",
+    "fingerprint_method": "sha256(sorted case-insensitive relative_path:file_sha256 lines; slash=/; utf8-no-bom; LF; no-final-newline); excludes self-referential build metadata",
+    "fingerprint_exclusions": [
+      "vendor27/**",
+      "**/__pycache__/**",
+      "**/*.pyc",
+      "**/bridge_runtime.json",
+      "**/*.bak_*",
+      "BUILD_INFO.json",
+      "BUILD_MANIFEST.json",
+      "ZAGENT_BUILD_INFO.json"
+    ],
+    "stage3_bridge_sha256": "553741d0f8c31693b1bade71f3fbf8ec7ebec1df637403eb49a8dbd3f9141586"
+  },
+  "runtimes": {
+    "mcp": {
+      "language": "Python",
+      "version": "3.11.9",
+      "development_runtime": "agents\\arcmap\\runtime\\python",
+      "dependency": "mcp[cli]>=2,<3",
+      "ownership": "Zagent Core / NativeAgentSupervisor"
+    },
+    "desktop_bridge": {
+      "product": "ArcMap Desktop",
+      "version": "10.6.1",
+      "language": "Python 2.7",
+      "ownership": "external",
+      "zagent_must_not_kill_arcmap": true
+    }
+  },
+  "transport": {
+    "default_host": "127.0.0.3",
+    "default_port": 18840,
+    "path": "/mcp",
+    "development_gateway": "18900-18999"
+  },
+  "public_tools": {
+    "count": 160,
+    "stage2": 8,
+    "stage3": 20,
+    "snapshot": "agents\\arcmap\\runtime-tools.snapshot.json",
+    "registry_capabilities": 160
+  },
+  "paths": {
+    "engine_env": "ZAGENT_ARCMAP_ENGINE_ROOT",
+    "data_env": "ZAGENT_ARCMAP_DATA_ROOT",
+    "config_env": "ZAGENT_ARCMAP_CONFIG_DIR",
+    "ipc_env": "ZAGENT_ARCMAP_IPC_ROOT",
+    "visual_root_env": "ZAGENT_VISUAL_ROOT",
+    "mutable_state_outside_source": true
+  },
+  "ownership": {
+    "mcp_process": "arcmap.mcp",
+    "mcp_job_object_owned": true,
+    "arcmap_desktop_external": true,
+    "live_bridge_mutex": "Local\\Zagent.ArcMap.SessionOwner.v1",
+    "foreign_bridge_detection": true,
+    "dual_control_policy": "refuse"
+  },
+  "production_export_defaults": {
+    "formats": [
+      "PDF",
+      "PNG"
+    ],
+    "dpi": 400,
+    "output_folder": "Hasil Peta",
+    "naming": "PETA A4 <nama perusahaan> ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ <jenis peta>",
+    "additional_capabilities_preserved": [
+      "JPEG",
+      "TIFF"
+    ]
+  },
+  "contracts": {
+    "snapshot": "arcmap_snapshot_state",
+    "restore": "arcmap_restore_snapshot",
+    "export_pdf": "arcmap_export_pdf",
+    "export_png": "arcmap_export_png",
+    "bundle": "arcmap_export_bundle",
+    "stage3_export": "arcmap_stage3_export_current",
+    "visual_snapshot": "arcmap_visual_snapshot",
+    "visual_latest": "arcmap_visual_latest",
+    "window_capture": "arcmap_window_capture"
+  },
+  "health": {
+    "mcp_ready": "process/tool surface reachable",
+    "bridge_ready": "external CURRENT-MXD bridge reachable",
+    "registry_when_mcp_ready_bridge_offline": "Degraded",
+    "restart_mcp_when_bridge_offline": false
+  },
+  "validation": {"status":"NOT_RUN", "reason":"Tests/build/runtime explicitly deferred to Windows"},
+    "execution_context": {"version":1,"internal_channel":"X-Zagent-Internal-Token / ZAGENT_INTERNAL_TOKEN", "public_metadata_is_authority":false},
+    "baseline_validation": {
+    "python3_compile": "PASS",
+    "python27_arcgis_compile": "PASS",
+    "runtime_tools": "160 SOURCE_DECLARED; live acceptance pending, do not infer production runtime acceptance",
+    "stage2_loaded": true,
+    "stage3_loaded": true,
+    "visual_store_integration": "PASS",
+    "platform_routing": "360/360 PASS",
+    "release_build": "PASS 0 warnings / 0 errors",
+    "arcobjects_layout_backend": true,
+    "arcobjects_active_application_backend": "win32com:esriFramework.AppRef",
+    "timing_chain": "PASS_FULL_CHAIN",
+    "timing_dominant_wait": "IPC enqueue -> Add-In claim; bounded by 500ms timer polling interval",
+    "live_current_mxd": "PASS_CURRENT_ARCMAP_PID_5676_REAL_MXD",
+    "arcmap_core_tests": "26/26 PASS",
+    "known_bug_regression_gate": "ZA-BUG-006 PASS; ZA-BUG-007 PASS; ZA-BUG-008 PASS; ZA-BUG-009 PASS; ZA-BUG-010 PASS; ZA-BUG-011 PASS; STEP12_WINDOW_CAPTURE_PASS; STEP15_RECOVERY_HARDENING_PASS",
+    "stage3_pagelayout_acceptance": "PASS_PutCustomSize_A4_LANDSCAPE_29.7x21.0_SAVED_FALSE",
+    "arcobjects_pagelayout_backend": "comtypes:esriFramework.AppRef+IApplication+IMxDocument+IPageLayout+IPage",
+    "window_capture": "PASS_REAL_ARCMAP_WINDOW_PRINTWINDOW",
+    "visual_feedback_loop": "PASS_BEFORE_CHANGE_AFTER_ROLLBACK_RESTORED"
+  },
+  "packaging_pending": [
+    "Final Step 16 clean install/repair/upgrade/uninstall acceptance before Production promotion."
+  ],
+  "known_bug_fixes": [
+    {
+      "id": "ZA-BUG-006",
+      "status": "RESOLVED",
+      "primary_backend": "esriFramework.AppRef"
+    },
+    {
+      "id": "ZA-BUG-007",
+      "status": "RESOLVED",
+      "owner_publish": "MoveFileExW atomic replace",
+      "owner_read": "retry transient sharing locks"
+    },
+    {
+      "id": "ZA-BUG-008",
+      "status": "RESOLVED",
+      "timing_claim_epoch": "preserved after command timing merge",
+      "full_timing_chain": true
+    },
+    {
+      "id": "ZA-BUG-009",
+      "status": "RESOLVED",
+      "pagelayout_backend": "comtypes:esriFramework.AppRef+IApplication+IMxDocument+IPageLayout+IPage",
+      "live_method": "IPage.PutCustomSize"
+    },
+    {
+      "id": "ZA-BUG-010",
+      "status": "RESOLVED",
+      "fingerprint_schema": "2.0",
+      "self_referential_metadata_excluded": true
+    },
+    {
+      "id": "ZA-BUG-011",
+      "status": "RESOLVED_SOURCE_FINAL_CORE_INCLUDED_PRODUCTION_RUNTIME_VALIDATION_PENDING",
+      "runtime_timeout_seconds": 15,
+      "export_timeout_seconds": 60,
+      "ddp_timeout_seconds": 120
+    }
+  ],
+  "candidate_features": {
+    "smart_corner_digitizer": {
+      "status": "DEV_UNIT_PASS_NOT_LIVE_ACCEPTED",
+      "tools": 7,
+      "new_total": 151
+    },
+    "arc05_arc10": {
+      "status": "DEV_UNIT_TESTED_LIVE_ACCEPTANCE_PENDING",
+      "tools": 9,
+      "new_total": 160
+    }
+  }
+}

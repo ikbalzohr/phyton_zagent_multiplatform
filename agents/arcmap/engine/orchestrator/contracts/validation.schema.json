@@ -1,0 +1,33 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"zagent://arcmap/orchestrator/validation.schema.json",
+  "title":"Zagent ArcMap Validation Evidence",
+  "type":"object",
+  "required":["schema_version","status","results"],
+  "properties":{
+    "schema_version":{"const":"2.0"},
+    "status":{"enum":["PASS","WARN","FAIL","NEEDS_REVIEW"]},
+    "results":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["rule_id","status","severity","expected","actual"],
+        "properties":{
+          "rule_id":{"type":"string"},
+          "status":{"enum":["PASS","WARN","FAIL","NEEDS_REVIEW"]},
+          "severity":{"enum":["info","warning","critical"]},
+          "expected":{},
+          "actual":{},
+          "evidence_id":{"type":["string","null"]},
+          "evidence_hash":{"type":["string","null"]},
+          "revision":{"type":["string","number","object","null"]},
+          "bounding_region":{"type":["array","object","null"]},
+          "confidence":{"type":["number","null"],"minimum":0,"maximum":1},
+          "permitted_repair":{"type":["string","null"]}
+        },
+        "additionalProperties":true
+      }
+    }
+  },
+  "additionalProperties":true
+}

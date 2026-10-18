@@ -1,0 +1,121 @@
+{
+    "schema_version":  "1.0",
+    "id":  "web.service",
+    "product":  "Zagent Web",
+    "version": "1.0.0",
+    "chrome_bridge_version":  "1.3.3",
+    "baseline":  {
+                     "source_component":  "Web 2.2.10",
+                     "frozen_baseline":  "_baseline_private\\web-2.2.10",
+                     "baseline_sha256":  "0aa9db066486432ec4c843b6f456d21f94b0c868a37d02cdbd7bb1328f96d614"
+                 },
+    "fingerprint_status":"BASELINE_VALUES_RETAINED_RECOMPUTE_BEFORE_RELEASE",
+    "engine":  {
+                   "relative_path":  "agents\\web\\engine",
+                   "runtime":  "Node.js / TypeScript / Playwright",
+                   "runtime_compatibility":  "\u003e=20.18 \u003c27",
+                   "development_node":  "v24.19.0",
+                   "entrypoint":  "dist\\index.js",
+                   "source_files_in_fingerprint":  49,
+                   "aggregate_sha256":  "77e4fc2d6ca30396a840bd9d94cf92cdc3b5e7d9cba5835512345345903aa563",
+                   "mutable_state_in_source_root":  false,
+                   "path_source_of_truth":  "src/config/paths.ts"
+               },
+    "lifecycle":  {
+                      "owner":  "Zagent Core / NativeAgentSupervisor",
+                      "process_id":  "web.service",
+                      "auto_restart":  true,
+                      "max_restart_attempts":  3,
+                      "job_object_owned":  true,
+                      "native_chrome_process_owned_by_zagent":  false
+                  },
+    "paths":  {
+                  "engine_root_env":  "ZAGENT_WEB_ENGINE_ROOT",
+                  "data_root_env":  "ZAGENT_WEB_DATA_ROOT",
+                  "config_root_env":  "ZAGENT_WEB_CONFIG_DIR",
+                  "runtime_root_env":  "ZAGENT_WEB_RUNTIME_DIR",
+                  "artifacts_root_env":  "ZAGENT_WEB_ARTIFACTS_DIR",
+                  "log_root_env":  "ZAGENT_WEB_LOG_DIR"
+              },
+    "browser":  {
+                    "default_browser":  "chrome",
+                    "default_runtime_mode":  "native_attach",
+                    "default_session_isolation":  "tabs",
+                    "auto_start_browser":  false,
+                    "auto_restart_browser":  false,
+                    "external_chrome_policy":  "Real user Chrome is external and must not be killed by Zagent.",
+                    "managed_fallback_preserved":  true
+                },
+    "bridge":  {
+                   "product":  "Zagent Chrome Bridge",
+                   "version":  "1.4.0",
+                   "production_required":  true,
+                   "pairing_model":  "profile-bound explicit user pairing",
+                   "authorization_model":  "time-limited explicit user approval",
+                   "request_timeout_seconds":  180,
+                   "endpoint_contract":  "installation/runtime-generated bridge-config.json",
+                   "development_endpoint_source":  "DEV runtime ZAGENT_BIND_HOST + ZAGENT_WEB_PORT",
+                   "production_endpoint_source":  "persisted zagent.machine.json BindHost + WebPort",
+                   "production_payload_endpoint":  "UNCONFIGURED until install initializer runs",
+                   "first_install_port_allocation":  "preferred production ports with automatic free-port fallback inside 18800-18899",
+                   "endpoint_override_storage_key":  "zagentBridgeBase",
+                   "endpoint_environment_storage_key":  "zagentBridgeEnvironment",
+                   "production_packaging_endpoint_guard":  true,
+                   "heartbeat_required_before_pair_request":  true,
+                   "heartbeat_preflight_timeout_seconds":  2,
+                   "allowed_loopback_hosts":  [
+                                                  "127.0.0.1",
+                                                  "127.0.0.3",
+                                                  "localhost"
+                                              ],
+                   "build_artifact":  "agents\\web\\engine\\artifacts\\chrome-bridge",
+                   "credentials_copied_from_legacy":  false,
+                   "fail_closed_before_pairing":  true,
+                   "manager_missing_heartbeat_diagnostic":  true
+               },
+    "security":  {
+                     "dns_rebinding_validation":  "Explicit host/origin allow-list including Zagent 127.0.0.3",
+                     "bridge_profile_identity":  true,
+                     "cross_profile_reconnect_blocked":  true,
+                     "exact_target_authorization":  true,
+                     "sensitive_headers_redacted": true,
+                     "browser_owner": "immutable principal/workspace/resource per process; cookies not tenant-isolated"
+                 },
+    "public_tools":  {
+                         "count":  151,
+                         "snapshot":  "agents\\web\\runtime-tools.snapshot.json",
+                         "capability_registry_count":  151,
+                         "naming":  "public MCP web_*; internal capability web.*"
+                     },
+    "baseline_integration":  {
+                        "tunnel_service_id":  "zagent_web",
+                        "tunnel_namespace":  "web",
+                        "files_tools":  71,
+                        "web_tools":  151,
+                        "tunnel_management_tools":  15,
+                        "routed_total":  237,
+                        "files_ping_through_tunnel":  "PASS",
+                        "web_ping_through_tunnel":  "PASS"
+                    },
+    "validation": {"status":"NOT_RUN", "reason":"Tests/build/runtime explicitly deferred to Windows"},
+    "execution_context": {"version":1,"internal_channel":"X-Zagent-Internal-Token / ZAGENT_INTERNAL_TOKEN", "public_metadata_is_authority":false},
+    "baseline_validation":  {
+                       "typescript_typecheck":  "PASS",
+                       "npm_regression":  "32/32 PASS",
+                       "chrome_bridge_build":  "PASS",
+                       "web_tests":  "14/14 PASS",
+                       "visual_artifact_store":  "PASS",
+                       "mcp_image_content":  "PASS",
+                       "observe_reason_act_observe":  "PASS",
+                       "video_frame_extraction":  "PASS",
+                       "installation_aware_endpoint_e2e":  "PASS",
+                       "manager_machine_config_endpoint_e2e":  "PASS",
+                       "tunnel_files_web_integration":  "1/1 PASS",
+                       "release_build":  "PASS_0_WARNINGS_0_ERRORS",
+                       "legacy_branding_source_hits":  0
+                   },
+    "production_packaging_pending":  [
+                                         "Bundle/manage a compatible Node.js runtime and production dependencies; do not depend on the developer machine Node installation.",
+                                         "Preserve managed Chrome fallback by bundling or installing the required Chrome-compatible runtime payload."
+                                     ]
+}

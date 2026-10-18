@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zagent.local/schemas/capability-registry-v1.schema.json",
+  "title": "Zagent Capability Registry v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generation",
+    "agents"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "updated_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "agent_id",
+          "environment",
+          "registration_state",
+          "production_approved",
+          "health",
+          "manifest_path"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "environment": {
+            "enum": [
+              "DEVELOPMENT",
+              "STAGING",
+              "PRODUCTION"
+            ]
+          },
+          "registration_state": {
+            "enum": [
+              "DISCOVERED",
+              "VALIDATING",
+              "REGISTERED",
+              "QUARANTINED",
+              "DISABLED"
+            ]
+          },
+          "production_approved": {
+            "type": "boolean"
+          },
+          "health": {
+            "enum": [
+              "UNKNOWN",
+              "READY",
+              "DEGRADED",
+              "OFFLINE",
+              "FAILED"
+            ]
+          },
+          "manifest_path": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "allocated_port": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "capability_names": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "last_health_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_fingerprint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

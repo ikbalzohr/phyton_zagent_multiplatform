@@ -1,0 +1,10 @@
+{
+  "templates": [
+    {
+      "id": "administrasi_a4",
+      "path": "<select-template-mxd>",
+      "profile": "config\\profiles\\administrasi_a4.json",
+      "recipe": "config\\recipes\\peta_administrasi_a4.example.json"
+    }
+  ]
+}

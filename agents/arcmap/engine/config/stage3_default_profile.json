@@ -1,0 +1,47 @@
+{
+  "profile_name": "ZAGENT_STAGE3_A4_DEFAULT",
+  "page": {
+    "size": "A4",
+    "orientation": "landscape"
+  },
+  "layout": {
+    "title": {
+      "name": "MAP_TITLE",
+      "x_frac": 0.5,
+      "y_frac": 0.96,
+      "font_size": 16
+    },
+    "subtitle": {
+      "name": "MAP_SUBTITLE",
+      "x_frac": 0.5,
+      "y_frac": 0.92,
+      "font_size": 9
+    },
+    "legend": {
+      "name": "ZAGENT_LEGEND",
+      "x_frac": 0.77,
+      "y_frac": 0.16,
+      "width_frac": 0.21,
+      "height_frac": 0.48
+    },
+    "north_arrow": {
+      "name": "ZAGENT_NORTH_ARROW",
+      "x_frac": 0.9,
+      "y_frac": 0.78,
+      "size_frac": 0.07
+    },
+    "scale_bar": {
+      "name": "ZAGENT_SCALE_BAR",
+      "x_frac": 0.34,
+      "y_frac": 0.055,
+      "width_frac": 0.3
+    },
+    "neatline_margin_frac": 0.018
+  },
+  "extent_padding_percent": 5.0,
+  "export": {
+    "pdf": true,
+    "png": true,
+    "resolution": 400
+  }
+}
