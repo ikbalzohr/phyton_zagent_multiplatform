@@ -304,7 +304,7 @@ if (args.Contains("--serve-dashboard", StringComparer.Ordinal))
     if (!OperatingSystem.IsWindows() || !Environment.UserInteractive)
         throw new InvalidOperationException("Core1 requires an interactive per-user Windows desktop.");
     using (var certificate = dashboardOptions.LoadCertificate()) { }
-    Environment.SetEnvironmentVariable("ZAGENT_DEFAULT_WORKSPACE_ID", dashboardOptions.WorkspaceId);
+    Zagent.Core.Manager.InternalSecretStore.ValidatePrivatePath(dashboardConfig, directory: false);
     var requestedPipe = GetOptionValue(args, "--pipe");
 
     var managerEnvironment =
@@ -406,7 +406,8 @@ if (args.Contains("--serve-dashboard", StringComparer.Ordinal))
                 "ZAGENT_SUPERVISOR_LEASE_NAME") ??
                 (development ? @"Local\Zagent.Dev.Supervisor" :
                     ZagentInstallationProfile.SupervisorLeaseName(machine.InstallationRole)),
-        Environment: managerEnvironment);
+        Environment: managerEnvironment,
+        WorkspaceId: dashboardOptions.WorkspaceId);
 
     await using var host =
         await ManagerCoreHost.CreateAsync(hostOptions);

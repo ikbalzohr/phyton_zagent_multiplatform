@@ -34,9 +34,9 @@ public static class TunnelProcessFactory
                 ["ZAGENT_DEVICE_NAME"] = options.DeviceName,
                 ["ZAGENT_DEVICE_ALIAS"] = options.DeviceAlias,
                 ["ZAGENT_INTERNAL_TOKEN"] =
-                    Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_TOKEN") ?? "",
+                    Zagent.Core.Manager.InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_TOKEN"),
                 ["ZAGENT_INTERNAL_CONTEXT_KEY"] =
-                    Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY") ?? "",
+                    Zagent.Core.Manager.InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_CONTEXT_KEY"),
                 ["ZAGENT_DEVICE_FINGERPRINT"] = options.DeviceFingerprint,
                 ["ZAGENT_INSTALLATION_ID"] = options.InstallationId,
                 ["ZAGENT_DEVICE_BINDING"] = options.DeviceBinding,
@@ -93,10 +93,9 @@ public static class TunnelProcessFactory
                 ["ZAGENT_DEVICE_ID"] = options.DeviceId,
                 ["ZAGENT_DEVICE_NAME"] = options.DeviceName,
                 ["ZAGENT_DEVICE_BINDING"] = options.DeviceBinding,
-                ["ZAGENT_INTERNAL_TOKEN"] =
-                    Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_TOKEN") ?? "",
-                ["ZAGENT_INTERNAL_CONTEXT_KEY"] =
-                    Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY") ?? ""
+                // Public transport is not an internal management client. Clear inherited values.
+                ["ZAGENT_INTERNAL_TOKEN"] = "",
+                ["ZAGENT_INTERNAL_CONTEXT_KEY"] = ""
             },
             GracefulShutdownSeconds: 3,
             AutoRestart: true,

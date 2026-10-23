@@ -35,6 +35,9 @@ public sealed class CoreInstallInitializer : IInstallInitializer
                     throw new InvalidOperationException("Installer data/config path must not traverse reparse points.");
             }
             var infoDirectory = Directory.CreateDirectory(directory);
+            var previousAcl = infoDirectory.GetAccessControl();
+            if (!owner.Equals(previousAcl.GetOwner(typeof(SecurityIdentifier))))
+                throw new InvalidOperationException("Refusing to adopt a data/config directory owned by another Windows identity.");
             var acl = new DirectorySecurity();
             acl.SetOwner(owner);
             acl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
@@ -42,8 +45,20 @@ public sealed class CoreInstallInitializer : IInstallInitializer
                 InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
                 PropagationFlags.None, AccessControlType.Allow));
             infoDirectory.SetAccessControl(acl);
+            var actualAcl = infoDirectory.GetAccessControl();
+            var rules = actualAcl.GetAccessRules(true, true, typeof(SecurityIdentifier));
+            if (!actualAcl.AreAccessRulesProtected || !owner.Equals(actualAcl.GetOwner(typeof(SecurityIdentifier))) ||
+                rules.Count != 1 || rules[0] is not FileSystemAccessRule actualRule ||
+                !owner.Equals(actualRule.IdentityReference) || actualRule.IsInherited ||
+                actualRule.AccessControlType != AccessControlType.Allow || actualRule.FileSystemRights != FileSystemRights.FullControl ||
+                actualRule.InheritanceFlags != (InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit) ||
+                actualRule.PropagationFlags != PropagationFlags.None)
+                throw new InvalidOperationException("Owner-only data/config ACL read-back failed.");
         }
 
+        // Initialization is not dashboard enrollment. The interactive owner must separately run
+        // Provision-WindowsDashboard.ps1 for localhost TLS, DPAPI internal secrets and password.
+        // Do not prompt through the redirected installer process or provision external OAuth here.
         var info = new ProcessStartInfo
         {
             FileName = core,

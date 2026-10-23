@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:zagent:files-resource:v1",
+  "title": "Server-provisioned Files resource on a principal grant",
+  "description": "resource_server.grants[principal_id].files_resource. Workspace/revision/expiry/revocation come from current_grant; device and installation must match Router placement. Profile must also be approved locally by Files. Not client metadata.",
+  "type": "object",
+  "properties": {
+    "resource_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "kind": {"const": "files"},
+    "profile_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "device_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "installation_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "revoked": {"type": "boolean"}
+  },
+  "required": ["resource_id", "kind", "profile_id", "device_id", "installation_id"],
+  "additionalProperties": false
+}

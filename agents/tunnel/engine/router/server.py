@@ -22,7 +22,7 @@ from jsonschema import Draft202012Validator
 from .access import AuthContext, AuthorizationError, ResourceAuthorizer, owner_key
 from .artifacts import read_artifact
 from .config import load_tunnel_config
-from .execution_context import new_context, reject_authority, scheduler_meta, validate_context
+from .execution_context import new_context, policy_resources, reject_authority, scheduler_meta, validate_context
 from .identity import Placement, internal_token, verify_internal_token
 from .orchestration import Orchestrator
 from .registry import MCPRegistry
@@ -70,11 +70,15 @@ async def _revalidate(context: dict[str, Any]) -> AuthContext:
     entry = _credentials.get(context["request_id"])
     if entry is None or entry[1] <= time.time() or _auth_client is None:
         raise AuthorizationError("AUTHORIZATION_EXPIRED", 403)
-    auth = await authorizer().authenticate(entry[0], _auth_client)
+    current_authorizer = authorizer()
+    auth = await current_authorizer.authenticate(entry[0], _auth_client)
     if (auth.principal_id != context["principal_id"] or auth.workspace_id != context["workspace_id"]
             or auth.policy_revision != context["policy_revision"]):
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
     auth.require(context["required_scope"], context["public_tool"])
+    if context["effective_resources"] != policy_resources(
+            auth, placement, context["required_scope"], current_authorizer):
+        raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
     try:
         policy = _policy(context["public_tool"])
     except AuthorizationError:
@@ -313,7 +317,8 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
         queued = orchestrator.journal.conn.execute("SELECT COUNT(*) FROM tasks WHERE session_id=? AND state IN ('accepted','queued','waiting_capacity','waiting_lock','running','cancelling')", (auth.owner,)).fetchone()[0]
     if queued >= 64 or orchestrator.queue_depth() >= 1024:
         raise AuthorizationError("OVERLOADED", 429)
-    context = new_context(auth, placement, policy["scope"], name)
+    context = new_context(auth, placement, policy["scope"], name,
+                          resource_authorizer=authorizer())
     _remember(context, bearer)
     meta = scheduler_meta(context, auth.owner, key, arguments)
     if submit:
@@ -482,7 +487,7 @@ async def workflow_control(run_id: str, action: str, request: Request):
 def run():
     cfg = load_tunnel_config().get("router", {})
     host = cfg.get("host", "127.0.0.1")
-    if host not in {"127.0.0.1", "::1"}:
+    if host not in {"127.0.0.1", "127.0.0.3", "::1"}:
         raise ValueError("Tunnel router must bind loopback; terminate public HTTPS at a provisioned ingress")
     uvicorn.run("router.server:app", host=host, port=int(cfg.get("port",18810)),
                 log_level=cfg.get("log_level","info"), reload=False, proxy_headers=False)

@@ -82,7 +82,9 @@ public sealed class TunnelRouterHealthProbe
                 ToolCount: toolCount,
                 PluginConfigured: pluginConfigured,
                 PluginConnected: pluginConnected,
-                Error: null);
+                Error: null,
+                PublicAuthConfigured: root.TryGetProperty("authorization", out var authorization) &&
+                    authorization.GetString() == "CONFIGURED");
         }
         catch (Exception ex)
             when (ex is HttpRequestException or

@@ -1,7 +1,7 @@
 """Sessionless owner/context regression; client brands are not authority. NOT_RUN."""
 import time
 import unittest
-from router.access import AuthContext, owner_key
+from router.access import AuthContext, ResourceAuthorizer, owner_key
 from router.identity import Placement
 from router.execution_context import new_context, reject_authority, validate_context
 
@@ -9,9 +9,16 @@ class NeutralContextTests(unittest.TestCase):
     def auth(self):
         return AuthContext("p", "ws", frozenset({"files:read"}), frozenset({"files_stat"}), "1", time.time()+60)
 
+    def context(self):
+        policy = ResourceAuthorizer({"workspace_id": "ws", "policy_revision": "1",
+            "grants": {"p": {"files_resource": {"resource_id": "repo", "kind": "files",
+                "profile_id": "approved-repo", "device_id": "device", "installation_id": "install"}}}})
+        return new_context(self.auth(), Placement("device", "install"), "files:read", "files_stat",
+                           resource_authorizer=policy)
+
     def test_reconnect_mints_request_but_preserves_owner(self):
-        a = new_context(self.auth(), Placement("device", "install"), "files:read", "files_stat")
-        b = new_context(self.auth(), Placement("device", "install"), "files:read", "files_stat")
+        a = self.context()
+        b = self.context()
         self.assertNotEqual(a["request_id"], b["request_id"])
         self.assertNotEqual(a["task_id"], b["task_id"])
         self.assertEqual(owner_key(a["principal_id"], a["workspace_id"]), self.auth().owner)
@@ -23,7 +30,7 @@ class NeutralContextTests(unittest.TestCase):
                 reject_authority({key:"untrusted"})
 
     def test_stale_or_wrong_device_context_rejected(self):
-        context = new_context(self.auth(), Placement("device", "install"), "files:read", "files_stat")
+        context = self.context()
         validate_context(context, Placement("device", "install"))
         for key, value in (("device_id","other"),("context_version",99),("deadline",0),("effective_resources",["bypass"])):
             broken = dict(context); broken[key] = value

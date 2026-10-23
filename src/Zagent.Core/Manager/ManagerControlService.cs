@@ -604,14 +604,14 @@ public sealed class ManagerControlService
         if (_files is null || !IsAgentDesiredRunning("files.service")) unavailable.Add("Files");
         if (_web is null || !IsAgentDesiredRunning("web.service")) unavailable.Add("Web");
 
-        if (_files is not null &&
-            IsAgentDesiredRunning("files.service"))
+        if (_files is not null)
         {
             try
             {
                 filesSnapshot =
                     await _files.GetProfilesAsync(
-                        cancellationToken);
+                        cancellationToken, includeWorkspace: IsAgentDesiredRunning("files.service"));
+                unavailable.AddRange(filesSnapshot.UnavailableDependencies);
             }
             catch (Exception ex)
             {

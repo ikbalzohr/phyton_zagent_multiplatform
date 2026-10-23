@@ -25,7 +25,8 @@ public sealed class FilesConfigurationWriter
         Directory.CreateDirectory(options.LogRoot);
         Directory.CreateDirectory(options.BackupRoot);
         Directory.CreateDirectory(options.UpdateStateRoot);
-        Directory.CreateDirectory(options.DefaultProfileRoot);
+        if (!File.Exists(Path.Combine(options.ConfigRoot, "profiles.json")))
+            Directory.CreateDirectory(options.DefaultProfileRoot);
 
         var settings = new
         {
@@ -105,10 +106,11 @@ public sealed class FilesConfigurationWriter
             settings,
             cancellationToken);
 
-        await _store.SaveAsync(
-            Path.Combine(options.ConfigRoot, "profiles.json"),
-            profiles,
-            cancellationToken);
+        if (!File.Exists(Path.Combine(options.ConfigRoot, "profiles.json")))
+            await _store.SaveAsync(
+                Path.Combine(options.ConfigRoot, "profiles.json"),
+                profiles,
+                cancellationToken);
 
         await _store.SaveAsync(
             Path.Combine(options.ConfigRoot, "command_policy.json"),
@@ -120,99 +122,31 @@ public sealed class FilesConfigurationWriter
         FilesIntegrationOptions options,
         CancellationToken cancellationToken)
     {
-        var profilesPath = Path.Combine(
-            options.ConfigRoot,
-            "profiles.json");
-
-        FilesProfilesDocument existing;
+        var profilesPath = Path.Combine(options.ConfigRoot, "profiles.json");
         if (_store.Exists(profilesPath))
         {
-            existing = await _store.LoadAsync<FilesProfilesDocument>(
-                profilesPath,
-                cancellationToken);
-
+            var existing = await _store.LoadAsync<FilesProfilesDocument>(profilesPath, cancellationToken);
             if (existing.Profiles is null)
-            {
-                throw new InvalidDataException(
-                    "Existing Files profiles configuration is missing the profiles array.");
-            }
+                throw new InvalidDataException("Existing Files profiles configuration is missing the profiles array.");
+            // Preparation is not renewed consent. Preserve revoked, disabled, root and mode state.
+            return existing;
         }
-        else
-        {
-            existing = new FilesProfilesDocument();
-        }
-
-        var merged = new List<FilesProfileDocumentEntry>();
-        var seen = new HashSet<string>(
-            StringComparer.OrdinalIgnoreCase);
-
-        foreach (var profile in existing.Profiles)
-        {
-            if (!profile.AuthorizedByUser ||
-                string.IsNullOrWhiteSpace(profile.Name) ||
-                !seen.Add(profile.Name))
-            {
-                continue;
-            }
-
-            merged.Add(profile);
-        }
-
-        var defaultName = options.DefaultProfileName;
-        var existingDefaultIndex = merged.FindIndex(
-            item => string.Equals(
-                item.Name,
-                defaultName,
-                StringComparison.OrdinalIgnoreCase));
-        var existingDefault =
-            existingDefaultIndex >= 0
-                ? merged[existingDefaultIndex]
-                : null;
-
-        var installerDefault = new FilesProfileDocumentEntry
-        {
-            Name = defaultName,
-            Root = Path.GetFullPath(options.DefaultProfileRoot),
-            Mode = options.DefaultProfileMode,
-            Description =
-                existingDefault?.Description ??
-                "Zagent default Files profile",
-            Enabled = true,
-            AuthorizedByUser = true,
-            AuthorizedAt =
-                existingDefault?.AuthorizedAt ??
-                DateTimeOffset.UtcNow,
-            AuthorizationSource =
-                existingDefault?.AuthorizationSource ??
-                "zagent_install"
-        };
-
-        if (existingDefaultIndex >= 0)
-        {
-            merged[existingDefaultIndex] = installerDefault;
-        }
-        else
-        {
-            merged.Add(installerDefault);
-        }
-
-        var activeProfile = existing.ActiveProfile;
-        if (string.IsNullOrWhiteSpace(activeProfile) ||
-            !merged.Any(item =>
-                item.Enabled &&
-                string.Equals(
-                    item.Name,
-                    activeProfile,
-                    StringComparison.OrdinalIgnoreCase)))
-        {
-            activeProfile = defaultName;
-        }
-
         return new FilesProfilesDocument
         {
             SchemaVersion = "2.0",
-            ActiveProfile = activeProfile,
-            Profiles = merged
+            ActiveProfile = options.DefaultProfileName,
+            Profiles = new List<FilesProfileDocumentEntry> {
+                new() {
+                    Name = options.DefaultProfileName,
+                    Root = Path.GetFullPath(options.DefaultProfileRoot),
+                    Mode = options.DefaultProfileMode,
+                    Description = "Zagent default Files profile",
+                    Enabled = true,
+                    AuthorizedByUser = true,
+                    AuthorizedAt = DateTimeOffset.UtcNow,
+                    AuthorizationSource = "zagent_install"
+                }
+            }
         };
     }
 
@@ -271,6 +205,12 @@ public sealed class FilesConfigurationWriter
                 "Default Files profile name is required.",
                 nameof(options));
         }
+
+        var defaultRoot = Path.GetFullPath(options.DefaultProfileRoot);
+        var volumeRoot = Path.GetPathRoot(defaultRoot);
+        if (string.Equals(defaultRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                volumeRoot?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("A whole drive/share cannot be the default Files profile.", nameof(options));
 
         if (options.DefaultProfileMode is not ("read-only" or "read-write"))
         {

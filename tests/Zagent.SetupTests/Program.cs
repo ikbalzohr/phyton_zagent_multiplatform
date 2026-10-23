@@ -8,8 +8,10 @@ var failed = 0;
 var devRoot =
     Environment.GetEnvironmentVariable("ZAGENT_DEV_ROOT") ??
     Path.GetTempPath();
+// Fixture output can be isolated without moving the TestChild build lookup.
+var fixtureRoot = Environment.GetEnvironmentVariable("ZAGENT_TEST_FIXTURE_ROOT") ?? devRoot;
 var root = Path.Combine(
-    devRoot,
+    fixtureRoot,
     "_validation",
     "phase9-setup-" +
     Guid.NewGuid().ToString("N"));

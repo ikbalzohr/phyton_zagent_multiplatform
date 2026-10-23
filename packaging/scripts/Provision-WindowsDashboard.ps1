@@ -1,63 +1,95 @@
+[CmdletBinding()]
 param(
     [Parameter(Mandatory=$true)][string]$InstallRoot,
     [string]$DataRoot = '',
-    [Parameter(Mandatory=$true)][string]$CertificateThumbprint,
+    [string]$CoreExecutable = '',
+    [string]$CertificateThumbprint = '',
+    [switch]$CreateCertificate,
+    [switch]$TrustCertificate,
     [Parameter(Mandatory=$true)][string]$WorkspaceId,
     [Parameter(Mandatory=$true)][string]$Account,
-    [string]$DashboardUrl = 'https://127.0.0.1:19443/',
+    [string]$DashboardUrl = 'https://localhost:19443/',
+    [switch]$Development,
     [switch]$RegisterStartup
 )
 $ErrorActionPreference = 'Stop'
-if ($env:OS -ne 'Windows_NT' -or -not [Environment]::UserInteractive -or [Console]::IsInputRedirected) { throw 'Run only in the interactive Windows installation-owner console.' }
-$InstallRoot = (Resolve-Path $InstallRoot).Path
-if (-not $DataRoot) { $DataRoot = Join-Path $InstallRoot 'data' }
+. (Join-Path $PSScriptRoot 'WindowsDashboard-Provisioning.ps1')
+Assert-ZagentOwnerConsole
+$InstallRoot = (Resolve-Path -LiteralPath $InstallRoot).Path
+Assert-ZagentPlainPath $InstallRoot
+if (-not $DataRoot) { $DataRoot = if ($Development) { Join-Path $InstallRoot 'dev\data' } else { Join-Path $InstallRoot 'data' } }
 $DataRoot = [IO.Path]::GetFullPath($DataRoot)
-$core = Join-Path $InstallRoot 'Zagent.Core.exe'
-if (-not (Test-Path $core -PathType Leaf)) { throw 'Installed Core executable missing.' }
-$manifest = Get-Content (Join-Path $InstallRoot 'payload-manifest.json') -Raw | ConvertFrom-Json
-if ($manifest.product_line -ne 'zagent-mcp-v1' -or $manifest.suite_version -ne '1.0.0') { throw 'Provision only the v1 installed payload.' }
-$uri = [Uri]$DashboardUrl
-if ($uri.Scheme -ne 'https' -or -not $uri.IsLoopback -or $uri.AbsolutePath -ne '/' -or $uri.Query -or $uri.Fragment -or $uri.UserInfo) { throw 'Exact HTTPS loopback origin required.' }
-$certificate = Get-Item -LiteralPath ("Cert:\CurrentUser\My\"+$CertificateThumbprint)
-if (-not $certificate.HasPrivateKey -or $certificate.NotAfter -le (Get-Date) -or $certificate.NotBefore -gt (Get-Date)) { throw 'Valid CurrentUser TLS certificate/private key required; certificate issuance and trust are external prerequisites.' }
-$owner = [Security.Principal.WindowsIdentity]::GetCurrent().User
-foreach ($directory in @($DataRoot,(Join-Path $DataRoot 'config'),(Join-Path $DataRoot 'dashboard-keys'))) {
-    $ancestor = [IO.DirectoryInfo]::new([IO.Path]::GetFullPath($directory))
-    while ($null -ne $ancestor) {
-        if ($ancestor.Exists -and ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Data/config path must not traverse reparse points.' }
-        $ancestor = $ancestor.Parent
-    }
-    if (Test-Path $directory) {
-        if ((Get-Item -LiteralPath $directory -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Reparse directory rejected: $directory" }
-    } else { New-Item -ItemType Directory -Path $directory | Out-Null }
-    $acl = [Security.AccessControl.DirectorySecurity]::new()
-    $acl.SetOwner($owner)
-    $acl.SetAccessRuleProtection($true,$false)
-    $rule = [Security.AccessControl.FileSystemAccessRule]::new($owner,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
-    $acl.AddAccessRule($rule)
-    Set-Acl -LiteralPath $directory -AclObject $acl
-    $actual = Get-Acl -LiteralPath $directory
-    if (-not $actual.AreAccessRulesProtected) { throw "ACL protection not applied: $directory" }
+Assert-ZagentPlainPath $DataRoot
+if ($DataRoot.TrimEnd('\') -eq $InstallRoot.TrimEnd('\') -or $DataRoot -eq [IO.Path]::GetPathRoot($DataRoot)) { throw 'Choose a dedicated DataRoot, not the install root or drive root.' }
+Assert-ZagentDashboardOrigin $DashboardUrl
+if ($WorkspaceId -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$' -or [string]::IsNullOrWhiteSpace($Account)) { throw 'Valid workspace identifier and account required.' }
+if ($CreateCertificate -eq [bool]$CertificateThumbprint) { throw 'Choose exactly one: -CreateCertificate or -CertificateThumbprint.' }
+if ($TrustCertificate -and -not $CreateCertificate) { throw 'Automatic trust is restricted to the new localhost self-signed certificate; manage existing CA trust separately.' }
+if (-not $CoreExecutable) {
+    if ($Development) { throw 'Development requires explicit -CoreExecutable path to the Windows-built Core apphost.' }
+    $CoreExecutable = Join-Path $InstallRoot 'Zagent.Core.exe'
 }
-$config = Join-Path $DataRoot 'config\dashboard.json'
-if (Test-Path $config) { throw 'Account already exists. Use documented offline recovery; no silent overwrite.' }
-# Password is read without echo by Core; never accepted as a script/command-line parameter.
-& $core --provision-dashboard --dashboard-config $config --dashboard-url $DashboardUrl --certificate-thumbprint $CertificateThumbprint --workspace-id $WorkspaceId --account $Account
-if ($LASTEXITCODE -ne 0) { throw 'Core dashboard provisioning failed.' }
-$stored = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
-if ($stored.Url -ne $DashboardUrl -or $stored.WorkspaceId -ne $WorkspaceId -or $stored.Administrator -ne $Account -or -not $stored.PasswordHash -or $stored.RemoteEnabled) { throw 'Provisioned config read-back mismatch.' }
+$CoreExecutable = (Resolve-Path -LiteralPath $CoreExecutable).Path
+Assert-ZagentPlainPath $CoreExecutable
+if (-not (Test-Path -LiteralPath $CoreExecutable -PathType Leaf) -or [IO.Path]::GetFileName($CoreExecutable) -ine 'Zagent.Core.exe') { throw 'Zagent.Core.exe Windows apphost required; no build/install is performed.' }
+if (-not $Development) {
+    $manifest = Get-Content -LiteralPath (Join-Path $InstallRoot 'payload-manifest.json') -Raw | ConvertFrom-Json
+    if ($manifest.product_line -ne 'zagent-mcp-v1' -or $manifest.suite_version -ne '1.0.0') { throw 'Provision only the v1 installed payload.' }
+}
+$configDirectory = Join-Path $DataRoot 'config'
+$config = Join-Path $configDirectory 'dashboard.json'
+$secretPath = Join-Path $configDirectory 'internal-secrets.dpapi.json'
+foreach ($path in @($config,$secretPath)) {
+    Assert-ZagentPlainPath $path
+    if (Test-Path -LiteralPath $path) { throw 'Provisioning already exists or is partial; offline owner recovery required. No overwrite.' }
+}
 if ($RegisterStartup) {
+    if ($Development) { throw 'DEV startup registration is deliberately unsupported; launch explicitly.' }
     $startup = [Environment]::GetFolderPath('Startup')
     $shortcut = Join-Path $startup ('Zagent Core1-'+(Split-Path $InstallRoot -Leaf)+'.lnk')
-    if (Test-Path $shortcut) { throw "Startup entry already exists: $shortcut" }
+    Assert-ZagentPlainPath $shortcut
+    if (Test-Path -LiteralPath $shortcut) { throw 'Startup entry already exists; no overwrite.' }
+}
+# Refuse to recursively adopt existing data. A fresh or already private root is required.
+if (Test-Path -LiteralPath $DataRoot) { Assert-ZagentOwnerAcl $DataRoot }
+$keyDirectory = Join-Path $DataRoot 'dashboard-keys'
+foreach ($directory in @($DataRoot,$configDirectory,$keyDirectory)) { New-ZagentPrivateDirectory $directory }
+if (@(Get-ChildItem -LiteralPath $keyDirectory -Force).Count -ne 0) { throw 'Existing dashboard keys require explicit offline recovery; fresh enrollment will not adopt them.' }
+if ($CreateCertificate) {
+    $certificate = New-SelfSignedCertificate -DnsName 'localhost' -Subject 'CN=localhost' -CertStoreLocation 'Cert:\CurrentUser\My' -FriendlyName 'Zagent local dashboard (owner only)' -Type SSLServerAuthentication -KeyAlgorithm RSA -KeyLength 3072 -HashAlgorithm SHA256 -KeyExportPolicy NonExportable -NotAfter (Get-Date).AddYears(1)
+    $CertificateThumbprint = $certificate.Thumbprint
+}
+if ($CertificateThumbprint -cnotmatch '^[0-9A-Fa-f]{40}$') { throw 'Exact SHA1 certificate-store thumbprint required, no path or whitespace.' }
+$certificate = Get-Item -LiteralPath ('Cert:\CurrentUser\My\'+$CertificateThumbprint)
+Assert-ZagentLocalCertificate $certificate
+if ($TrustCertificate) {
+    $store = [Security.Cryptography.X509Certificates.X509Store]::new('Root','CurrentUser')
+    $store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+    try {
+        # Trust only the public certificate; never export/persist a private key or PFX password.
+        $public = [Security.Cryptography.X509Certificates.X509Certificate2]::new($certificate.RawData)
+        try { $store.Add($public) } finally { $public.Dispose() }
+        if (@($store.Certificates.Find([Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint,$CertificateThumbprint,$false)).Count -ne 1) { throw 'CurrentUser trust read-back failed.' }
+    } finally { $store.Dispose() }
+}
+New-ZagentInternalSecrets $secretPath
+# Core performs the no-echo password+confirmation prompt; no password/token parameter exists here.
+& $CoreExecutable --provision-dashboard --root $InstallRoot --data-root $DataRoot --dashboard-config $config --dashboard-url $DashboardUrl --certificate-thumbprint $CertificateThumbprint --workspace-id $WorkspaceId --account $Account
+if ($LASTEXITCODE -ne 0) { throw 'Core dashboard provisioning failed; partial state retained for explicit offline recovery, no startup registered.' }
+Set-ZagentOwnerAcl $config
+$stored = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
+if ($stored.Url -cne $DashboardUrl -or $stored.CertificateThumbprint -ine $CertificateThumbprint -or $stored.WorkspaceId -cne $WorkspaceId -or $stored.Administrator -cne $Account -or -not $stored.PasswordHash -or -not $stored.SecurityStamp -or $stored.RemoteEnabled -ne $false) { throw 'Provisioned config read-back mismatch.' }
+Assert-ZagentOwnerAcl $secretPath
+if ($RegisterStartup) {
     $shell = New-Object -ComObject WScript.Shell
     $link = $shell.CreateShortcut($shortcut)
-    $link.TargetPath = $core
-    $link.Arguments = '--serve-dashboard --root "'+$InstallRoot+'" --data-root "'+$DataRoot+'" --dashboard-config "'+$config+'"'
+    $link.TargetPath = $CoreExecutable
+    $link.Arguments = '--dashboard --root "'+$InstallRoot+'" --data-root "'+$DataRoot+'" --dashboard-config "'+$config+'"'
     $link.WorkingDirectory = $InstallRoot
-    $link.Description = 'Zagent Core1 per-user interactive dashboard host (not a Session0 service)'
+    $link.Description = 'Zagent per-user interactive local dashboard (not a Session0 service)'
     $link.Save()
     $check = $shell.CreateShortcut($shortcut)
-    if ($check.TargetPath -ne $core -or $check.Arguments -ne $link.Arguments) { throw 'Startup shortcut read-back failed.' }
+    if ($check.TargetPath -ne $CoreExecutable -or $check.Arguments -cne $link.Arguments) { throw 'Startup shortcut read-back failed.' }
 }
-Write-Output 'Dashboard provisioning saved. Start Core and verify certificate trust, login and CSRF/Origin controls locally; this is not live acceptance.'
+Write-Output ('Local provisioning saved. Origin: '+$DashboardUrl+' Certificate: '+$CertificateThumbprint)
+Write-Output 'NOT runtime acceptance. Core DPAPI loader, certificate trust, login and CSRF checks must pass on Windows. MCP auth/remote remains BLOCKED until real external AS/transport evidence exists.'

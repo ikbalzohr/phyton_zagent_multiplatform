@@ -1,0 +1,13 @@
+{
+  "revoked": true,
+  "scopes": ["files:read"],
+  "tools": ["files_stat", "files_read"],
+  "files_resource": {
+    "resource_id": "workspace:REPLACE_WORKSPACE:approved-repository",
+    "kind": "files",
+    "profile_id": "REPLACE_WITH_LOCALLY_APPROVED_PROFILE_NAME",
+    "device_id": "REPLACE_WITH_ROUTER_DEVICE_ID",
+    "installation_id": "REPLACE_WITH_ROUTER_INSTALLATION_ID",
+    "revoked": true
+  }
+}

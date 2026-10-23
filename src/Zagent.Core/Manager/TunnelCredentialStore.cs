@@ -154,7 +154,7 @@ public sealed class TunnelCredentialStore
     private static byte[] Unprotect(byte[] encrypted) =>
         Crypt(encrypted, protect: false);
 
-    private static byte[] Crypt(
+    internal static byte[] Crypt(
         byte[] input,
         bool protect)
     {

@@ -30,7 +30,8 @@ public sealed record ManagerCoreHostOptions(
     int WebPort = 18830,
     int ArcMapPort = 18840,
     string? SupervisorLeaseName = null,
-    AgentEnvironment Environment = AgentEnvironment.Production);
+    AgentEnvironment Environment = AgentEnvironment.Production,
+    string? WorkspaceId = null);
 
 public sealed class ManagerCoreHost : IAsyncDisposable
 {
@@ -79,7 +80,9 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                 $"Zagent root was not found: {root}");
         }
 
-        Directory.CreateDirectory(data);
+        var privateCredentials = InternalSecretStore.Load(data);
+        if (string.IsNullOrWhiteSpace(options.WorkspaceId))
+            throw new InvalidOperationException("Installation workspace must be explicitly provisioned.");
 
         var machineIdentityStore =
             new MachineIdentityStore(
@@ -93,19 +96,9 @@ public sealed class ManagerCoreHost : IAsyncDisposable
             await machineIdentityStore.EnsureAsync(
                 cancellationToken);
 
-        // Child processes inherit these owner-provisioned private-channel credentials.
+        // Identity is local state; private secrets are never read from ambient environment.
         Environment.SetEnvironmentVariable("ZAGENT_DEVICE_ID", machineIdentity.DeviceId);
         Environment.SetEnvironmentVariable("ZAGENT_INSTALLATION_ID", machineIdentity.InstallationId);
-        var internalToken = Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_TOKEN");
-        if (!string.IsNullOrWhiteSpace(internalToken))
-        {
-            Environment.SetEnvironmentVariable("ZAGENT_INTERNAL_TOKEN", internalToken);
-        }
-        var internalContextKey = Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY");
-        if (!string.IsNullOrWhiteSpace(internalContextKey))
-        {
-            Environment.SetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY", internalContextKey);
-        }
 
         if (!options.BindHost.Equals("127.0.0.3", StringComparison.Ordinal) &&
             !options.BindHost.Equals("127.0.0.1", StringComparison.Ordinal) &&
@@ -170,6 +163,9 @@ public sealed class ManagerCoreHost : IAsyncDisposable
 
         try
         {
+            InternalManagementChannel.Configure(privateCredentials.Token, privateCredentials.ContextKey,
+                options.WorkspaceId!, machineIdentity.DeviceId, machineIdentity.InstallationId,
+                Path.Combine(data, "files", "config"));
             var filesData = Path.Combine(data, "files");
             var tunnelData = Path.Combine(data, "tunnel");
             var webData = Path.Combine(data, "web");
@@ -204,7 +200,7 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                 DefaultProfileRoot:
                     Path.GetFullPath(
                         options.FilesDefaultProfile),
-                DefaultProfileMode: "read-write",
+                DefaultProfileMode: "read-only",
                 DeviceId: machineIdentity.DeviceId,
                 DeviceName: machineIdentity.DeviceName);
 
@@ -718,7 +714,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                             "refresh",
                             TunnelAgentManifestFactory.AgentId,
                             health.Ready
-                                ? $"Tunnel ready ({health.ToolCount} tools)."
+                                ? $"Local router ready ({health.ToolCount} tools); public OAuth " +
+                                    (health.PublicAuthConfigured ? "configured, connection unverified." : "NOT_CONFIGURED (BLOCKED).")
                                 : health.Error ??
                                     "Tunnel offline.");
                     }));

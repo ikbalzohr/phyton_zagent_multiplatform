@@ -102,6 +102,13 @@
           }
         },
         "required": ["resource_id", "kind"],
+        "allOf": [{
+          "if": {"properties": {"kind": {"const": "files"}}, "required": ["kind"]},
+          "then": {"required": ["profile_id"], "properties": {
+            "profile_id": {"maxLength": 256, "pattern": "\\S"},
+            "resource_id": {"maxLength": 256, "pattern": "\\S"}
+          }}
+        }],
         "additionalProperties": false
       }
     },

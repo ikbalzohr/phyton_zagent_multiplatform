@@ -44,7 +44,7 @@ public sealed class TunnelConfigurationWriter
                 allowed_hosts = new[]
                 {
                     "127.0.0.1",
-                    "127.0.0.2",
+                    "::1",
                     "127.0.0.3",
                     options.BindHost,
                     "localhost"

@@ -78,8 +78,9 @@ def validate_service(service: dict[str, Any]) -> None:
     if not parsed.hostname:
         raise ValueError(f"Invalid MCP URL host for {service['name']}")
 
-    if security.get("allow_local_upstreams_only", True):
-        allowed = {x.lower() for x in security.get("allowed_hosts", ["127.0.0.1", "localhost"])}
+    allowed = {x.lower() for x in security.get("allowed_hosts", ["127.0.0.1", "localhost"])}
+    # Core's exact alias is opt-in even when the legacy local-only switch is off.
+    if security.get("allow_local_upstreams_only", True) or parsed.hostname == "127.0.0.3":
         if parsed.hostname.lower() not in allowed:
             raise ValueError(
                 f"Host '{parsed.hostname}' is not allowed. Zagent Tunnel1 accepts approved local MCP agents only."
@@ -87,7 +88,7 @@ def validate_service(service: dict[str, Any]) -> None:
 
     if parsed.scheme == "http" and not security.get("allow_http", True):
         raise ValueError("HTTP upstreams are disabled by security policy")
-    if parsed.hostname not in {"127.0.0.1", "::1", "localhost"} or parsed.username or parsed.password or parsed.query or parsed.fragment:
+    if parsed.hostname not in {"127.0.0.1", "127.0.0.3", "::1", "localhost"} or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("Internal channel requires an exact loopback URL without credentials/query")
 
     service["enabled"] = bool(service.get("enabled", True))

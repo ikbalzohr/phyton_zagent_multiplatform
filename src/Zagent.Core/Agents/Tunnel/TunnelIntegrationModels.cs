@@ -54,4 +54,5 @@ public sealed record TunnelRouterHealthSnapshot(
     int ToolCount,
     bool PluginConfigured,
     bool PluginConnected,
-    string? Error);
+    string? Error,
+    bool PublicAuthConfigured = false);

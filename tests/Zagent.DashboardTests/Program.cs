@@ -21,10 +21,9 @@ Check(DashboardSecurity.IsSameOrigin("https://localhost:19443", options.Origin),
 foreach (var origin in new[] { "null", "https://evil.example", "https://localhost:19444", "http://localhost:19443", "https://localhost:19443.evil.example" })
     Check(!DashboardSecurity.IsSameOrigin(origin, options.Origin), "reject origin " + origin);
 Check(!DashboardSecurity.IsSameOrigin(null, options.Origin), "missing Origin rejected");
-Environment.SetEnvironmentVariable("ZAGENT_INTERNAL_TOKEN", new string('k', 32));
-Environment.SetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY", new string('s', 32));
-Environment.SetEnvironmentVariable("ZAGENT_DEFAULT_WORKSPACE_ID", "workspace-1");
-InternalManagementChannel.ValidateProvisioning();
+// Ambient env is not authority; persisted startup provisioning is required.
+try { InternalManagementChannel.ValidateProvisioning(); throw new Exception("Accepted unprovisioned channel"); }
+catch (InvalidOperationException) { }
 Check(InternalManagementChannel.Canonicalize(JsonNode.Parse("{\"b\":2,\"a\":[true,null,1]}")) == "{\"a\":[true,null,1],\"b\":2}", "canonical JSON contract");
 var profilesSnapshot = JsonElement.Parse("""
     {"profiles":[],"pendingApprovals":[],"defaultProfile":"workspace-1","capturedAtUtc":"2026-01-01T00:00:00Z"}

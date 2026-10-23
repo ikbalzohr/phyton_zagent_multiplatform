@@ -40,9 +40,9 @@ public static class FilesProcessFactory
                 ["ZAGENT_DEVICE_ID"] = options.DeviceId,
                 ["ZAGENT_DEVICE_NAME"] = options.DeviceName,
                 ["ZAGENT_INTERNAL_TOKEN"] =
-                    Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_TOKEN") ?? "",
+                    Zagent.Core.Manager.InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_TOKEN"),
                 ["ZAGENT_INTERNAL_CONTEXT_KEY"] =
-                    Environment.GetEnvironmentVariable("ZAGENT_INTERNAL_CONTEXT_KEY") ?? "",
+                    Zagent.Core.Manager.InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_CONTEXT_KEY"),
                 ["PYTHONPATH"] = Path.GetFullPath(options.EngineRoot),
                 ["PYTHONUNBUFFERED"] = "1"
             },

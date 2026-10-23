@@ -37,23 +37,19 @@ public sealed class FilesManagerReadModel
     }
 
     public async Task<ManagerProfilesSnapshot> GetProfilesAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool includeWorkspace = true)
     {
-        var profilesJson = await CallToolForJsonAsync(
-            "files_profile_list",
-            cancellationToken);
-
-        var activeJson = await CallToolForJsonAsync(
-            "files_profile_default_get",
-            cancellationToken);
-
-        var pendingJson = await CallToolForJsonAsync(
-            "files_profile_pending_list",
-            cancellationToken);
-
-        var sessionsJson = await CallToolForJsonAsync(
-            "files_workspace_list",
-            cancellationToken);
+        // Profile administration is intentionally unavailable over Files MCP.
+        // The authenticated local dashboard reads the owner's configuration directly.
+        using var profilesJson = await ReadLocalProfilesAsync("ZAGENT_FILES_CONFIG_DIR", "profiles.json", cancellationToken);
+        using var activeJson = JsonDocument.Parse(JsonSerializer.Serialize(new {
+            name = profilesJson.RootElement.GetProperty("active_profile").GetString()
+        }));
+        using var pendingJson = await ReadLocalProfilesAsync("ZAGENT_FILES_DATA_ROOT", "pending_profile_requests.json", cancellationToken, optional: true);
+        var workspace = includeWorkspace ? await ReadWorkspaceViewAsync(cancellationToken)
+            : (Document: JsonDocument.Parse("[]"), Available: false);
+        using var sessionsJson = workspace.Document;
 
         var profileRoot =
             UnwrapData(profilesJson.RootElement);
@@ -149,6 +145,7 @@ public sealed class FilesManagerReadModel
         {
             foreach (var item in approvalArray.EnumerateArray())
             {
+                if (GetString(item, "status") != "pending") continue;
                 var summary = item.TryGetProperty(
                         "payload",
                         out var payload)
@@ -186,7 +183,10 @@ public sealed class FilesManagerReadModel
             sessions,
             approvals,
             activeName,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow) {
+                UnavailableDependencies = workspace.Available ? Array.Empty<string>()
+                    : new[] { "Files workspace view unavailable; local profile/approval state only." }
+            };
     }
 
     public async Task<ManagerOperationResult> ResolveApprovalAsync(
@@ -582,6 +582,27 @@ public sealed class FilesManagerReadModel
             operation,
             target,
             stdout.Trim());
+    }
+
+    private async Task<JsonDocument> ReadLocalProfilesAsync(string rootKey, string fileName,
+        CancellationToken cancellationToken, bool optional = false)
+    {
+        if (_approvalOptions is null || !_approvalOptions.EnvironmentVariables.TryGetValue(rootKey, out var root))
+            throw new InvalidOperationException("Local Files management paths are not configured.");
+        var path = Path.Combine(root, fileName);
+        if (optional && !File.Exists(path)) return JsonDocument.Parse("{\"requests\":[]}");
+        return JsonDocument.Parse(await File.ReadAllTextAsync(path, cancellationToken));
+    }
+
+    private async Task<(JsonDocument Document, bool Available)> ReadWorkspaceViewAsync(CancellationToken cancellationToken)
+    {
+        try { return (await CallToolForJsonAsync("files_workspace_list", cancellationToken), true); }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or JsonException or TaskCanceledException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Local approvals remain visible when the agent is stopped/revoked; no ready claim.
+            return (JsonDocument.Parse("[]"), false);
+        }
     }
 
     private Task<JsonDocument> CallToolForJsonAsync(
