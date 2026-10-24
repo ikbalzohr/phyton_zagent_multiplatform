@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Zagent.Shared\Zagent.Shared.csproj" />
+    <!-- The executable hosts from AppContext.BaseDirectory, including DEV builds. -->
+    <Content Update="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>
