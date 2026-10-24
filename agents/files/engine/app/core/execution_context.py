@@ -77,7 +77,7 @@ def _operation(tool, arguments):
         raise PermissionError('CROSS_PROFILE_COPY_DISABLED')
     if op.startswith('profile_') or op.startswith('update_'):
         raise PermissionError('MANAGEMENT_PLANE_ONLY')
-    forbidden = set(AUTHORITY_ARGUMENTS)
+    forbidden = set(AUTHORITY_ARGUMENTS) - {'metadata'}
     if op in READ_CONTROLS | WRITE_CONTROLS or tool in COMMAND_TOOLS:
         forbidden.discard('profile_id')  # selection only, checked against trusted resource
     if op in {'operation_cancel', 'command_cancel'}:

@@ -7,7 +7,7 @@ from .access import AuthContext, AuthorizationError, ResourceAuthorizer, digest
 from .identity import Placement
 from .files_policy import validate_files_tool_scope
 
-AUTHORITY_FIELDS = frozenset({"_meta", "metadata", "session_id", "owner_session_id",
+AUTHORITY_FIELDS = frozenset({"_meta", "session_id", "owner_session_id",
     "operator_alias", "principal_id", "workspace_id", "grant_id", "scopes", "policy_revision",
     "device_id", "target_device_id", "installation_id", "request_id", "trace_id", "task_id",
     "resource_key", "access_mode", "priority", "fencing_epoch", "lease_owner", "execution_context",
