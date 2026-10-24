@@ -77,7 +77,12 @@ def render(config):
                        'introspection.token.claim': 'true'}}, {
             'name': 'zagent-owner-subject', 'protocol': 'openid-connect',
             'protocolMapper': 'oidc-sub-mapper', 'consentRequired': False,
-            'config': {'access.token.claim': 'true', 'introspection.token.claim': 'true'}}]})
+            'config': {'access.token.claim': 'true', 'introspection.token.claim': 'true'}}, {
+            'name': 'zagent-introspection-audience', 'protocol': 'openid-connect',
+            'protocolMapper': 'oidc-audience-mapper', 'consentRequired': False,
+            'config': {'included.client.audience': 'zagent-resource-server',
+                       'access.token.claim': 'true', 'introspection.token.claim': 'true',
+                       'id.token.claim': 'false'}}]})
     host = urlsplit(issuer).hostname
     nginx = f'''# Parent must validate with nginx -t before enabling; certificates already required.
 server {{

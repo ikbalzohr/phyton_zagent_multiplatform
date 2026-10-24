@@ -44,12 +44,18 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('proxy_set_header Forwarded "";', proxy)
         self.assertNotIn('proxy_add_x_forwarded_for', proxy)
 
-    def test_access_token_has_subject_and_only_exact_resource_audience(self):
+    def test_access_token_has_subject_and_both_resource_audiences(self):
         realm, *_ = render.render(self.config)
         scope = next(s for s in realm['clientScopes'] if s['name'] == 'zagent-resource-audience')
         audience = next(m for m in scope['protocolMappers'] if m['protocolMapper'] == 'oidc-audience-mapper')
         self.assertNotIn('included.client.audience', audience['config'])
         self.assertEqual(audience['config']['included.custom.audience'], self.config['resource_uri'])
+        introspection = next((m for m in scope['protocolMappers'] if m['name'] == 'zagent-introspection-audience'), {})
+        self.assertTrue(introspection, 'Keycloak introspection requires its client ID in the audience')
+        self.assertEqual(introspection['config']['included.client.audience'], 'zagent-resource-server')
+        self.assertNotIn('included.custom.audience', introspection['config'])
+        self.assertEqual(introspection['config']['access.token.claim'], 'true')
+        self.assertEqual(introspection['config']['introspection.token.claim'], 'true')
         subject = next((m for m in scope['protocolMappers'] if m['protocolMapper'] == 'oidc-sub-mapper'), {})
         self.assertTrue(subject, 'Keycloak 25+ requires an explicit subject mapper')
         self.assertEqual(subject['config']['access.token.claim'], 'true')
