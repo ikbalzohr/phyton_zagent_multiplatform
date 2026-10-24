@@ -284,20 +284,10 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
     if name == "zagent_capabilities":
         return _text({"ok":True,"version":"1.0.0","tools":[t["name"] for t in _visible(auth)],
                       "workflow_execution_blocker": workflow_runtime.execution_unavailable()})
-    policy = _policy(name)
-    auth.require(policy["scope"], name)
-    if name == "zagent_task_submit":
-        target = arguments["tool_name"]
-        if target.startswith("zagent_"):
-            raise ValueError("UPSTREAM_TOOL_REQUIRED")
-        return _text(await _dispatch(target, arguments.get("arguments", {}), auth, bearer,
-                                    arguments.get("idempotency_key", ""), True))
-    if name == "zagent_artifact_read":
-        return _text(await asyncio.to_thread(read_artifact, workflow_journal,
-            arguments["artifact_id"], auth.owner,
-            load_tunnel_config().get("artifact_roots", []),
-            arguments.get("offset", 0), arguments.get("length", 65536)))
-    if name.startswith("zagent_task_"):
+    # Read-only receipts are authorized against the task owner and ORIGINAL tool.
+    # Do not demand extra grant tool names merely to retrieve an approved read.
+    # Submission/cancellation retain the separate control-policy checks below.
+    if name in {"zagent_task_status", "zagent_task_result", "zagent_task_list"}:
         if name == "zagent_task_list":
             rows = await orchestrator.journal.list(auth.owner, arguments.get("limit", 50))
             visible = []
@@ -312,6 +302,23 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
         await _owned_task(task_id, auth)
         action = name.removeprefix("zagent_task_")
         return _text(await getattr(orchestrator, action)(task_id))
+    policy = _policy(name)
+    auth.require(policy["scope"], name)
+    if name == "zagent_task_submit":
+        target = arguments["tool_name"]
+        if target.startswith("zagent_"):
+            raise ValueError("UPSTREAM_TOOL_REQUIRED")
+        return _text(await _dispatch(target, arguments.get("arguments", {}), auth, bearer,
+                                    arguments.get("idempotency_key", ""), True))
+    if name == "zagent_artifact_read":
+        return _text(await asyncio.to_thread(read_artifact, workflow_journal,
+            arguments["artifact_id"], auth.owner,
+            load_tunnel_config().get("artifact_roots", []),
+            arguments.get("offset", 0), arguments.get("length", 65536)))
+    if name == "zagent_task_cancel":
+        task_id = arguments["task_id"]
+        await _owned_task(task_id, auth)
+        return _text(await orchestrator.cancel(task_id))
     if name.startswith("zagent_workflow_"):
         run_id = arguments["run_id"]
         try:
