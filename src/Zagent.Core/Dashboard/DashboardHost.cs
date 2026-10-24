@@ -115,6 +115,10 @@ public static class DashboardHost
         });
         app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-store" });
         app.MapRazorPages();
+        // Login needs this single public stylesheet before a session exists. Keep
+        // all other static files and management routes behind fallback authorization.
+        app.MapMethods("/dashboard.css", ["GET", "HEAD"], () => Results.File(
+            Path.Combine(app.Environment.WebRootPath, "dashboard.css"), contentType: "text/css")).AllowAnonymous();
         app.MapPost("/auth/login", async (HttpContext ctx) => {
             var form = await ctx.Request.ReadFormAsync();
             var name = form["account"].ToString(); var password = form["password"].ToString();

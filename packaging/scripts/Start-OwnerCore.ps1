@@ -44,11 +44,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $InstallRoot 'agents\web\engine\dist
 $tunnelPython = $env:ZAGENT_TUNNEL_PYTHON
 if (-not $tunnelPython) { $tunnelPython = Join-Path $env:LOCALAPPDATA 'Zagent-Envs\tunnel\Scripts\python.exe' }
 if (-not (Test-Path -LiteralPath $tunnelPython -PathType Leaf)) { throw 'Known isolated Tunnel Python missing; no fallback to legacy Python.' }
+$filesPython = $env:ZAGENT_FILES_PYTHON
+if (-not $filesPython) { $filesPython = Join-Path $env:LOCALAPPDATA 'Zagent-Envs\files\Scripts\python.exe' }
+if (-not (Test-Path -LiteralPath $filesPython -PathType Leaf)) { throw 'Known isolated Files Python missing; create its Python 3.11 venv and install agents/files/engine/requirements.txt. No fallback to legacy Python.' }
+Assert-ZagentPlainPath $filesPython
+$previousFiles = $env:ZAGENT_FILES_PYTHON
 $previousDotnet = $env:DOTNET_ROOT
 $previousTunnel = $env:ZAGENT_TUNNEL_PYTHON
 try {
     $env:DOTNET_ROOT = $DotnetRoot
     $env:ZAGENT_TUNNEL_PYTHON = $tunnelPython
+    $env:ZAGENT_FILES_PYTHON = $filesPython
     Write-Host ('Using existing DataRoot: ' + $DataRoot)
     Write-Host 'Opening the local dashboard. Use its local admin account, not the OAuth account.'
     & $CoreExecutable --dashboard --root $InstallRoot --data-root $DataRoot --dashboard-config $config
@@ -57,4 +63,5 @@ try {
 finally {
     $env:DOTNET_ROOT = $previousDotnet
     $env:ZAGENT_TUNNEL_PYTHON = $previousTunnel
+    $env:ZAGENT_FILES_PYTHON = $previousFiles
 }
