@@ -68,7 +68,12 @@ function Assert-ZagentLocalCertificate($Certificate) {
     $san = @($Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' })
     # DER SEQUENCE containing only dNSName localhost: no wildcard, IP SAN or second name.
     if ($san.Count -ne 1 -or [BitConverter]::ToString($san[0].RawData) -cne '30-0B-82-09-6C-6F-63-61-6C-68-6F-73-74') { throw 'Certificate SAN must contain exact DNS localhost only.' }
-    $eku = @($Certificate.EnhancedKeyUsageList | ForEach-Object { $_.ObjectId.Value })
+    # Decode the standard X.509 extension: PowerShell's display-only
+    # EnhancedKeyUsageList/ObjectId shape differs across provider versions.
+    $ekuExtensions = @($Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.37' })
+    if ($ekuExtensions.Count -ne 1) { throw 'Exactly one TLS EKU extension required.' }
+    $decodedEku = [Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]::new($ekuExtensions[0], $ekuExtensions[0].Critical)
+    $eku = @($decodedEku.EnhancedKeyUsages | ForEach-Object { $_.Value })
     if ($eku -notcontains '1.3.6.1.5.5.7.3.1') { throw 'TLS serverAuth EKU required.' }
 }
 function New-ZagentInternalSecrets([string]$Path) {
