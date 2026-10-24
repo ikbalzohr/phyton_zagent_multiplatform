@@ -81,6 +81,23 @@ $resource = [ordered]@{
     workspace_id = 'workspace-local'; policy_revision = 'oauth-readonly-' + [guid]::NewGuid().ToString('N')
     scopes_supported = @('files:read'); grants = $grants
 }
+# A grant alone does not publish tools: Router also requires per-tool scope policy.
+$policyProperty = $config.PSObject.Properties['tool_policy']
+if ($null -eq $policyProperty) {
+    $config | Add-Member -NotePropertyName tool_policy -NotePropertyValue ([pscustomobject]@{})
+} elseif ($policyProperty.Value -isnot [pscustomobject]) {
+    throw 'tool_policy must be an object; no write performed.'
+}
+foreach ($name in @('files_stat','files_read')) {
+    $entry = $config.tool_policy.PSObject.Properties[$name]
+    if ($null -eq $entry) {
+        $config.tool_policy | Add-Member -NotePropertyName $name -NotePropertyValue ([pscustomobject]@{ scope = 'files:read' })
+    } else {
+        if ($entry.Value -isnot [pscustomobject] -or $entry.Value.scope -cne 'files:read') { throw 'Conflicting Files tool policy; no overwrite performed.' }
+        $enabled = $entry.Value.PSObject.Properties['enabled']
+        if ($null -ne $enabled -and ($enabled.Value -isnot [bool] -or $enabled.Value -ne $true)) { throw 'Conflicting Files tool policy: disabled; no overwrite performed.' }
+    }
+}
 $config | Add-Member -NotePropertyName resource_server -NotePropertyValue $resource -Force
 $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($config | ConvertTo-Json -Depth 64))
 $id = [guid]::NewGuid().ToString('N')
