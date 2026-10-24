@@ -6,6 +6,16 @@ import json
 
 ROOT = Path(__file__).resolve().parents[1]
 class OwnerFilesActivationSource(unittest.TestCase):
+    def test_shell_selection_skips_store_alias_without_weakening_path_guard(self):
+        text = (ROOT / 'packaging/scripts/Enable-OwnerFilesCapabilities.ps1').read_text()
+        self.assertIn("Join-Path $PSHOME 'pwsh.exe'", text)
+        self.assertIn('[Environment]::SystemDirectory', text)
+        self.assertIn("'WindowsPowerShell\\v1.0\\powershell.exe'", text)
+        self.assertIn("$_.Exception.Message -cne 'Reparse path/ancestor rejected.'", text)
+        self.assertIn('Assert-ZagentPlainPath $candidate', text)
+        self.assertIn("'Skipping reparse shell candidate: '", text)
+        self.assertIn("throw 'No regular-file PowerShell executable available", text)
+
     def test_catalog_excludes_unimplemented_commands_and_accounts_for_all_tools(self):
         catalog = json.loads((ROOT / 'packaging/files-capabilities.json').read_text())
         router = ast.parse((ROOT / 'agents/tunnel/engine/router/files_policy.py').read_text())

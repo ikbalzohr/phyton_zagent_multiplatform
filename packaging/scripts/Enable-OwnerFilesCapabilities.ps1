@@ -92,16 +92,28 @@ if ($EnableCommands) {
         $commands = @(Get-Command $name -CommandType Application -ErrorAction SilentlyContinue)
         if ($commands.Count -gt 0) { $exe = $commands[0].Source; Assert-ZagentPlainPath $exe; $executables += [IO.Path]::GetFullPath($exe) }
     }
-    # Exactly one shell, matching the executor's unambiguous shell contract.
-    foreach ($name in @('pwsh.exe','powershell.exe')) {
-        $commands = @(Get-Command $name -CommandType Application -ErrorAction SilentlyContinue)
-        if ($commands.Count -gt 0) {
-            $exe = $commands[0].Source
-            Assert-ZagentPlainPath $exe
-            $executables += [IO.Path]::GetFullPath($exe)
-            break
+    # Prefer a physical executable over Microsoft Store app-execution aliases.
+    # Exactly one shell is selected; reparse checks remain strict everywhere.
+    $shellCandidates = @((Join-Path $PSHOME 'pwsh.exe'))
+    $commands = @(Get-Command 'pwsh.exe' -CommandType Application -ErrorAction SilentlyContinue)
+    foreach ($command in $commands) { $shellCandidates += $command.Source }
+    $shellCandidates += Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+    $selectedShell = $null
+    foreach ($candidate in @($shellCandidates | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+        try {
+            Assert-ZagentPlainPath $candidate
+        } catch {
+            if ($_.Exception.Message -cne 'Reparse path/ancestor rejected.') { throw }
+            Write-Host ('Skipping reparse shell candidate: ' + $candidate)
+            continue
         }
+        $selectedShell = [IO.Path]::GetFullPath($candidate)
+        break
     }
+    if (-not $selectedShell) { throw 'No regular-file PowerShell executable available; no write performed.' }
+    Write-Host ('Selected command shell: ' + $selectedShell)
+    $executables += $selectedShell
     $executables = @($executables | Sort-Object -Unique)
     if ($executables.Count -eq 0) { throw 'No explicitly resolved command executables available.' }
     $commandTools = @($desiredTools | Where-Object { $catalog.tools.$_ -ceq 'files:execute' })
