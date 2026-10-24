@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$InstallRoot)
+param(
+    [Parameter(Mandatory=$true)][string]$InstallRoot,
+    [switch]$ActivateReadOnlyGrant
+)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'WindowsDashboard-Provisioning.ps1')
 Assert-ZagentOwnerConsole
@@ -40,13 +43,33 @@ if (($profiles | ConvertTo-Json -Depth 64 -Compress) -cne ($profilesAfter | Conv
 $before = [IO.File]::ReadAllBytes($target)
 $config = [Text.Encoding]::UTF8.GetString($before) | ConvertFrom-Json
 $existing = $config.PSObject.Properties['resource_server']
-if ($null -ne $existing -and $null -ne $existing.Value -and @($existing.Value.PSObject.Properties).Count -gt 0) { throw 'Existing resource_server requires explicit review; no overwrite performed.' }
 $issuer = 'https://vmi3669591.contaboserver.net/realms/zagent'
 $principal = 'principal_v1_41d40891edc920d08c8bf7d58f508bb1a082a9dc8dc5bb70f4fa2d913161a59d'
+if ($ActivateReadOnlyGrant) {
+    if ($null -eq $existing -or $null -eq $existing.Value) { throw 'Activation requires the exact staged policy; no write performed.' }
+    $oldResource = $existing.Value
+    $oldGrantProperty = $oldResource.grants.PSObject.Properties[$principal]
+    if ($oldResource.issuer -cne $issuer -or $oldResource.resource_uri -cne 'https://vmi3669591.contaboserver.net/mcp' -or
+        $oldResource.introspection_endpoint -cne ($issuer + '/protocol/openid-connect/token/introspect') -or
+        $oldResource.introspection_client_id -cne 'zagent-resource-server' -or
+        $oldResource.introspection_secret_env -cne 'ZAGENT_OAUTH_INTROSPECTION_SECRET' -or
+        $oldResource.workspace_id -cne 'workspace-local' -or @($oldResource.grants.PSObject.Properties).Count -ne 1 -or
+        $null -eq $oldGrantProperty) { throw 'Activation requires the exact staged policy; no write performed.' }
+    $oldGrant = $oldGrantProperty.Value
+    if ($oldGrant.revoked -ne $true -or $oldGrant.files_resource.revoked -ne $true -or
+        (@($oldGrant.scopes) -join ',') -cne 'files:read' -or (@($oldGrant.tools) -join ',') -cne 'files_stat,files_read' -or
+        $oldGrant.files_resource.kind -cne 'files' -or $oldGrant.files_resource.profile_id -cne 'appBridge' -or
+        $oldGrant.files_resource.resource_id -cne 'workspace:workspace-local:approved-repository' -or
+        $oldGrant.files_resource.device_id -cne $identity.device_id -or
+        $oldGrant.files_resource.installation_id -cne $identity.installation_id) { throw 'Activation requires the exact staged policy; no write performed.' }
+} elseif ($null -ne $existing -and $null -ne $existing.Value -and @($existing.Value.PSObject.Properties).Count -gt 0) {
+    throw 'Existing resource_server requires explicit review; no overwrite performed.'
+}
+$revoked = -not $ActivateReadOnlyGrant
 $grant = [ordered]@{
-    revoked = $true; expires_at = [DateTimeOffset]::UtcNow.AddHours(24).ToUnixTimeSeconds()
+    revoked = $revoked; expires_at = [DateTimeOffset]::UtcNow.AddHours(24).ToUnixTimeSeconds()
     scopes = @('files:read'); tools = @('files_stat','files_read')
-    files_resource = [ordered]@{ resource_id = 'workspace:workspace-local:approved-repository'; kind = 'files'; profile_id = 'appBridge'; device_id = $identity.device_id; installation_id = $identity.installation_id; revoked = $true }
+    files_resource = [ordered]@{ resource_id = 'workspace:workspace-local:approved-repository'; kind = 'files'; profile_id = 'appBridge'; device_id = $identity.device_id; installation_id = $identity.installation_id; revoked = $revoked }
 }
 $grants = [ordered]@{}; $grants[$principal] = $grant
 $resource = [ordered]@{
@@ -69,6 +92,10 @@ if ([Convert]::ToBase64String($before) -cne [Convert]::ToBase64String([IO.File]:
 [IO.File]::Replace($temp, $target, $backup)
 $readback = Read-LocalJson $target
 if (($readback.resource_server | ConvertTo-Json -Depth 64 -Compress) -cne ($resource | ConvertTo-Json -Depth 64 -Compress)) { throw 'Read-back failed; preserve backup and stop.' }
-Write-Host 'OAUTH_RESOURCE_CONFIG_WRITTEN; read-back verified; grant REVOKED; public MCP NOT_VERIFIED.'
+if ($ActivateReadOnlyGrant) {
+    Write-Host 'OAUTH_READONLY_GRANT_ACTIVE; read-back verified; files_stat/files_read only; expires in 24 hours; authenticated MCP NOT_VERIFIED.'
+} else {
+    Write-Host 'OAUTH_RESOURCE_CONFIG_WRITTEN; read-back verified; grant REVOKED; public MCP NOT_VERIFIED.'
+}
 Write-Host ('Private configuration backup: ' + $backup)
 Write-Host 'Restart with Start-OwnerCore.ps1. No OAuth login, network exposure or profile changes were performed.'
