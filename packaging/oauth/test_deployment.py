@@ -26,7 +26,7 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(interactive['redirectUris'], [self.config['redirect_uri']])
         self.assertEqual(interactive['attributes']['pkce.code.challenge.method'], 'S256')
         self.assertTrue(interactive['publicClient'])
-        self.assertEqual(interactive['optionalClientScopes'], list(render.SCOPES))
+        self.assertEqual(interactive['optionalClientScopes'], ['files:read', 'offline_access'])
         self.assertFalse(introspection['publicClient'])
         self.assertFalse(introspection['standardFlowEnabled'])
         self.assertFalse(introspection['serviceAccountsEnabled'])
@@ -43,6 +43,18 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('proxy_set_header X-Forwarded-For $remote_addr;', proxy)
         self.assertIn('proxy_set_header Forwarded "";', proxy)
         self.assertNotIn('proxy_add_x_forwarded_for', proxy)
+
+    def test_access_token_has_subject_and_only_exact_resource_audience(self):
+        realm, *_ = render.render(self.config)
+        scope = next(s for s in realm['clientScopes'] if s['name'] == 'zagent-resource-audience')
+        audience = next(m for m in scope['protocolMappers'] if m['protocolMapper'] == 'oidc-audience-mapper')
+        self.assertNotIn('included.client.audience', audience['config'])
+        self.assertEqual(audience['config']['included.custom.audience'], self.config['resource_uri'])
+        subject = next((m for m in scope['protocolMappers'] if m['protocolMapper'] == 'oidc-sub-mapper'), {})
+        self.assertTrue(subject, 'Keycloak 25+ requires an explicit subject mapper')
+        self.assertEqual(subject['config']['access.token.claim'], 'true')
+        self.assertEqual(subject['config']['introspection.token.claim'], 'true')
+        self.assertEqual(realm['clients'][0]['optionalClientScopes'], ['files:read', 'offline_access'])
 
     def test_placeholders_and_unsafe_urls_are_blocked(self):
         for field, values in {

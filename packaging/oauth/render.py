@@ -61,7 +61,7 @@ def render(config):
     client = realm['clients'][0]
     client['redirectUris'] = [redirect]
     client['defaultClientScopes'] = ['zagent-resource-audience']
-    client['optionalClientScopes'] = list(SCOPES)
+    client['optionalClientScopes'] = ['files:read', 'offline_access']
     realm['clientScopes'] = [dict(name=s, protocol='openid-connect', attributes={
         'include.in.token.scope': 'true', 'display.on.consent.screen': 'true',
         'consent.screen.text': s}) for s in SCOPES]
@@ -72,9 +72,12 @@ def render(config):
             'name': 'exact-zagent-resource', 'protocol': 'openid-connect',
             'protocolMapper': 'oidc-audience-mapper', 'consentRequired': False,
             'config': {'included.custom.audience': resource,
-                       'included.client.audience': 'zagent-resource-server',
+
                        'access.token.claim': 'true', 'id.token.claim': 'false',
-                       'introspection.token.claim': 'true'}}]})
+                       'introspection.token.claim': 'true'}}, {
+            'name': 'zagent-owner-subject', 'protocol': 'openid-connect',
+            'protocolMapper': 'oidc-sub-mapper', 'consentRequired': False,
+            'config': {'access.token.claim': 'true', 'introspection.token.claim': 'true'}}]})
     host = urlsplit(issuer).hostname
     nginx = f'''# Parent must validate with nginx -t before enabling; certificates already required.
 server {{
