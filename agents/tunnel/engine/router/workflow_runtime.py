@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .workflow_domain import TERMINAL_RUN_STATES, WorkflowDomainJournal
-from .workflow_executor import ConcreteWorkflowExecutor
+from .workflow_executor import ConcreteWorkflowExecutor, workflow_execution_unavailable
 from .config import load_tunnel_config
 from orchestrator.compiler import validate_compiled_plan
 from orchestrator.reporting import (
@@ -57,10 +57,19 @@ class WorkflowRuntimeService:
                 "ZAGENT_TUNNEL_RUNTIME_DIR",
                 str(Path.cwd() / "runtime"))) / "workflow-runs"),
         )
-        self.concrete = ConcreteWorkflowExecutor(
-            journal,
-            workspace_root,
-        )
+        self.concrete = None
+        if workflow_execution_unavailable() is None:
+            self.concrete = ConcreteWorkflowExecutor(journal, workspace_root)
+
+    def execution_unavailable(self) -> dict[str, Any] | None:
+        unavailable = workflow_execution_unavailable()
+        if unavailable is not None:
+            return unavailable
+        if self.concrete is None:
+            # Installing sources after startup requires a deliberate restart.
+            return {"ok": False, "status": "BLOCKED", "errors": [{
+                "code": "WORKFLOW_EXECUTOR_RESTART_REQUIRED"}]}
+        return None
 
     def _assert_owner(self, owner: dict[str, Any]) -> tuple[str, str]:
         session_id = str((owner or {}).get("session_id") or "")
@@ -113,6 +122,9 @@ class WorkflowRuntimeService:
 
         dry_run = bool((plan.get("goal") or {}).get("dry_run"))
         if not dry_run:
+            unavailable = self.execution_unavailable()
+            if unavailable is not None:
+                return unavailable
             policy = load_tunnel_config().get("workflow_policy") or {}
             if str(plan.get("strategy") or "") not in policy.get("allowed_strategies", []):
                 return {"ok": False, "status": "BLOCKED", "errors": [{"code": "STRATEGY_NOT_PROVISIONED"}]}
@@ -265,6 +277,9 @@ class WorkflowRuntimeService:
         plan = (arguments or {}).get("plan") or {}
         if not run_id or not owner_session_id:
             raise ValueError("RUN_CONTEXT_REQUIRED")
+        unavailable = self.execution_unavailable()
+        if unavailable is not None:
+            return unavailable
         task_id = str(getattr(ctx, "task_id", "") or "")
         strategy = str(plan.get("strategy") or "")
         if strategy == "A_EXISTING_MXD":
@@ -565,6 +580,9 @@ class WorkflowRuntimeService:
                 "status": "WAITING_FOR_REVIEW",
                 "errors": [{"code": "REVIEW_DECISION_REQUIRED"}],
             }
+        unavailable = self.execution_unavailable()
+        if unavailable is not None:
+            return unavailable
         row = self.journal.transition(
             run_id, "PREFLIGHT", owner_session_id=owner_session_id
         )

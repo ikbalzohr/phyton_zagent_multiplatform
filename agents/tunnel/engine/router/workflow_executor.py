@@ -10,13 +10,27 @@ _ARCMAP_ENGINE_ROOT = Path(__file__).resolve().parents[3] / "arcmap" / "engine"
 if str(_ARCMAP_ENGINE_ROOT) not in sys.path:
     sys.path.insert(0, str(_ARCMAP_ENGINE_ROOT))
 
-from orchestrator.adapters.file_worker import ArcGISProcessFileWorker
-from orchestrator.artifacts import Publisher
-from orchestrator.executor.strategy_a import StrategyAExecutor
-from orchestrator.executor.strategy_d import StrategyDExecutor
-from orchestrator.staging import RunWorkspace, StrategyBCStager
-from .workflow_live_adapter import ProductionArcMapLiveAdapter
 from .workflow_security import authorize_step
+
+
+def workflow_execution_unavailable() -> dict[str, Any] | None:
+    """Source prerequisite only: presence is NOT an ArcMap readiness claim.
+
+    Do not import an unavailable optional engine, or replace its integrity gate.
+    A retained, validated artifacts implementation is required for all strategies.
+    """
+    source = _ARCMAP_ENGINE_ROOT / "orchestrator" / "artifacts"
+    if source.with_suffix(".py").is_file() or (source / "__init__.py").is_file():
+        return None
+    return {
+        "ok": False,
+        "status": "BLOCKED",
+        "errors": [{
+            "code": "WORKFLOW_ARTIFACTS_UNAVAILABLE",
+            "module": "orchestrator.artifacts",
+            "message": "ArcMap workflow execution is disabled: artifacts validation/publication source is missing.",
+        }],
+    }
 
 
 def _sha256(path: str) -> str:
@@ -29,6 +43,17 @@ def _sha256(path: str) -> str:
 
 class ConcreteWorkflowExecutor:
     def __init__(self, journal, workspace_root: str | Path):
+        if workflow_execution_unavailable():
+            raise RuntimeError("WORKFLOW_ARTIFACTS_UNAVAILABLE")
+        # Optional execution imports must precede all executor construction.
+        # Other import errors remain visible; never broadly suppress them.
+        from orchestrator.adapters.file_worker import ArcGISProcessFileWorker
+        from orchestrator.artifacts import Publisher
+        from orchestrator.executor.strategy_a import StrategyAExecutor
+        from orchestrator.executor.strategy_d import StrategyDExecutor
+        from orchestrator.staging import RunWorkspace, StrategyBCStager
+        from .workflow_live_adapter import ProductionArcMapLiveAdapter
+
         self.journal=journal
         self.workspace_root=Path(workspace_root).resolve()
         self.worker=ArcGISProcessFileWorker(_ARCMAP_ENGINE_ROOT)

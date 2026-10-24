@@ -29,7 +29,10 @@
 /agents/tunnel/engine/requests/
 /agents/tunnel/engine/sessions/
 /agents/tunnel/engine/runtime/
-/agents/arcmap/engine/orchestrator/artifacts/
+# This name is a Python source package, not a generated output directory.
+# Keep generated maps/data ignored; allow only Python source recovery here.
+/agents/arcmap/engine/orchestrator/artifacts/*
+!/agents/arcmap/engine/orchestrator/artifacts/*.py
 /toolchain.json
 
 # Compiled/cached output at any depth

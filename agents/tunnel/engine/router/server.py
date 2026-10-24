@@ -53,6 +53,9 @@ def _policy(name: str) -> dict[str, Any]:
 
 _SKIP = {"zagent_access_status", "zagent_capabilities"}
 _ALWAYS = {"zagent_task_list", "zagent_task_status", "zagent_task_result", "zagent_task_cancel"}
+# Plan/validate/read/cancel remain available; execution must not be advertised
+# while the optional engine's artifact integrity component is absent.
+_WORKFLOW_EXECUTION_TOOLS = {"arcmap_goal_execute", "arcmap_goal_build_map", "arcmap_goal_resume"}
 
 
 def _remember(context: dict[str, Any], bearer: str) -> None:
@@ -231,6 +234,11 @@ def _visible(auth: AuthContext):
     tools = []
     for tool in [*registry.list_public_tools(), *_management_tools()]:
         name = tool["name"]
+        # Management tools have no upstream mapping (get_mapping would raise).
+        mapping = registry.tool_index.get(name)
+        upstream_name = mapping[1] if mapping else name
+        if upstream_name in _WORKFLOW_EXECUTION_TOOLS and workflow_runtime.execution_unavailable():
+            continue
         if name in _SKIP:
             tools.append(tool); continue
         if name in _ALWAYS:
@@ -274,7 +282,8 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
     if name == "zagent_access_status":
         return _text({"ok":True, **auth.public()})
     if name == "zagent_capabilities":
-        return _text({"ok":True,"version":"1.0.0","tools":[t["name"] for t in _visible(auth)]})
+        return _text({"ok":True,"version":"1.0.0","tools":[t["name"] for t in _visible(auth)],
+                      "workflow_execution_blocker": workflow_runtime.execution_unavailable()})
     policy = _policy(name)
     auth.require(policy["scope"], name)
     if name == "zagent_task_submit":
