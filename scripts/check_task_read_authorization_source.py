@@ -28,7 +28,8 @@ class TaskReadAuthorizationSource(unittest.TestCase):
     def test_owned_task_checks_owner_and_current_origin_grant(self):
         owned = ast.get_source_segment(SOURCE, function('_owned_task')) or ''
         self.assertIn('row.get("session_id") != auth.owner', owned)
-        self.assertIn('auth.require(_policy(public_tool)["scope"], public_tool)', owned)
+        self.assertIn('scope = _policy(public_tool)["scope"]', owned)
+        self.assertIn('auth.require(scope, public_tool)', owned)
 
 if __name__ == '__main__':
     unittest.main()

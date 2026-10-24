@@ -8,7 +8,7 @@ import re
 from urllib.parse import urlsplit
 
 HERE = Path(__file__).resolve().parent
-SCOPES = ('zagent:read', 'files:read', 'files:write', 'web:control',
+SCOPES = ('zagent:read', 'files:read', 'files:write', 'files:execute', 'web:control',
           'arcmap:inspect', 'arcmap:execute', 'artifacts:read')
 
 

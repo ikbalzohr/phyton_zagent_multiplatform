@@ -8,9 +8,12 @@ from app.core.execution_context import verify, request_meta, owner_key
 def invocation(monkeypatch, token='k' * 32, **changes):
     monkeypatch.setenv('ZAGENT_INTERNAL_TOKEN', 'k' * 32)
     monkeypatch.setenv('ZAGENT_DEVICE_ID', 'device')
+    monkeypatch.setenv('ZAGENT_INSTALLATION_ID', 'install')
     context = dict(context_version=1, principal_id='principal', workspace_id='workspace',
                    device_id='device', operation_id='op', request_id='request', trace_id='trace',
                    deadline=time.time() + 30, effective_access='read',
+                   public_tool='files_read', required_scope='files:read', scopes=['files:read'],
+                   installation_id='install',
                    effective_resources=[dict(resource_id='root', kind='files', profile_id='approved')])
     context.update(changes)
     return SimpleNamespace(request_context=SimpleNamespace(

@@ -34,7 +34,7 @@ with LOG_FILE.open("a", encoding="utf-8", buffering=1) as log:
 
         print(f"Loaded server.py from: {Path(server.__file__).resolve()}")
         print(f"Configured endpoint: http://{server.HOST}:{server.PORT}/mcp")
-        print("Command Execution Layer: enabled")
+        print("Command Execution Layer: registered; explicit local owner policy required")
         server.mcp.run(transport="streamable-http")
     except BaseException:
         print("FATAL MCP STARTUP ERROR")

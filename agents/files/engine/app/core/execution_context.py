@@ -11,7 +11,7 @@ import os
 import time
 from contextvars import ContextVar
 
-CURRENT = ContextVar('zagent_verified_execution_context', default=None)
+CURRENT: ContextVar[dict | None] = ContextVar('zagent_verified_execution_context', default=None)
 
 
 class VerifiedContext(dict):
@@ -44,6 +44,113 @@ def request_meta(ctx):
     return TrustedMetadata(meta)
 
 
+# Deliberately closed native catalog. Commands have a separate owner-managed gate.
+NATIVE_READ = frozenset({'ping', 'runtime_info', 'get_root', 'exists', 'list', 'tree',
+    'stat', 'read', 'read_bytes_b64', 'search', 'hash', 'diff', 'syntax_check', 'backup_list'})
+NATIVE_WRITE = frozenset({'write', 'append', 'patch', 'mkdir', 'copy', 'move', 'delete',
+    'backup', 'restore', 'zip', 'unzip'})
+READ_CONTROLS = frozenset({'workspace_status', 'workspace_list', 'operation_status',
+    'operation_list', 'capabilities'})
+WRITE_CONTROLS = frozenset({'workspace_open', 'workspace_switch', 'operation_cancel'})
+COMMAND_TOOLS = frozenset({'files_command_capabilities', 'files_command_cancel',
+    'files_exec_command', 'files_powershell_run', 'files_node', 'files_npm', 'files_npx',
+    'files_git', 'files_build', 'files_test', 'files_process_list', 'files_process_start',
+    'files_process_stop'})
+AUTHORITY_ARGUMENTS = frozenset({'_meta', 'metadata', 'execution_context', 'principal_id',
+    'owner_session_id', 'session_id', 'scopes', 'grant_id', 'policy_revision', 'device_id',
+    'target_device_id', 'installation_id', 'request_id', 'trace_id', 'task_id',
+    'resource_key', 'access_mode', 'effective_access', 'effective_resources', 'files_resource',
+    'operator_alias', 'profile_id', 'source_profile', 'destination_profile',
+    'public_tool', 'required_scope', 'deadline', 'expires_at', 'fencing_epoch', 'lease_owner'})
+
+
+def _fingerprint(arguments):
+    return hashlib.sha256(json.dumps(arguments, sort_keys=True, ensure_ascii=False,
+        separators=(',', ':'), allow_nan=False).encode('utf-8')).hexdigest()
+
+
+def _operation(tool, arguments):
+    if not isinstance(tool, str) or not tool.startswith('files_') or not isinstance(arguments, dict):
+        raise PermissionError('UNKNOWN_FILES_OPERATION')
+    op = tool[6:]
+    if op in {'copy_between_profiles', 'copy_batch_between_profiles'}:
+        raise PermissionError('CROSS_PROFILE_COPY_DISABLED')
+    if op.startswith('profile_') or op.startswith('update_'):
+        raise PermissionError('MANAGEMENT_PLANE_ONLY')
+    forbidden = set(AUTHORITY_ARGUMENTS)
+    if op in READ_CONTROLS | WRITE_CONTROLS or tool in COMMAND_TOOLS:
+        forbidden.discard('profile_id')  # selection only, checked against trusted resource
+    if op in {'operation_cancel', 'command_cancel'}:
+        forbidden.discard('task_id')  # target selector only; actual owner is trusted context
+    if forbidden.intersection(arguments):
+        raise PermissionError('CLIENT_AUTHORITY_NOT_ALLOWED')
+    if 'workspace_id' in arguments and op not in READ_CONTROLS | WRITE_CONTROLS:
+        raise PermissionError('CLIENT_AUTHORITY_NOT_ALLOWED')
+    if op == 'execute':
+        if set(arguments) != {'operation', 'arguments'}:
+            raise PermissionError('CLIENT_AUTHORITY_NOT_ALLOWED')
+        inner = arguments['operation']
+        if not isinstance(inner, str):
+            raise PermissionError('UNKNOWN_FILES_OPERATION')
+        inner = inner.removeprefix('files_')
+        if inner not in NATIVE_READ | NATIVE_WRITE:
+            if inner in {'copy_between_profiles', 'copy_batch_between_profiles'}:
+                raise PermissionError('CROSS_PROFILE_COPY_DISABLED')
+            raise PermissionError('UNKNOWN_FILES_OPERATION')
+        inner_op, _, _ = _operation('files_' + inner, arguments['arguments'])
+        return inner_op, 'files:write', 'write'
+    if tool in COMMAND_TOOLS:
+        return op, 'files:execute', 'write'
+    if op in NATIVE_READ | READ_CONTROLS:
+        return op, 'files:read', 'read'
+    if op in NATIVE_WRITE | WRITE_CONTROLS:
+        return op, 'files:write', 'write'
+    raise PermissionError('UNKNOWN_FILES_OPERATION')
+
+
+def _check_scope(context, scope, access):
+    scopes = context.get('scopes')
+    if (context.get('required_scope') != scope or not isinstance(scopes, list)
+            or not all(isinstance(s, str) for s in scopes) or scope not in scopes
+            or (scope == 'files:execute' and 'files:write' not in scopes)):
+        raise PermissionError('CANONICAL_SCOPE_REQUIRED')
+    if context.get('effective_access') != access:
+        raise PermissionError('OPERATION_ACCESS_MISMATCH')
+
+
+def validate_profile(context, profile):
+    """Compare approved current local state; a name never supplies approval."""
+    if (profile.get('name') != context.get('profile_id')
+            or profile.get('enabled') is not True or profile.get('authorized_by_user') is not True
+            or profile.get('mode') not in ('read-only', 'read-write')):
+        raise PermissionError('FILES_PROFILE_NOT_APPROVED')
+    if context['effective_access'] == 'write' and profile['mode'] != 'read-write':
+        raise PermissionError('WRITE_PROFILE_REQUIRED')
+    for field in ('device_id', 'installation_id'):
+        if field in profile and profile[field] != context.get(field):
+            raise PermissionError('PROFILE_IDENTITY_MISMATCH')
+    return profile
+
+
+def authorize_operation(context, operation, arguments):
+    """Recheck native call at execution, including exact wrapper inner arguments."""
+    if not isinstance(context, VerifiedContext):
+        raise PermissionError('AUTHENTICATED_EXECUTION_CONTEXT_REQUIRED')
+    if time.time() >= context['expires_at']:
+        raise PermissionError('CONTEXT_EXPIRED')
+    op, scope, access = _operation('files_' + operation.removeprefix('files_'), arguments)
+    if (op != context.get('_authorized_operation')
+            or _fingerprint(arguments) != context.get('_arguments_fingerprint')):
+        raise PermissionError('CONTEXT_OPERATION_MISMATCH')
+    if context.get('public_tool') == 'files_execute':
+        # Canonical wrapper always requires write, even for an inner read.
+        scope, access = 'files:write', 'write'
+    elif context.get('public_tool') != 'files_' + op:
+        raise PermissionError('CONTEXT_TOOL_MISMATCH')
+    _check_scope(context, scope, access)
+    return op
+
+
 def verify(meta, tool, arguments):
     if not isinstance(meta, TrustedMetadata):
         raise PermissionError('AUTHENTICATED_INTERNAL_CHANNEL_REQUIRED')
@@ -65,17 +172,43 @@ def verify(meta, tool, arguments):
     local = os.environ.get('ZAGENT_DEVICE_ID', '').strip()
     if not local or context['device_id'] != local:
         raise PermissionError('IDENTITY_MISMATCH_OR_DEVICE_NOT_CONFIGURED')
+    installation = os.environ.get('ZAGENT_INSTALLATION_ID', '').strip()
+    if installation and context.get('installation_id') != installation:
+        raise PermissionError('INSTALLATION_IDENTITY_MISMATCH')
+    if context.get('public_tool') != tool:
+        raise PermissionError('CONTEXT_TOOL_MISMATCH')
+    op, scope, access = _operation(tool, arguments)
+    _check_scope(context, scope, access)
     resources = context.get('effective_resources')
-    if not isinstance(resources, list) or not resources or len(resources) > 128:
-        raise PermissionError('RESOURCE_SCOPE_REQUIRED')
-    for resource in resources:
-        if not isinstance(resource, dict) or not all(isinstance(resource.get(k), str) and resource[k] for k in ('resource_id', 'kind')):
-            raise PermissionError('INVALID_RESOURCE_SCOPE')
-    if context.get('effective_access') not in ('read', 'write'):
-        raise PermissionError('INVALID_ACCESS_SCOPE')
-    result = VerifiedContext(context)
+    if not isinstance(resources, list) or len(resources) != 1:
+        raise PermissionError('FILES_RESOURCE_MUST_BE_UNIQUE')
+    resource = resources[0]
+    if (not isinstance(resource, dict) or resource.get('kind') != 'files'
+            or not all(isinstance(resource.get(k), str) and resource[k].strip()
+                       and len(resource[k]) <= 256 for k in ('resource_id', 'profile_id'))
+            or resource.get('revoked', False) is not False):
+        raise PermissionError('INVALID_FILES_RESOURCE_SCOPE')
+    for field in ('device_id', 'installation_id'):
+        if field in resource and resource[field] != context.get(field):
+            raise PermissionError('RESOURCE_IDENTITY_MISMATCH')
+    profile_id = resource['profile_id']
+    if context.get('profile_id', profile_id) != profile_id:
+        raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
+    for field in ('profile_id', 'active_profile'):
+        if arguments.get(field) is not None and arguments[field] != profile_id:
+            raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
+    if 'profiles' in arguments and arguments['profiles'] != [profile_id]:
+        raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
+    if 'workspace_id' in arguments and arguments['workspace_id'] != context['workspace_id']:
+        raise PermissionError('WORKSPACE_SCOPE_MISMATCH')
+    result = VerifiedContext(json.loads(json.dumps(context, allow_nan=False)))
     result['expires_at'] = expiry
+    result['profile_id'] = profile_id
     result['session_id'] = owner_key(context)  # legacy column, not transport identity
+    result['_authorized_operation'] = op
+    actual_arguments = arguments['arguments'] if tool == 'files_execute' else arguments
+    result['_arguments_fingerprint'] = _fingerprint(actual_arguments)
+    result['_argument_keys'] = list(actual_arguments)
     result.pop('operator_alias', None)
     return result
 

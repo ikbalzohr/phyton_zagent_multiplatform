@@ -23,6 +23,7 @@ from .access import AuthContext, AuthorizationError, ResourceAuthorizer, owner_k
 from .artifacts import read_artifact
 from .config import load_tunnel_config
 from .execution_context import new_context, policy_resources, reject_authority, scheduler_meta, validate_context
+from .files_policy import scope_for_files_tool, validate_files_tool_scope
 from .identity import Placement, internal_token, verify_internal_token
 from .orchestration import Orchestrator
 from .registry import MCPRegistry
@@ -48,11 +49,17 @@ def _policy(name: str) -> dict[str, Any]:
     policy = (load_tunnel_config().get("tool_policy") or {}).get(name)
     if not isinstance(policy, dict) or not policy.get("scope"):
         raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
+    if name.startswith("files_") and policy["scope"] != scope_for_files_tool(name):
+        raise AuthorizationError("FILES_TOOL_SCOPE_MISMATCH", 403)
     return policy
 
 
 _SKIP = {"zagent_access_status", "zagent_capabilities"}
 _ALWAYS = {"zagent_task_list", "zagent_task_status", "zagent_task_result", "zagent_task_cancel"}
+# Scoped command controls must remain reachable while the installation lock is
+# held by their target. These are not arbitrary filesystem mutation shortcuts.
+_FILES_IMMEDIATE_CONTROLS = frozenset({"files_command_cancel", "files_command_capabilities",
+    "files_process_list", "files_process_stop"})
 # Plan/validate/read/cancel remain available; execution must not be advertised
 # while the optional engine's artifact integrity component is absent.
 _WORKFLOW_EXECUTION_TOOLS = {"arcmap_goal_execute", "arcmap_goal_build_map", "arcmap_goal_resume"}
@@ -79,6 +86,8 @@ async def _revalidate(context: dict[str, Any]) -> AuthContext:
             or auth.policy_revision != context["policy_revision"]):
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
     auth.require(context["required_scope"], context["public_tool"])
+    if context["public_tool"].startswith("files_"):
+        validate_files_tool_scope(context["public_tool"], context["required_scope"], auth.scopes)
     if context["effective_resources"] != policy_resources(
             auth, placement, context["required_scope"], current_authorizer):
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
@@ -94,7 +103,7 @@ async def _revalidate(context: dict[str, Any]) -> AuthContext:
 async def _executor(service: str, tool: str, arguments: dict[str, Any], ctx):
     async with orchestrator.journal._lock:
         isolated = orchestrator.journal.conn.execute("SELECT 1 FROM tasks WHERE resource_key=? AND state='orphaned' AND started_at IS NOT NULL AND task_id<>? LIMIT 1", (ctx.resource_key, ctx.task_id)).fetchone()
-    if isolated:
+    if isolated and tool not in _FILES_IMMEDIATE_CONTROLS:
         raise AuthorizationError("RESOURCE_RECONCILIATION_REQUIRED", 409)
     auth = await _revalidate(ctx.execution_context)
     if ctx.session_id != auth.owner:
@@ -246,11 +255,16 @@ def _visible(auth: AuthContext):
         try:
             policy = _policy(name)
             auth.require(policy["scope"], name)
+            if name.startswith("files_"):
+                validate_files_tool_scope(name, policy["scope"], auth.scopes)
             if policy.get("enabled", True) is True:
                 if not name.startswith("zagent_"):
                     tool = dict(tool)
                     tool.pop("outputSchema", None)
-                    tool["description"] = str(tool.get("description", ""))+" Returns a durable task receipt; retrieve the domain result with zagent_task_result."
+                    if name in _FILES_IMMEDIATE_CONTROLS:
+                        tool["description"] = str(tool.get("description", ""))+" Returns an immediate owned-process control result, not a durable task receipt."
+                    else:
+                        tool["description"] = str(tool.get("description", ""))+" Returns a durable task receipt; retrieve the domain result with zagent_task_result."
                 tools.append(tool)
         except AuthorizationError:
             pass
@@ -262,7 +276,12 @@ def _validate_tool(name: str, arguments: dict[str, Any], auth: AuthContext):
     if tool is None:
         raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
     if not name.startswith("zagent_"):
-        reject_authority(arguments)
+        # Only these cancellation APIs accept task_id as a target selector.
+        # It never replaces the authenticated context's task/owner identity.
+        selected = arguments
+        if name in {"files_command_cancel", "files_operation_cancel"}:
+            selected = {key: value for key, value in arguments.items() if key != "task_id"}
+        reject_authority(selected)
     Draft202012Validator(tool["inputSchema"]).validate(arguments)
 
 
@@ -272,7 +291,10 @@ async def _owned_task(task_id: str, auth: AuthContext):
         raise KeyError("TASK_NOT_FOUND")
     context = json.loads(row.get("execution_context_json") or "{}")
     public_tool = context.get("public_tool", "")
-    auth.require(_policy(public_tool)["scope"], public_tool)
+    scope = _policy(public_tool)["scope"]
+    auth.require(scope, public_tool)
+    if public_tool.startswith("files_"):
+        validate_files_tool_scope(public_tool, scope, auth.scopes)
     return row
 
 
@@ -329,6 +351,17 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
             raise KeyError("RUN_NOT_FOUND")
         return _text(await getattr(workflow_runtime, name.removeprefix("zagent_workflow_"))(run_id, auth.owner))
     service, upstream = registry.get_mapping(name)
+    if name in _FILES_IMMEDIATE_CONTROLS:
+        context = new_context(auth, placement, policy["scope"], name,
+                              resource_authorizer=authorizer())
+        _remember(context, bearer)
+        try:
+            control = orchestrator.context(service, upstream,
+                scheduler_meta(context, auth.owner, key, arguments), task_id=context["task_id"])
+            result = await _executor(service, upstream, arguments, control)
+            return result if submit else _text(result)
+        finally:
+            _credentials.pop(context["request_id"], None)
     async with orchestrator.journal._lock:
         queued = orchestrator.journal.conn.execute("SELECT COUNT(*) FROM tasks WHERE session_id=? AND state IN ('accepted','queued','waiting_capacity','waiting_lock','running','cancelling')", (auth.owner,)).fetchone()[0]
     if queued >= 64 or orchestrator.queue_depth() >= 1024:

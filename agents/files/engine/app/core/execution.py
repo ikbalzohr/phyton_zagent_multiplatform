@@ -16,7 +16,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from app.core import fsops
-from app.core.execution_context import VerifiedContext, owner_key
+from app.core.execution_context import (VerifiedContext, owner_key, CURRENT,
+                                       authorize_operation, validate_profile)
 from app.profiles import manager
 from app.paths import CONFIG_DIR, RUNTIME_DIR
 READ = {'ping','runtime_info','get_root','exists','list','tree','stat','read',
@@ -304,6 +305,7 @@ class Engine:
             bid = args['backup_id']
             if not bid or any(c not in '0123456789_' for c in bid):
                 raise ValueError('Invalid backup ID')
+            fsops.guard_subtree(fsops.BACKUP_ROOT / bid)
             data = json.loads((fsops.BACKUP_ROOT / bid / 'metadata.json').read_text())
             if data['profile'] != profile['name']:
                 raise PermissionError('Backup belongs to another profile')
@@ -352,6 +354,16 @@ class Engine:
         if not isinstance(metadata, VerifiedContext):
             raise PermissionError('AUTHENTICATED_EXECUTION_CONTEXT_REQUIRED')
         args, meta = dict(args or {}), dict(metadata)
+        # FastMCP may materialize optional defaults; discard only exact defaults
+        # absent from the authenticated invocation before comparing its payload.
+        native_op = op.removeprefix('files_')
+        if native_op in self.operations:
+            parameters = inspect.signature(self.operations[native_op]).parameters
+            for key in set(args) - set(metadata.get('_argument_keys', [])):
+                parameter = parameters.get(key)
+                if parameter is not None and parameter.default is not inspect.Parameter.empty and args[key] == parameter.default:
+                    del args[key]
+        op = authorize_operation(metadata, op, args)
         if time.time() >= meta['expires_at']:
             raise PermissionError('CONTEXT_EXPIRED')
         if op.startswith('files_'):
@@ -380,6 +392,7 @@ class Engine:
         self.ensure_session(sid, meta.get('profile_id'))
         # Resource selection is explicit and cannot silently change another root.
         profile = self.bind_named(sid, meta['profile_id'])
+        validate_profile(metadata, profile)
         if profile['name'] not in allowed:
             raise PermissionError('ACTIVE_PROFILE_NOT_IN_RESOURCE_SCOPE')
         meta.update(session_id=sid, profile_id=profile['name'])
@@ -461,9 +474,12 @@ class Engine:
                         if time.time() >= meta['expires_at']:
                             raise PermissionError('CONTEXT_EXPIRED_WHILE_QUEUED')
                         p = self.bind_named(meta['session_id'], profile['name'])
+                        authorize_operation(VerifiedContext(meta), op, args)
+                        validate_profile(VerifiedContext(meta), p)
                         if p != profile:
                             raise PermissionError('Profile changed while operation was queued')
                         token = manager.BOUND_PROFILE.set(profile)
+                        authority_token = CURRENT.set(VerifiedContext(meta))
                         worktoken = WORK.set((self, meta, flag))
                         try:
                             if flag.is_set():
@@ -471,6 +487,7 @@ class Engine:
                             self.preflight(op, args, profile)
                             return self.operations[op](**args)
                         finally:
+                            CURRENT.reset(authority_token)
                             WORK.reset(worktoken)
                             manager.BOUND_PROFILE.reset(token)
                     result = await asyncio.get_running_loop().run_in_executor(self.pool, work)

@@ -8,6 +8,8 @@ import hashlib
 import json
 import os
 import shutil
+import stat as statmod
+import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +31,7 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def sha256_file(path: Path, algorithm: str = "sha256") -> str:
+    guard_no_links(path)
     h = hashlib.new(algorithm)
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
@@ -36,8 +39,73 @@ def sha256_file(path: Path, algorithm: str = "sha256") -> str:
     return h.hexdigest()
 
 
+def guard_no_links(path: Path) -> None:
+    """Best-effort pathname checks, not an OS sandbox; local TOCTOU remains."""
+    path = Path(path).absolute()
+    for node in reversed((path, *path.parents)):
+        try:
+            info = node.lstat()
+        except FileNotFoundError:
+            continue
+        if (statmod.S_ISLNK(info.st_mode)
+                or getattr(info, 'st_file_attributes', 0) & getattr(statmod, 'FILE_ATTRIBUTE_REPARSE_POINT', 0x400)):
+            raise PermissionError('REPARSE_OR_SYMLINK_PATH_NOT_ALLOWED')
+        if statmod.S_ISREG(info.st_mode) and info.st_nlink > 1:
+            raise PermissionError('HARDLINK_FILE_NOT_ALLOWED')
+
+
+def guard_subtree(path: Path) -> None:
+    guard_no_links(path)
+    guard_secret(path)
+    if path.is_dir():
+        def failed(error):
+            raise error
+        for directory, dirs, files in os.walk(path, followlinks=False, onerror=failed):
+            guard_no_links(Path(directory))
+            for name in dirs + files:
+                child = Path(directory) / name
+                guard_no_links(child)
+                guard_secret(child)
+
+
+def _revalidate_profile(profile):
+    from app.core.execution_context import CURRENT, current, validate_profile
+    if CURRENT.get() is not None:
+        authority = current()
+        latest = get_profile(profile['name'])
+        validate_profile(authority, latest)
+        if latest != profile:
+            raise PermissionError('PROFILE_CHANGED_BEFORE_EFFECT')
+
+
 def _profile_root(profile: Dict[str, Any]) -> Path:
-    return Path(profile["root"]).resolve()
+    _revalidate_profile(profile)
+    base = Path(profile['root'])
+    guard_no_links(base)
+    return base.resolve()
+
+
+def _atomic_write(path: Path, raw: bytes, expected_sha256: str | None = None) -> None:
+    """Exclusive random sibling temp, checked again before atomic publication."""
+    resolve(str(path))
+    guard_no_links(path)
+    fd, name = tempfile.mkstemp(prefix='.zagent-', suffix='.tmp', dir=str(path.parent))
+    temp = Path(name)
+    try:
+        with os.fdopen(fd, 'wb') as out:
+            out.write(raw)
+            out.flush()
+            os.fsync(out.fileno())
+        require_write()
+        resolve(str(path))
+        guard_no_links(temp)
+        if expected_sha256 and (not path.is_file() or sha256_file(path).lower() != expected_sha256.lower()):
+            raise ValueError('SHA-256 target changed before publication')
+        os.replace(temp, path)
+    finally:
+        guard_no_links(temp)
+        if temp.exists():
+            temp.unlink()
 
 
 def root() -> Path:
@@ -50,30 +118,47 @@ def resolve(path: str = ".", profile: Dict[str, Any] | None = None) -> Path:
         raise PermissionError("Profile is disabled or not approved")
     base = _profile_root(profile)
     raw = str(path or ".")
-    candidate = Path(raw).resolve() if os.path.isabs(raw) else (base / raw).resolve()
+    parsed = Path(raw)
+    if '..' in parsed.parts:
+        raise PermissionError('PATH_TRAVERSAL_NOT_ALLOWED')
+    if os.name == 'nt':
+        for part in parsed.parts:
+            if part == parsed.anchor:
+                continue
+            if ':' in part or (part.endswith((' ', '.')) and part != '.') or Path(part).is_reserved():
+                raise PermissionError('WINDOWS_SPECIAL_PATH_NOT_ALLOWED')
+    lexical = parsed if os.path.isabs(raw) else base / parsed
+    guard_no_links(lexical)
+    candidate = lexical.resolve()
     try:
         candidate.relative_to(base)
     except ValueError:
         raise ValueError("Path berada di luar root profile.")
+    guard_secret(candidate)
     return candidate
 
 
 def rel(path: Path, profile: Dict[str, Any] | None = None) -> str:
     profile = profile or active_profile()
+    guard_no_links(path)
     return str(path.resolve().relative_to(_profile_root(profile)))
 
 
 def require_write(profile: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    from app.core.execution_context import CURRENT, current
+    if CURRENT.get() is not None and current().get('effective_access') != 'write':
+        raise PermissionError('WRITE_SCOPE_REQUIRED')
     profile = profile or active_profile()
+    _revalidate_profile(profile)
     if profile.get("mode") != "read-write":
         raise PermissionError("Profile aktif adalah read-only.")
-    if not profile.get("enabled", True):
+    if profile.get('enabled') is not True or profile.get('authorized_by_user') is not True:
         raise PermissionError("Profile dinonaktifkan.")
     return profile
 
 
 def guard_secret(path: Path) -> None:
-    if path.name.lower() in SECRET_NAMES:
+    if any(part.lower() in SECRET_NAMES for part in path.parts):
         raise PermissionError("File rahasia dilindungi.")
 
 
@@ -90,13 +175,18 @@ def _backup_id() -> str:
 
 def backup(path: Path, reason: str = "manual", profile: Dict[str, Any] | None = None) -> Dict[str, Any]:
     profile = profile or active_profile()
-    path = path.resolve()
+    require_write(profile)
+    path = resolve(str(path), profile)
+    guard_subtree(path)
+    guard_no_links(BACKUP_ROOT)
     if not path.exists():
         raise FileNotFoundError(str(path))
     backup_id = _backup_id()
     dest = BACKUP_ROOT / backup_id
     payload = dest / "payload"
     dest.mkdir(parents=True, exist_ok=False)
+    guard_no_links(dest)
+    guard_subtree(path)
     if path.is_dir():
         shutil.copytree(path, payload)
         kind = "dir"
@@ -126,8 +216,11 @@ def backup_before_overwrite(path: Path, reason: str) -> str | None:
 
 def backup_list(limit: int = 50) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+    guard_no_links(BACKUP_ROOT)
     for d in sorted(BACKUP_ROOT.iterdir(), reverse=True):
+        guard_no_links(d)
         meta = d / "metadata.json"
+        guard_no_links(meta)
         if not d.is_dir() or not meta.exists():
             continue
         try:
@@ -146,6 +239,7 @@ def restore_backup(backup_id: str, overwrite: bool = True) -> Dict[str, Any]:
     if not backup_id or any(c not in "0123456789_" for c in backup_id):
         raise ValueError("Invalid backup ID")
     d = BACKUP_ROOT / backup_id
+    guard_subtree(d)
     meta_path = d / "metadata.json"
     payload = d / "payload"
     if not meta_path.exists() or not payload.exists():
@@ -154,17 +248,18 @@ def restore_backup(backup_id: str, overwrite: bool = True) -> Dict[str, Any]:
     current = active_profile()
     if meta.get("profile") != current.get("name"):
         raise PermissionError("Backup hanya dapat direstore saat profile asal sedang aktif.")
-    target = Path(meta["original_path"]).resolve()
-    resolve(str(target), current)
+    target = resolve(meta['original_path'], current)
+    guard_root_delete(target, current)
+    guard_subtree(target)
+    guard_secret(target)
     require_write(current)
     if target.exists():
         if not overwrite:
             raise FileExistsError(str(target))
         backup(target, reason=f"pre_restore_{backup_id}", profile=current)
-        if target.is_dir():
-            shutil.rmtree(target)
-        else:
-            target.unlink()
+        _remove(target)
+    resolve(str(target), current)
+    guard_subtree(payload)
     if meta["kind"] == "dir":
         shutil.copytree(payload, target)
     else:
@@ -175,6 +270,7 @@ def restore_backup(backup_id: str, overwrite: bool = True) -> Dict[str, Any]:
 
 def file_tree(path: str = ".", max_depth: int = 4, max_items: int = 1000) -> Dict[str, Any]:
     base = resolve(path)
+    guard_subtree(base)
     if not base.exists():
         raise FileNotFoundError(str(base))
     items: List[Dict[str, str]] = []
@@ -249,6 +345,7 @@ def read_bytes_b64(path: str) -> Dict[str, Any]:
 
 def search(query: str, path: str = ".", glob: str = "*", case_sensitive: bool = False, max_results: int = 200) -> Dict[str, Any]:
     base = resolve(path)
+    guard_subtree(base)
     needle = query if case_sensitive else query.lower()
     results: List[Dict[str, Any]] = []
     for p in base.rglob("*"):
@@ -309,9 +406,7 @@ def write(path: str, content: str, encoding: str = "utf-8", expected_sha256: str
     backup_id = backup_before_overwrite(p, "pre_write")
     if create_parents:
         p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(p.suffix + ".tmp")
-    tmp.write_bytes(raw)
-    os.replace(tmp, p)
+    _atomic_write(p, raw, expected_sha256)
     return {"path": rel(p), "bytes": len(raw), "sha256": sha256_bytes(raw), "backup_id": backup_id}
 
 
@@ -321,8 +416,11 @@ def append(path: str, content: str, encoding: str = "utf-8") -> Dict[str, Any]:
     guard_secret(p)
     backup_id = backup_before_overwrite(p, "pre_append")
     p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a", encoding=encoding, newline="") as f:
-        f.write(content)
+    raw = p.read_bytes() if p.exists() else b''
+    raw += content.encode(encoding)
+    if len(raw) > MAX_WRITE:
+        raise ValueError('Konten terlalu besar.')
+    _atomic_write(p, raw)
     return {"path": rel(p), "sha256": sha256_file(p), "backup_id": backup_id}
 
 
@@ -338,9 +436,10 @@ def patch(path: str, old_text: str, new_text: str, count: int = 1, encoding: str
         raise ValueError(f"Old text hanya ditemukan {occurrences} kali; butuh {count}.")
     backup_id = backup(p, reason="pre_patch")["backup_id"]
     new_content = text.replace(old_text, new_text, int(count))
-    tmp = p.with_suffix(p.suffix + ".tmp")
-    tmp.write_text(new_content, encoding=encoding)
-    os.replace(tmp, p)
+    raw = new_content.encode(encoding)
+    if len(raw) > MAX_WRITE:
+        raise ValueError('Konten terlalu besar.')
+    _atomic_write(p, raw, expected_sha256)
     return {"path": rel(p), "replacements": int(count), "sha256": sha256_file(p), "backup_id": backup_id}
 
 
@@ -352,16 +451,30 @@ def mkdir(path: str, parents: bool = True, exist_ok: bool = True) -> Dict[str, A
 
 
 def _remove(path: Path) -> None:
+    require_write()
+    resolve(str(path))
+    guard_root_delete(path)
+    guard_subtree(path)
     if path.is_dir():
         shutil.rmtree(path)
     else:
         path.unlink()
 
 
+def guard_no_overlap(source: Path, destination: Path) -> None:
+    if (source == destination or source in destination.parents
+            or destination in source.parents):
+        raise ValueError('Source and destination overlap')
+
+
 def copy(src: str, dst: str, overwrite: bool = False) -> Dict[str, Any]:
     require_write()
     s = resolve(src)
     d = resolve(dst)
+    guard_no_overlap(s, d)
+    guard_subtree(s)
+    guard_subtree(d)
+    guard_root_delete(d)
     if not s.exists():
         raise FileNotFoundError(str(s))
     backup_id = None
@@ -372,8 +485,13 @@ def copy(src: str, dst: str, overwrite: bool = False) -> Dict[str, Any]:
         _remove(d)
     d.parent.mkdir(parents=True, exist_ok=True)
     if s.is_dir():
+        resolve(str(s))
+        resolve(str(d))
+        guard_subtree(s)
         shutil.copytree(s, d)
     else:
+        resolve(str(s))
+        resolve(str(d))
         shutil.copy2(s, d)
     return {"src": rel(s), "dst": rel(d), "backup_id": backup_id}
 
@@ -382,6 +500,10 @@ def move(src: str, dst: str, overwrite: bool = False) -> Dict[str, Any]:
     require_write()
     s = resolve(src)
     d = resolve(dst)
+    guard_no_overlap(s, d)
+    guard_subtree(s)
+    guard_subtree(d)
+    guard_root_delete(d)
     guard_root_delete(s)
     if not s.exists():
         raise FileNotFoundError(str(s))
@@ -393,6 +515,9 @@ def move(src: str, dst: str, overwrite: bool = False) -> Dict[str, Any]:
         overwrite_backup = backup(d, reason="pre_move_overwrite")["backup_id"]
         _remove(d)
     d.parent.mkdir(parents=True, exist_ok=True)
+    resolve(str(s))
+    resolve(str(d))
+    guard_subtree(s)
     shutil.move(str(s), str(d))
     return {"src": src, "dst": dst, "source_backup_id": source_backup, "overwrite_backup_id": overwrite_backup}
 
@@ -412,13 +537,17 @@ def zip_create(source: str, zip_path: str, overwrite: bool = False) -> Dict[str,
     require_write()
     src = resolve(source)
     dst = resolve(zip_path)
+    guard_subtree(src)
+    guard_subtree(dst)
+    guard_root_delete(dst)
     if dst.exists():
         if not overwrite:
             raise FileExistsError(str(dst))
         backup(dst, reason="pre_zip_overwrite")
         dst.unlink()
     dst.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as z:
+    resolve(str(dst))
+    with zipfile.ZipFile(dst, "x", zipfile.ZIP_DEFLATED) as z:
         if src.is_dir():
             for p in src.rglob("*"):
                 if p.is_file():
@@ -432,12 +561,15 @@ def unzip_safe(zip_path: str, dest_dir: str, overwrite: bool = False) -> Dict[st
     require_write()
     zp = resolve(zip_path)
     dest = resolve(dest_dir)
+    guard_subtree(dest)
     dest.mkdir(parents=True, exist_ok=True)
     extracted: List[str] = []
     backup_ids: List[str] = []
     with zipfile.ZipFile(zp, "r") as z:
         for member in z.infolist():
-            target = (dest / member.filename).resolve()
+            lexical = dest / member.filename
+            guard_no_links(lexical)
+            target = resolve(str(lexical))
             try:
                 target.relative_to(dest)
             except ValueError:
@@ -451,8 +583,14 @@ def unzip_safe(zip_path: str, dest_dir: str, overwrite: bool = False) -> Dict[st
                     raise FileExistsError(str(target))
                 backup_ids.append(backup(target, reason="pre_unzip_overwrite")["backup_id"])
             target.parent.mkdir(parents=True, exist_ok=True)
-            with z.open(member, "r") as src, target.open("wb") as out:
-                shutil.copyfileobj(src, out)
+            guard_no_links(target)
+            if member.file_size > MAX_WRITE:
+                raise ValueError('ZIP member too large')
+            with z.open(member, 'r') as src:
+                raw = src.read(MAX_WRITE + 1)
+            if len(raw) > MAX_WRITE:
+                raise ValueError('ZIP member too large')
+            _atomic_write(target, raw)
             extracted.append(str(target.relative_to(root())))
     return {"zip_path": zip_path, "dest_dir": dest_dir, "files": extracted, "backup_ids": backup_ids}
 
@@ -481,27 +619,7 @@ def syntax_check(path: str) -> Dict[str, Any]:
 
 
 def cross_profile_capabilities() -> Dict[str, Any]:
-    rows = []
-    for p in list_profiles():
-        rows.append({
-            "name": p.get("name"),
-            "root": p.get("root"),
-            "mode": p.get("mode"),
-            "active": p.get("active", False),
-            "allowed_as_source": bool(p.get("enabled", True)),
-            "allowed_as_destination": p.get("mode") == "read-write" and bool(p.get("enabled", True)),
-        })
-    return {
-        "ok": True,
-        "feature": "cross-profile-copy",
-        "source_read_only_supported": True,
-        "destination_must_be_read_write": True,
-        "supports_files": True,
-        "supports_directories": True,
-        "overwrite_backup": True,
-        "verification": "SHA-256 manifest",
-        "profiles": rows,
-    }
+    return {'ok': True, 'enabled': False, 'reason': 'CROSS_PROFILE_COPY_DISABLED'}
 
 
 def _manifest(path: Path) -> Dict[str, str]:
@@ -515,63 +633,4 @@ def _manifest(path: Path) -> Dict[str, str]:
 
 
 def copy_between_profiles(source_profile: str, source_path: str, destination_profile: str, destination_path: str, overwrite: bool = False, verify: bool = True) -> Dict[str, Any]:
-    sp = get_profile(source_profile)
-    dp = get_profile(destination_profile)
-    if not sp.get("enabled", True) or not dp.get("enabled", True):
-        raise PermissionError("Profile dinonaktifkan.")
-    if dp.get("mode") != "read-write":
-        raise PermissionError("Destination profile harus read-write.")
-    src = resolve(source_path, sp)
-    dst = resolve(destination_path, dp)
-    if not src.exists():
-        raise FileNotFoundError(str(src))
-    overwrite_backup = None
-    if dst.exists():
-        if not overwrite:
-            raise FileExistsError(str(dst))
-        # backup uses current profile semantics; create manual cross backup here
-        stamp = _backup_id()
-        bd = BACKUP_ROOT / stamp
-        bd.mkdir(parents=True)
-        payload = bd / "payload"
-        if dst.is_dir():
-            shutil.copytree(dst, payload)
-        else:
-            shutil.copy2(dst, payload)
-        meta = {
-            "backup_id": stamp,
-            "profile": destination_profile,
-            "root": dp["root"],
-            "original_path": str(dst),
-            "relative_path": str(dst.relative_to(_profile_root(dp))),
-            "kind": "dir" if dst.is_dir() else "file",
-            "reason": "pre_cross_profile_overwrite",
-            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        }
-        (bd / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        overwrite_backup = stamp
-        _remove(dst)
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    if src.is_dir():
-        shutil.copytree(src, dst)
-    else:
-        shutil.copy2(src, dst)
-    verified = True
-    source_manifest = destination_manifest = None
-    if verify:
-        source_manifest = _manifest(src)
-        destination_manifest = _manifest(dst)
-        verified = source_manifest == destination_manifest
-        if not verified:
-            raise IOError("Cross-profile verification gagal.")
-    return {
-        "ok": True,
-        "source_profile": source_profile,
-        "source_path": source_path,
-        "destination_profile": destination_profile,
-        "destination_path": destination_path,
-        "overwrite_backup_id": overwrite_backup,
-        "verified": verified,
-        "source_manifest": source_manifest,
-        "destination_manifest": destination_manifest,
-    }
+    raise PermissionError('CROSS_PROFILE_COPY_DISABLED')

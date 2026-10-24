@@ -44,6 +44,12 @@ class DeploymentTests(unittest.TestCase):
         self.assertIn('proxy_set_header Forwarded "";', proxy)
         self.assertNotIn('proxy_add_x_forwarded_for', proxy)
 
+    def test_execute_scope_exists_without_implicit_client_approval(self):
+        realm, *_ = render.render(self.config)
+        self.assertIn('files:execute', {s['name'] for s in realm['clientScopes']})
+        self.assertNotIn('files:execute', realm['clients'][0]['optionalClientScopes'])
+        self.assertNotIn('files:write', realm['clients'][0]['optionalClientScopes'])
+
     def test_access_token_has_subject_and_both_resource_audiences(self):
         realm, *_ = render.render(self.config)
         scope = next(s for s in realm['clientScopes'] if s['name'] == 'zagent-resource-audience')

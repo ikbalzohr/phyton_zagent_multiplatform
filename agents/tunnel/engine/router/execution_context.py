@@ -5,12 +5,13 @@ import uuid
 from typing import Any
 from .access import AuthContext, AuthorizationError, ResourceAuthorizer, digest
 from .identity import Placement
+from .files_policy import validate_files_tool_scope
 
 AUTHORITY_FIELDS = frozenset({"_meta", "metadata", "session_id", "owner_session_id",
     "operator_alias", "principal_id", "workspace_id", "grant_id", "scopes", "policy_revision",
     "device_id", "target_device_id", "installation_id", "request_id", "trace_id", "task_id",
     "resource_key", "access_mode", "priority", "fencing_epoch", "lease_owner", "execution_context",
-    "effective_resources", "files_resource"})
+    "effective_resources", "files_resource", "effective_access", "required_scope", "public_tool"})
 
 
 def reject_authority(arguments: dict[str, Any]) -> None:
@@ -63,6 +64,9 @@ def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
     # operations need an explicitly provisioned lifetime, not silent extension.
     placement.validate()
     auth.require(scope, tool)
+    effective_access = "write"
+    if _kind_from_scope(scope) == "files" or tool.startswith("files_"):
+        effective_access = validate_files_tool_scope(tool, scope, auth.scopes)
     resources = policy_resources(auth, placement, scope, resource_authorizer)
     return {"context_version": 1, "principal_id": auth.principal_id,
         "workspace_id": auth.workspace_id, "device_id": placement.device_id,
@@ -74,7 +78,7 @@ def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
         # Typed object shape matching consumers B (files/web/arcmap) and producer C
         # (InternalManagementChannel): {resource_id, kind, profile_id?}.
         "effective_resources": resources,
-        "effective_access": "write", "required_scope": scope, "public_tool": tool}
+        "effective_access": effective_access, "required_scope": scope, "public_tool": tool}
 
 
 def scheduler_meta(context: dict[str, Any], owner: str, key: str = "", arguments: Any = None) -> dict[str, Any]:
@@ -112,7 +116,16 @@ def validate_context(value: Any, placement: Placement) -> dict[str, Any]:
             or not isinstance(value.get("deadline"), (float, int))
             or not time.time() < value["deadline"] <= time.time()+3600
             or not isinstance(value.get("scopes"), list)
-            or not all(isinstance(s, str) for s in value["scopes"])
-            or value.get("effective_access") != "write"):
+            or not all(isinstance(s, str) for s in value["scopes"])):
+        raise AuthorizationError("CONTEXT_INVALID", 403)
+    effective_access = "write"
+    if (_kind_from_scope(value["required_scope"]) == "files"
+            or value["public_tool"].startswith("files_")
+            or any(r["kind"] == "files" for r in resources)):
+        effective_access = validate_files_tool_scope(
+            value["public_tool"], value["required_scope"], value["scopes"])
+        if not all(r["kind"] == "files" for r in resources):
+            raise AuthorizationError("CONTEXT_INVALID", 403)
+    if value.get("effective_access") != effective_access:
         raise AuthorizationError("CONTEXT_INVALID", 403)
     return dict(value)

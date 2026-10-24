@@ -7,18 +7,23 @@ from mcp.server.fastmcp import FastMCP, Context
 from mcp.types import ToolAnnotations
 from app.mcp import legacy
 from app.core.execution import Engine, READ
-from app.core.execution_context import CURRENT, current, verify, request_meta
+from app.core.execution_context import CURRENT, current, verify, request_meta, validate_profile
 
 
 class TrustedFilesMCP(FastMCP):
     async def call_tool(self, name, arguments):
         authority = verify(request_meta(self.get_context()), name, arguments or {})
-        command_names = {'files_command_capabilities', 'files_command_cancel', 'files_exec_command', 'files_powershell_run', 'files_node', 'files_npm', 'files_npx', 'files_git', 'files_build', 'files_test', 'files_process_list', 'files_process_start', 'files_process_stop'}
-        read_controls = {'files_workspace_status', 'files_workspace_list', 'files_operation_status', 'files_operation_list', 'files_capabilities'}
-        if name not in read_controls and name not in {'files_execute'} and name.removeprefix('files_') not in READ and authority['effective_access'] != 'write':
-            raise PermissionError('WRITE_SCOPE_REQUIRED')
-        if name.startswith('files_update_') or name in command_names:
+        if name.startswith('files_update_'):
             raise PermissionError('MANAGEMENT_PLANE_ONLY')
+        validate_profile(authority, engine.approved(authority['profile_id']))
+        # Import only for command calls: native startup does not require this
+        # optional owner-managed facility. It takes explicit verified authority.
+        from app.core.execution_context import COMMAND_TOOLS
+        if name in COMMAND_TOOLS:
+            from app.mcp.managed_commands import COMMAND_TOOL_NAMES, authorize_command_call
+            if name not in COMMAND_TOOL_NAMES:
+                raise PermissionError('UNKNOWN_FILES_COMMAND')
+            authorize_command_call(name, arguments or {}, authority)
         token = CURRENT.set(authority)
         try:
             return await super().call_tool(name, arguments)
@@ -66,7 +71,7 @@ def scoped_profile(profile):
     if profile and profile not in allowed_profiles():
         raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
     if profile:
-        engine.approved(profile)  # also reject locally revoked roots
+        validate_profile(current(), engine.approved(profile))
     return profile
 
 
@@ -144,7 +149,7 @@ def files_workspace_switch(workspace_id: str, profile_id: str) -> dict:
 
 
 @mcp.tool()
-async def files_execute(operation: str, arguments: dict, metadata: dict, ctx: Context) -> dict:
+async def files_execute(operation: str, arguments: dict, metadata: dict | None = None, ctx: Context = None) -> dict:
     """Authenticated Router adapter; arguments.metadata never grants authority."""
     return await engine.execute(operation, arguments, metadata_from(ctx, metadata))
 
@@ -190,7 +195,9 @@ def files_capabilities() -> dict:
             'native_fast_path':['ping','exists','read','write','append','patch','list','tree','stat','search','hash','diff'],
             'sqlite_wal':True, 'worker_threads':8, 'background_limit':6,
             'global_orchestrator':'Zagent Tunnel 1.0.0',
-            'metadata_transport':['signed params._meta.zagent.execution_context'],
+            'metadata_transport':['authenticated private-channel params._meta.zagent.execution_context'],
+            'native_filesystem_boundary':'best-effort reparse rejection and revalidation; not an OS sandbox; TOCTOU remains against hostile local processes',
+            'cross_profile_copy_enabled':False,
             'tunnel_session_orchestrator':'authenticated principal/workspace/resource context; legacy journal column is internal owner namespace',
             'locking':'canonical path + ancestor/descendant reader/writer, atomic multi-resource acquisition',
             'disconnect':'generic operations continue safely; cancellable batch receives cooperative cancel',
