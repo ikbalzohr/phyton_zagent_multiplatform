@@ -35,7 +35,8 @@ public sealed record TunnelIntegrationOptions(
     string PluginAccessEnforcement = "mandatory",
     string PluginFallback = "",
     string PluginParentAudience = "zagent-production",
-    string ArcMapMcpUrl = "");
+    string ArcMapMcpUrl = "",
+    string? OAuthCredentialDataRoot = null);
 
 public sealed record TunnelTransportOptions(
     string ClientExecutable,

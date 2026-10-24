@@ -13,6 +13,10 @@ using Zagent.Shared.Installation;
 using Zagent.Core.Network;
 using Zagent.Shared.Manager;
 
+// Ignore inherited OAuth credentials for this process and all incidental children.
+// Only the Router factory receives the owner-validated DPAPI credential explicitly.
+Environment.SetEnvironmentVariable(OAuthIntrospectionCredentialStore.EnvironmentName, null);
+
 if (args.Contains("--version", StringComparer.Ordinal))
 {
     Console.WriteLine($"{ZagentProductInfo.ProductName} Core {ZagentProductInfo.CoreVersion}");

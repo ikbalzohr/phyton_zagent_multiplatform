@@ -253,6 +253,8 @@ public sealed class FilesManagerReadModel
             "ZAGENT_MANAGER_APPROVAL_REASON"] =
             request.Reason ?? "";
 
+        // Strip after every explicit environment merge as well as ambient inheritance.
+        startInfo.Environment.Remove(OAuthIntrospectionCredentialStore.EnvironmentName);
         using var process = new Process
         {
             StartInfo = startInfo
@@ -546,6 +548,8 @@ public sealed class FilesManagerReadModel
             startInfo.Environment[pair.Key] = pair.Value;
         }
 
+        // Strip after every explicit environment merge as well as ambient inheritance.
+        startInfo.Environment.Remove(OAuthIntrospectionCredentialStore.EnvironmentName);
         using var process = new Process
         {
             StartInfo = startInfo

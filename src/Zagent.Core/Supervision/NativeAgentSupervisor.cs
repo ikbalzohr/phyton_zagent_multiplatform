@@ -697,10 +697,15 @@ public sealed class NativeAgentSupervisor : IAgentSupervisor
             startInfo.ArgumentList.Add(argument);
         }
 
+        // Drop ambient OAuth on every child; Router alone receives an explicit validated value.
+        startInfo.Environment.Remove(Zagent.Core.Manager.OAuthIntrospectionCredentialStore.EnvironmentName);
         if (definition.EnvironmentVariables is not null)
         {
             foreach (var pair in definition.EnvironmentVariables)
             {
+                if (pair.Key.Equals(Zagent.Core.Manager.OAuthIntrospectionCredentialStore.EnvironmentName, StringComparison.OrdinalIgnoreCase) &&
+                    definition.AgentId != Zagent.Core.Agents.Tunnel.TunnelProcessFactory.RouterProcessId)
+                    continue;
                 startInfo.Environment[pair.Key] = pair.Value;
             }
         }

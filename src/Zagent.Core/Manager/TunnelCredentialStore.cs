@@ -219,11 +219,14 @@ public sealed class TunnelCredentialStore
         {
             if (inputPtr != IntPtr.Zero)
             {
+                // Protect input and unprotect output can contain plaintext credentials.
+                for (var i = 0; i < input.Length; i++) Marshal.WriteByte(inputPtr, i, 0);
                 Marshal.FreeHGlobal(inputPtr);
             }
 
             if (output.Data != IntPtr.Zero)
             {
+                for (var i = 0; i < output.Size; i++) Marshal.WriteByte(output.Data, i, 0);
                 LocalFree(output.Data);
             }
         }

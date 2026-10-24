@@ -347,7 +347,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                     pluginAccessConfig.FallbackPlugin,
                 PluginParentAudience:
                     pluginAccessConfig.ParentAudience,
-                ArcMapMcpUrl: $"http://{options.BindHost}:{options.ArcMapPort}/mcp");
+                ArcMapMcpUrl: $"http://{options.BindHost}:{options.ArcMapPort}/mcp",
+                OAuthCredentialDataRoot: data);
 
             var credentialScope =
                 options.Environment.ToString().ToLowerInvariant();

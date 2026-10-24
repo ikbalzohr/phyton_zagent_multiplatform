@@ -30,6 +30,11 @@ public static class TunnelProcessFactory
                     Path.GetFullPath(options.RuntimeRoot),
                 ["ZAGENT_CHAT_LOG_PATH"] =
                     Path.GetFullPath(options.ChatLogPath),
+                // Managed resource_server is read after preparation; never use ambient secrets.
+                [Zagent.Core.Manager.OAuthIntrospectionCredentialStore.EnvironmentName] =
+                    options.OAuthCredentialDataRoot is null ? "" :
+                    Zagent.Core.Manager.OAuthIntrospectionCredentialStore.LoadOptional(
+                        options.OAuthCredentialDataRoot, options.ConfigRoot) ?? "",
                 ["ZAGENT_DEVICE_ID"] = options.DeviceId,
                 ["ZAGENT_DEVICE_NAME"] = options.DeviceName,
                 ["ZAGENT_DEVICE_ALIAS"] = options.DeviceAlias,
@@ -94,6 +99,7 @@ public static class TunnelProcessFactory
                 ["ZAGENT_DEVICE_NAME"] = options.DeviceName,
                 ["ZAGENT_DEVICE_BINDING"] = options.DeviceBinding,
                 // Public transport is not an internal management client. Clear inherited values.
+                [Zagent.Core.Manager.OAuthIntrospectionCredentialStore.EnvironmentName] = "",
                 ["ZAGENT_INTERNAL_TOKEN"] = "",
                 ["ZAGENT_INTERNAL_CONTEXT_KEY"] = ""
             },
