@@ -1,0 +1,82 @@
+name: zagent-oauth
+services:
+  postgres:
+    image: docker.io/library/postgres:17-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    secrets: [database_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      backend:
+        ipv4_address: 172.30.88.2
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U keycloak -d keycloak']
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    mem_limit: 512m
+    security_opt: [no-new-privileges:true]
+  keycloak:
+    image: zagent-keycloak:26.8.1-local
+    build:
+      context: .
+      dockerfile: Containerfile
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    entrypoint: [/bin/bash, /opt/zagent/start.sh]
+    command: [start, --optimized, --import-realm]
+    environment:
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_HOSTNAME: ${ISSUER_ORIGIN:?Set ISSUER_ORIGIN to the approved stable HTTPS origin}
+      KC_HOSTNAME_STRICT: 'true'
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: 172.30.88.1/32
+      KC_BOOTSTRAP_ADMIN_USERNAME: bootstrap-admin
+      KC_CACHE: local
+      JAVA_OPTS_KC_HEAP: -Xms256m -Xmx768m
+
+    volumes:
+      - ${REALM_FILE:?Set absolute rendered realm file}:/opt/keycloak/data/import/zagent-realm.json:ro
+    secrets: [database_password, bootstrap_password, introspection_secret]
+    networks:
+      backend:
+        ipv4_address: 172.30.88.3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1536m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 60s
+secrets:
+  database_password:
+    file: ${SECRET_DIR:?Set protected absolute secret directory}/database_password
+  bootstrap_password:
+    file: ${SECRET_DIR:?Set protected absolute secret directory}/bootstrap_password
+  introspection_secret:
+    file: ${SECRET_DIR:?Set protected absolute secret directory}/introspection_secret
+volumes:
+  postgres_data:
+networks:
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.88.0/24
+          gateway: 172.30.88.1

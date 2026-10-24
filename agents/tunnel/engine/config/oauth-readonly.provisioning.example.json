@@ -1,0 +1,14 @@
+{
+  "issuer": "https://as.example/realms/zagent",
+  "resource_uri": "https://resource.example/mcp",
+  "subject": "REPLACE_WITH_ACTUAL_ACCESS_TOKEN_SUB",
+  "workspace_id": "REPLACE_WITH_APPROVED_WORKSPACE",
+  "policy_revision": "REPLACE_WITH_NEW_POLICY_REVISION",
+  "profile_id": "REPLACE_WITH_LOCALLY_APPROVED_FILES_PROFILE",
+  "device_id": "REPLACE_WITH_ROUTER_DEVICE_ID",
+  "installation_id": "REPLACE_WITH_ROUTER_INSTALLATION_ID",
+  "grant_expires_at": 1,
+  "hermes_client_id": "hermes-zagent",
+  "introspection_client_id": "zagent-resource-server",
+  "redirect_port": 8765
+}

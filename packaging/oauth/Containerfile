@@ -1,0 +1,8 @@
+FROM quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b AS builder
+ENV KC_DB=postgres KC_HEALTH_ENABLED=true
+RUN /opt/keycloak/bin/kc.sh build
+FROM quay.io/keycloak/keycloak:26.8.1@sha256:a78d6b79572168cb25886b80a8b5b8d4ed4390743e3eecb810538683e209dd6b
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
+COPY --chown=1000:0 start.sh /opt/zagent/start.sh
+USER 1000
+ENTRYPOINT ["/bin/bash", "/opt/zagent/start.sh"]

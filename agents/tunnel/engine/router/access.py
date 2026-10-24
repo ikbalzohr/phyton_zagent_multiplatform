@@ -141,9 +141,13 @@ class ResourceAuthorizer:
                     or not isinstance(claims.get("sub"), str) or not claims["sub"]
                     or not isinstance(exp, (int, float)) or isinstance(exp, bool)
                     or not math.isfinite(exp) or exp <= stamp
-                    or not isinstance(nbf, (int, float)) or not math.isfinite(nbf) or nbf > stamp):
+                    or not isinstance(nbf, (int, float)) or isinstance(nbf, bool)
+                    or not math.isfinite(nbf) or nbf > stamp):
                 raise AuthorizationError("invalid_token", 401)
             audience = claims.get("aud")
+            if not (isinstance(audience, str) or (isinstance(audience, list)
+                    and audience and all(isinstance(item, str) and item for item in audience))):
+                raise AuthorizationError("invalid_token", 401)
             if c["resource_uri"] not in (audience if isinstance(audience, list) else [audience]):
                 raise AuthorizationError("invalid_token", 401)
             if not isinstance(claims.get("scope", ""), str):
