@@ -29,6 +29,79 @@ def signed(monkeypatch, tool='files_read', access='read', scope='files:read', **
     return request_meta(ctx)
 
 
+@pytest.mark.parametrize('service_id', ['zagent_files', 'zagent_files_v3'])
+@pytest.mark.parametrize('tool,arguments,access,scope', [
+    ('files_exists', {'path': 'a'}, 'read', 'files:read'),
+    ('files_write', {'path': 'a', 'content': 'b'}, 'write', 'files:write'),
+    ('files_execute', {'operation': 'write', 'arguments': {'path': 'a', 'content': 'b'}}, 'write', 'files:write'),
+])
+def test_router_files_transport_preserves_verified_operation_payload(monkeypatch, service_id, tool, arguments, access, scope):
+    # Exercise the REAL Router serializer and consumer verification together.
+    # Only private HTTP transport is replaced; no service/journal is started.
+    import asyncio
+    from pathlib import Path
+    tunnel = Path(__file__).resolve().parents[4] / 'agents/tunnel/engine'
+    monkeypatch.syspath_prepend(str(tunnel))
+    meta = signed(monkeypatch, tool, access, scope)
+    from router.registry import MCPRegistry, UpstreamState
+    registry = object.__new__(MCPRegistry)
+    registry.states = {service_id: UpstreamState(service={'id': service_id}, tools=[{
+        'name': tool, 'inputSchema': {'properties': {'metadata': {}, 'path': {}}},
+        '_meta': {'zagent.capability': {'operation': tool}},
+    }])}
+    context = SimpleNamespace(execution_context=meta['zagent.execution_context'],
+        session_id='owner', request_id='r', task_id='task', trace_id='t',
+        idempotency_key='', resource_key='installation:install', access_mode='write',
+        priority=2, profile_id='approved', target_device_id='device')
+    async def initialized(state):
+        return None
+    async def post(state, payload, **kwargs):
+        params = payload['params']
+        assert params['_meta']['zagent.execution_context'] == context.execution_context
+        authority = verify(meta, tool, params['arguments'])
+        actual = dict(params['arguments'])
+        actual.pop('metadata', None)  # real registered wrapper's transport stripping
+        operation = tool[6:]
+        if operation == 'execute':
+            operation, actual = actual['operation'], actual['arguments']
+        assert authorize_operation(authority, operation, actual) == operation
+        assert params['arguments'] == arguments
+        return {'result': {'content': [], 'isError': False}}
+    registry.ensure_initialized = initialized
+    registry._post = post
+    asyncio.run(registry.invoke(service_id, tool, arguments, context))
+
+
+def test_public_router_rejects_metadata_authority(monkeypatch):
+    from pathlib import Path
+    tunnel = Path(__file__).resolve().parents[4] / 'agents/tunnel/engine'
+    monkeypatch.syspath_prepend(str(tunnel))
+    from router.execution_context import reject_authority
+    for metadata in (None, {}, {'effective_access': 'write'}):
+        with pytest.raises(ValueError, match='CLIENT_AUTHORITY_NOT_ALLOWED'):
+            reject_authority({'path': 'a', 'metadata': metadata})
+
+
+@pytest.mark.parametrize('tool', ['files_workspace_open', 'files_workspace_status',
+    'files_workspace_switch', 'files_operation_status', 'files_operation_cancel', 'files_operation_list'])
+def test_workspace_selector_is_bound_to_authenticated_workspace(monkeypatch, tool):
+    from pathlib import Path
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4] / 'agents/tunnel/engine'))
+    from router.execution_context import authority_arguments, reject_authority
+    from router.access import AuthorizationError
+    args = {'workspace_id': 'w'}
+    filtered = authority_arguments(tool, args, 'w')
+    reject_authority(filtered)
+    assert args == {'workspace_id': 'w'}  # selector must still reach the domain handler
+    with pytest.raises(AuthorizationError, match='WORKSPACE_SCOPE_MISMATCH'):
+        authority_arguments(tool, {'workspace_id': 'other'}, 'w')
+    for injected in ('metadata', 'session_id', 'principal_id', 'execution_context'):
+        with pytest.raises(ValueError, match='CLIENT_AUTHORITY_NOT_ALLOWED'):
+            reject_authority(authority_arguments(tool, dict(args, **{injected: 'spoof'}), 'w'))
+    with pytest.raises(ValueError, match='CLIENT_AUTHORITY_NOT_ALLOWED'):
+        reject_authority(authority_arguments('files_read', args, 'w'))
+
+
 def test_read_and_write_canonical_authority(monkeypatch):
     assert verify(signed(monkeypatch), 'files_read', {'path': 'a'})['profile_id'] == 'approved'
     assert verify(signed(monkeypatch, 'files_write', 'write', 'files:write'),

@@ -331,7 +331,9 @@ class MCPRegistry:
         tool = next((item for item in state.tools if item.get("name") == upstream_name), {})
         properties = tool.get("inputSchema", {}).get("properties", {})
         capability = tool.get("_meta", {}).get("zagent.capability")
-        if "metadata" in properties and (capability or service_id in {"zagent_files", "zagent_files_v3"}):
+        # Files authority travels only in authenticated params._meta. Legacy
+        # argument enrichment changes the payload bound by the consumer verifier.
+        if "metadata" in properties and capability and service_id not in {"zagent_files", "zagent_files_v3"}:
             forwarded = {}
             forwarded.update({
                 "session_id": ctx.session_id,

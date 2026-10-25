@@ -22,7 +22,7 @@ from jsonschema import Draft202012Validator
 from .access import AuthContext, AuthorizationError, ResourceAuthorizer, owner_key
 from .artifacts import read_artifact
 from .config import load_tunnel_config
-from .execution_context import new_context, policy_resources, reject_authority, scheduler_meta, validate_context
+from .execution_context import authority_arguments, new_context, policy_resources, reject_authority, scheduler_meta, validate_context
 from .files_policy import scope_for_files_tool, validate_files_tool_scope
 from .identity import Placement, internal_token, verify_internal_token
 from .orchestration import Orchestrator
@@ -278,9 +278,9 @@ def _validate_tool(name: str, arguments: dict[str, Any], auth: AuthContext):
     if not name.startswith("zagent_"):
         # Only these cancellation APIs accept task_id as a target selector.
         # It never replaces the authenticated context's task/owner identity.
-        selected = arguments
+        selected = authority_arguments(name, arguments, auth.workspace_id)
         if name in {"files_command_cancel", "files_operation_cancel"}:
-            selected = {key: value for key, value in arguments.items() if key != "task_id"}
+            selected = {key: value for key, value in selected.items() if key != "task_id"}
         reject_authority(selected)
     Draft202012Validator(tool["inputSchema"]).validate(arguments)
 

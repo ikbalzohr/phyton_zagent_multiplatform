@@ -7,7 +7,7 @@ from .access import AuthContext, AuthorizationError, ResourceAuthorizer, digest
 from .identity import Placement
 from .files_policy import validate_files_tool_scope
 
-AUTHORITY_FIELDS = frozenset({"_meta", "session_id", "owner_session_id",
+AUTHORITY_FIELDS = frozenset({"_meta", "metadata", "session_id", "owner_session_id",
     "operator_alias", "principal_id", "workspace_id", "grant_id", "scopes", "policy_revision",
     "device_id", "target_device_id", "installation_id", "request_id", "trace_id", "task_id",
     "resource_key", "access_mode", "priority", "fencing_epoch", "lease_owner", "execution_context",
@@ -17,6 +17,25 @@ AUTHORITY_FIELDS = frozenset({"_meta", "session_id", "owner_session_id",
 def reject_authority(arguments: dict[str, Any]) -> None:
     if not isinstance(arguments, dict) or AUTHORITY_FIELDS.intersection(arguments):
         raise ValueError("CLIENT_AUTHORITY_NOT_ALLOWED")
+
+
+_FILES_WORKSPACE_SELECTORS = frozenset({
+    'files_workspace_open', 'files_workspace_status', 'files_workspace_switch',
+    'files_operation_status', 'files_operation_cancel', 'files_operation_list',
+})
+
+
+def authority_arguments(tool: str, arguments: dict[str, Any], workspace_id: str) -> dict[str, Any]:
+    """Exclude an authenticated same-workspace selector from authority checks only.
+
+    The original payload is untouched and still validated against the tool schema.
+    All other tools continue rejecting workspace_id as caller authority.
+    """
+    if tool in _FILES_WORKSPACE_SELECTORS and 'workspace_id' in arguments:
+        if arguments['workspace_id'] != workspace_id:
+            raise AuthorizationError('WORKSPACE_SCOPE_MISMATCH', 403)
+        return {key: value for key, value in arguments.items() if key != 'workspace_id'}
+    return dict(arguments)
 
 
 _SCOPE_TO_KIND = {
