@@ -7,6 +7,7 @@ using Zagent.Core.Manager;
 // Isolated exception/envelope regression. No Windows provisioning, server or credentials.
 void Assert(bool condition, string label) { if (!condition) throw new Exception(label); }
 await OwnerBindingReasonTests.Run();
+await TransportHeaderTests.Run();
 var type = typeof(DashboardProfileAdministration);
 var flags = BindingFlags.Static | BindingFlags.NonPublic;
 var filter = type.GetMethod("DependencyFailure", flags)!;

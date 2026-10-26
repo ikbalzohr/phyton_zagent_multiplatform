@@ -71,6 +71,8 @@ public sealed class ProfileAdministrationClient : IDisposable
             ["params"] = new JsonObject { ["name"] = tool, ["arguments"] = arguments.DeepClone(),
                 ["_meta"] = new JsonObject { [action is null ? "zagent.profile_catalog_context" : "zagent.profile_admin_context"] = context } } };
         using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = JsonContent.Create(body) };
+        // Files runs stateless_http + json_response; advertise only what this decoder supports.
+        request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.Add("X-Zagent-Internal-Token", InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_TOKEN"));
         byte[] responseBytes;
         try {
