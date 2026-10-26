@@ -57,7 +57,7 @@ def save(envelope):
 def test_command_generation_and_owner_namespace(multi):
     from app.profiles.administration import profile_generation
     roots, envelope, context = multi
-    state = json.loads(m.PROFILES_FILE.read_text())
+    state = json.loads(m.PROFILES_FILE.read_text(encoding='utf-8'))
     row = next(p for p in state['profiles'] if p['name'] == 'A')
     authority = context('A')
     authority['effective_resources'][0]['profile_generation'] = profile_generation(row, state)
@@ -140,7 +140,7 @@ def test_profile_removed_local_approval_expiry_scopes_and_root(multi):
         m.authorize_command_call('files_exec_command', {}, context('B'))
     envelope['profiles']['B']['root'] = str(roots['B'])
     save(envelope)
-    rows = json.loads(m.PROFILES_FILE.read_text())
+    rows = json.loads(m.PROFILES_FILE.read_text(encoding='utf-8'))
     rows['profiles'] = rows['profiles'][:1]
     m.PROFILES_FILE.write_text(json.dumps(rows))
     with pytest.raises(PermissionError, match='LOCAL_PROFILE_REQUIRED'):
@@ -240,7 +240,7 @@ def test_output_limits_and_secrets_per_profile(multi, monkeypatch):
             assert len(result['stdout']) == limit and result['stdout_truncated']
         finally:
             CURRENT.reset(token)
-    assert 'lane-b-never-export' not in m.AUDIT_LOG.read_text()
+    assert 'lane-b-never-export' not in m.AUDIT_LOG.read_text(encoding='utf-8')
 
 
 @pytest.mark.parametrize('phase', ['worker', 'suspended'])
@@ -251,12 +251,12 @@ def test_queued_and_pre_resume_approval_revalidation(multi, monkeypatch, phase, 
     grant = m.authorize_command_call('files_exec_command', {}, authority)
     def mutate():
         if change == 'local_revoke':
-            rows = json.loads(m.PROFILES_FILE.read_text())
+            rows = json.loads(m.PROFILES_FILE.read_text(encoding='utf-8'))
             rows['profiles'][0]['authorized_by_user'] = False
             m.PROFILES_FILE.write_text(json.dumps(rows))
         elif change == 'default_change':
             # Local session default is not this queued operation's authority.
-            rows = json.loads(m.PROFILES_FILE.read_text())
+            rows = json.loads(m.PROFILES_FILE.read_text(encoding='utf-8'))
             rows['active_profile'] = 'B'
             m.PROFILES_FILE.write_text(json.dumps(rows))
             assert manager.default_profile_name() == 'B'

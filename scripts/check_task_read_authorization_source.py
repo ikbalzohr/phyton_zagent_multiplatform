@@ -3,7 +3,7 @@ import ast
 from pathlib import Path
 import unittest
 
-SOURCE = (Path(__file__).resolve().parents[1] / 'agents/tunnel/engine/router/server.py').read_text()
+SOURCE = (Path(__file__).resolve().parents[1] / 'agents/tunnel/engine/router/server.py').read_text(encoding='utf-8')
 TREE = ast.parse(SOURCE)
 
 def function(name):

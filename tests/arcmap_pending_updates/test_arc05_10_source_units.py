@@ -130,10 +130,10 @@ class SourceWiringTests(unittest.TestCase):
                 ast.parse(source)
 
     def test_mcp_registration_and_dispatcher_integration(self):
-        mcp = (ENGINE / "mcp_server" / "tools" / "arc_backlog.py").read_text()
-        server = (ENGINE / "mcp_server" / "server.py").read_text()
+        mcp = (ENGINE / "mcp_server" / "tools" / "arc_backlog.py").read_text(encoding='utf-8')
+        server = (ENGINE / "mcp_server" / "server.py").read_text(encoding='utf-8')
         dispatcher = (ENGINE / "arcmap_bridge" / "core" /
-                      "dispatcher.py").read_text()
+                      "dispatcher.py").read_text(encoding='utf-8')
         self.assertEqual(mcp.count("@mcp.tool()"), 9)
         self.assertIn("arc_backlog,", server)
         self.assertIn("concurrent_edit_guard.reject_mutation(command)", dispatcher)

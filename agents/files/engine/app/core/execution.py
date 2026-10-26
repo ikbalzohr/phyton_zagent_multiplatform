@@ -306,7 +306,7 @@ class Engine:
             if not bid or any(c not in '0123456789_' for c in bid):
                 raise ValueError('Invalid backup ID')
             fsops.guard_subtree(fsops.BACKUP_ROOT / bid)
-            data = json.loads((fsops.BACKUP_ROOT / bid / 'metadata.json').read_text())
+            data = json.loads((fsops.BACKUP_ROOT / bid / 'metadata.json').read_text(encoding='utf-8'))
             if data['profile'] != profile['name']:
                 raise PermissionError('Backup belongs to another profile')
             paths.append((canonical(fsops.resolve(data['original_path'], profile)), 'write'))

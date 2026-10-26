@@ -7,7 +7,7 @@ import json
 ROOT = Path(__file__).resolve().parents[1]
 class OwnerFilesActivationSource(unittest.TestCase):
     def test_shell_selection_skips_store_alias_without_weakening_path_guard(self):
-        text = (ROOT / 'packaging/scripts/Enable-OwnerFilesCapabilities.ps1').read_text()
+        text = (ROOT / 'packaging/scripts/Enable-OwnerFilesCapabilities.ps1').read_text(encoding='utf-8')
         self.assertIn("Join-Path $PSHOME 'pwsh.exe'", text)
         self.assertIn('[Environment]::SystemDirectory', text)
         self.assertIn("'WindowsPowerShell\\v1.0\\powershell.exe'", text)
@@ -17,12 +17,12 @@ class OwnerFilesActivationSource(unittest.TestCase):
         self.assertIn("throw 'No regular-file PowerShell executable available", text)
 
     def test_catalog_excludes_unimplemented_commands_and_accounts_for_all_tools(self):
-        catalog = json.loads((ROOT / 'packaging/files-capabilities.json').read_text())
-        router = ast.parse((ROOT / 'agents/tunnel/engine/router/files_policy.py').read_text())
+        catalog = json.loads((ROOT / 'packaging/files-capabilities.json').read_text(encoding='utf-8'))
+        router = ast.parse((ROOT / 'agents/tunnel/engine/router/files_policy.py').read_text(encoding='utf-8'))
         values = {n.targets[0].id: ast.literal_eval(n.value) for n in router.body
                   if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)
                   and n.targets[0].id in ('FILES_TOOL_SCOPES', 'MANAGEMENT_ONLY_TOOLS')}
-        commands = ast.parse((ROOT / 'agents/files/engine/app/mcp/managed_commands.py').read_text())
+        commands = ast.parse((ROOT / 'agents/files/engine/app/mcp/managed_commands.py').read_text(encoding='utf-8'))
         node = next(n for n in commands.body if isinstance(n, ast.Assign)
                     and any(isinstance(t, ast.Name) and t.id == 'UNSUPPORTED_COMMAND_TOOLS' for t in n.targets))
         assert isinstance(node.value, ast.Call)
@@ -36,7 +36,7 @@ class OwnerFilesActivationSource(unittest.TestCase):
     def test_explicit_consent_preserves_existing_grant_lifetime(self):
         path = ROOT / 'packaging/scripts/Enable-OwnerFilesCapabilities.ps1'
         self.assertTrue(path.exists())
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         for token in ('ALLOW READ WRITE', 'ALLOW OWNER ACCOUNT EXECUTION', 'Assert-CoreStopped',
                       'Assert-SnapshotUnchanged', 'Write-PrivateAtomic', 'FILES_CAPABILITIES_CONFIGURED',
                       'files:execute', 'remote_execution_policy.json', 'acknowledge_host_access',

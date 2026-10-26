@@ -4,7 +4,7 @@ import unittest
 
 class ReadPolicySource(unittest.TestCase):
     def test_provisioner_writes_matching_read_policies(self):
-        text = (Path(__file__).resolve().parents[1] / 'packaging/scripts/Configure-OwnerOAuth.ps1').read_text()
+        text = (Path(__file__).resolve().parents[1] / 'packaging/scripts/Configure-OwnerOAuth.ps1').read_text(encoding='utf-8')
         self.assertIn("foreach ($name in @('files_stat','files_read'))", text)
         self.assertIn("-NotePropertyName tool_policy", text)
         self.assertIn("scope = 'files:read'", text)
@@ -13,7 +13,7 @@ class ReadPolicySource(unittest.TestCase):
     def test_bounded_patch_preserves_authority(self):
         path = Path(__file__).resolve().parents[1] / 'packaging/scripts/Repair-OwnerFilesReadPolicy.ps1'
         self.assertTrue(path.exists())
-        text = path.read_text()
+        text = path.read_text(encoding='utf-8')
         for required in ('Duplicate JSON member rejected', 'Assert-CoreStopped', 'Assert-ReviewedMetadata',
                          'Assert-SnapshotUnchanged $target $before', '[IO.File]::Replace',
                          'Assert-MigrationPrivatePath $backup', '$parsed.ToolPolicy', '$parsed.RootEnd',

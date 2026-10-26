@@ -194,7 +194,7 @@ def test_overlapping_copy_and_move_do_not_delete_source(native):
         for source, target in [('folder', 'folder'), ('folder', 'folder/sub'), ('folder/a', 'folder')]:
             with pytest.raises(ValueError, match='overlap'):
                 operation(source, target, overwrite=True)
-        assert (root / 'folder/a').read_text() == 'keep'
+        assert (root / 'folder/a').read_text(encoding='utf-8') == 'keep'
 
 
 def test_core_workspace_list_context_stays_compatible(monkeypatch):
@@ -224,7 +224,7 @@ def test_native_write_patch_delete_and_predictable_temp_are_safe(native):
     fs.write('a.txt', 'first')
     fs.patch('a.txt', 'first', 'second')
     assert fs.read_text('a.txt')['text'] == 'second'
-    assert (root / 'a.txt.tmp').read_text() == 'do not touch'
+    assert (root / 'a.txt.tmp').read_text(encoding='utf-8') == 'do not touch'
     fs.delete('a.txt')
     assert not (root / 'a.txt').exists()
     assert not list(root.glob('.zagent-*.tmp'))
@@ -248,7 +248,7 @@ def test_native_rejects_junction_ancestor_and_recursive_subtree(native, tmp_path
                           lambda: fs.delete('nested'), lambda: fs.copy('nested', 'copied')):
             with pytest.raises(PermissionError):
                 operation()
-        assert victim.read_text() == 'unchanged'
+        assert victim.read_text(encoding='utf-8') == 'unchanged'
         assert not (root / 'copied').exists()
     finally:
         junction.rmdir()

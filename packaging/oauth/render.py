@@ -57,7 +57,7 @@ def render(config):
     secret_dir = absolute_path(config['secret_dir'])
     cert = absolute_path(config['tls_certificate'])
     key = absolute_path(config['tls_certificate_key'])
-    realm = json.loads((HERE / 'realm.template.json').read_text())
+    realm = json.loads((HERE / 'realm.template.json').read_text(encoding='utf-8'))
     client = realm['clients'][0]
     client['redirectUris'] = [redirect]
     client['defaultClientScopes'] = ['zagent-resource-audience']
@@ -124,7 +124,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     try:
-        realm, nginx, proxy, issuer, secret_dir = render(json.loads(args.config.read_text()))
+        realm, nginx, proxy, issuer, secret_dir = render(json.loads(args.config.read_text(encoding='utf-8')))
         output = Path(absolute_path(str(args.output)))
         output.mkdir(mode=0o700, parents=True, exist_ok=True)
         files = {

@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-TEXT = (ROOT / 'agents/tunnel/engine/router/server.py').read_text()
+TEXT = (ROOT / 'agents/tunnel/engine/router/server.py').read_text(encoding='utf-8')
 TREE = ast.parse(TEXT)
 
 def body(name):
@@ -16,7 +16,7 @@ class FilesPerimeterSource(unittest.TestCase):
         validation = body('_validate_tool')
         self.assertIn('name in {"files_command_cancel", "files_operation_cancel"}', validation)
         self.assertIn('if key != "task_id"', validation)
-        consumer = (ROOT / 'agents/files/engine/app/core/execution_context.py').read_text()
+        consumer = (ROOT / 'agents/files/engine/app/core/execution_context.py').read_text(encoding='utf-8')
         self.assertIn("op in {'operation_cancel', 'command_cancel'}", consumer)
 
     def test_command_controls_do_not_queue_behind_the_command_they_cancel(self):

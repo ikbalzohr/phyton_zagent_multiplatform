@@ -90,7 +90,7 @@ class Regression(unittest.TestCase):
             pathlib.Path(ipc.INBOX,"expired.json").write_text(json.dumps(self.command(request_id="expired",expires_at_epoch=0)))
             self.assertTrue(runner.process_next())
             fake.dispatch.assert_not_called()
-            result=json.loads(pathlib.Path(ipc.OUTBOX,"expired.json").read_text())
+            result=json.loads(pathlib.Path(ipc.OUTBOX,"expired.json").read_text(encoding='utf-8'))
             self.assertEqual("COMMAND_EXPIRED",result["code"])
 
     def test_timeout_removes_queued_work(self):

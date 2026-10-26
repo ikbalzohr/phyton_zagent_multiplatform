@@ -4,7 +4,7 @@ import unittest
 
 class FilesLauncherSource(unittest.TestCase):
     def test_files_interpreter_is_explicit_and_restored(self):
-        text = (Path(__file__).resolve().parents[1] / 'packaging/scripts/Start-OwnerCore.ps1').read_text()
+        text = (Path(__file__).resolve().parents[1] / 'packaging/scripts/Start-OwnerCore.ps1').read_text(encoding='utf-8')
         self.assertIn("'Zagent-Envs\\files\\Scripts\\python.exe'", text)
         self.assertIn('$previousFiles = $env:ZAGENT_FILES_PYTHON', text)
         self.assertIn('$env:ZAGENT_FILES_PYTHON = $filesPython', text)

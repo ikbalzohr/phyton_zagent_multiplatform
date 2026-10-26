@@ -86,7 +86,7 @@ class DeploymentTests(unittest.TestCase):
                         render.render(c)
 
     def test_checked_in_example_is_not_deployable(self):
-        example = json.loads((render.HERE / 'deployment.example.json').read_text())
+        example = json.loads((render.HERE / 'deployment.example.json').read_text(encoding='utf-8'))
         with self.assertRaises(ValueError):
             render.render(example)
 
@@ -101,14 +101,14 @@ class DeploymentTests(unittest.TestCase):
             self.assertEqual(len(list(output.iterdir())), 4)
             for item in output.iterdir():
                 self.assertEqual(item.stat().st_mode & 0o777, 0o600)
-            self.assertEqual(json.loads((output / 'zagent-realm.json').read_text())['realm'], 'zagent')
+            self.assertEqual(json.loads((output / 'zagent-realm.json').read_text(encoding='utf-8'))['realm'], 'zagent')
             second = subprocess.run(command, text=True, capture_output=True)
             self.assertEqual(second.returncode, 2)
             self.assertIn('Output exists', second.stderr)
 
     def test_runtime_packaging_guards(self):
-        compose = (render.HERE / 'compose.yaml').read_text()
-        containerfile = (render.HERE / 'Containerfile').read_text()
+        compose = (render.HERE / 'compose.yaml').read_text(encoding='utf-8')
+        containerfile = (render.HERE / 'Containerfile').read_text(encoding='utf-8')
         # Docker 29 internal networks do not publish host ports. nginx reaches
         # the fixed private address; neither DB nor Keycloak binds a host port.
         self.assertNotIn('    ports:', compose)

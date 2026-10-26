@@ -63,7 +63,7 @@ def test_deadline_exact_marker_and_optional_identity(approved):
         resource = dict(context['effective_resources'][0], **{field: 'different'})
         with pytest.raises(PermissionError):
             m.authorize_command_call('files_exec_command', {}, VerifiedContext(context, effective_resources=[resource]))
-        profiles = json.loads(m.PROFILES_FILE.read_text())
+        profiles = json.loads(m.PROFILES_FILE.read_text(encoding='utf-8'))
         profiles['profiles'][0][field] = 'different'
         m.PROFILES_FILE.write_text(json.dumps(profiles))
         with pytest.raises(PermissionError):
@@ -154,7 +154,7 @@ def test_bounded_output_and_no_ambient_secrets(approved, monkeypatch):
         assert result['ok'] and len(result['stdout']) <= 1024 and len(result['stderr']) <= 1024
         assert result['stdout_truncated'] and result['stderr_truncated']
         assert result['stdout'].startswith('None')
-        assert 'secret-never-forward' not in m.AUDIT_LOG.read_text()
+        assert 'secret-never-forward' not in m.AUDIT_LOG.read_text(encoding='utf-8')
     finally:
         CURRENT.reset(token)
 
@@ -200,7 +200,7 @@ def test_timeout_kills_descendants_without_pipe_deadlock(approved):
         with pytest.raises(TimeoutError):
             asyncio.run(m.execute('files_exec_command', dict(executable=sys.executable, args=['-c', script], timeout_seconds=2)))
         assert child_pid.exists(), 'child must start before timeout; increase timeout if Windows host is slow'
-        pid = int(child_pid.read_text())
+        pid = int(child_pid.read_text(encoding='utf-8'))
         until = time.monotonic() + 5
         while _still_running(pid) and time.monotonic() < until:
             time.sleep(0.02)
@@ -326,7 +326,7 @@ def test_real_installed_npm_build_and_test_without_shim_execution(approved):
             assert result['ok'], result['stderr']
         finally:
             CURRENT.reset(token)
-    assert (root / 'built.txt').read_text() == 'ok'
+    assert (root / 'built.txt').read_text(encoding='utf-8') == 'ok'
 
 
 def test_registry_is_principal_workspace_profile_resource_scoped(approved):

@@ -33,7 +33,7 @@ def main():
     st = runtime.stat()
     if st.st_uid != 0 or stat.S_IMODE(st.st_mode) != 0o700:
         parser.exit(2, 'Runtime must be root-owned mode 0700.\n')
-    config = json.loads((runtime / 'deployment.json').read_text())
+    config = json.loads((runtime / 'deployment.json').read_text(encoding='utf-8'))
     issuer_origin = config['issuer_origin']
     parsed = urllib.parse.urlsplit(issuer_origin)
     if parsed.scheme != 'https' or not parsed.hostname or parsed.path or parsed.query or parsed.fragment or parsed.username or parsed.password:
@@ -68,7 +68,7 @@ def main():
         # This is private administration, NOT the application's OAuth password grant.
         token = request('/realms/master/protocol/openid-connect/token', method='POST', form={
             'grant_type': 'password', 'client_id': 'admin-cli', 'username': 'bootstrap-admin',
-            'password': bootstrap_path.read_text().strip()}, authenticated=False)['access_token']
+            'password': bootstrap_path.read_text(encoding='utf-8').strip()}, authenticated=False)['access_token']
         query = urllib.parse.urlencode({'username': args.username, 'exact': 'true'})
         endpoint = '/admin/realms/zagent/users'
         if request(endpoint + '?' + query):

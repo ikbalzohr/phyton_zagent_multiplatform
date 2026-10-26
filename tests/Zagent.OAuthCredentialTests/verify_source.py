@@ -3,11 +3,11 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[2]
-store = (root / "src/Zagent.Core/Manager/OAuthIntrospectionCredentialStore.cs").read_text()
-factory = (root / "src/Zagent.Core/Agents/Tunnel/TunnelProcessFactory.cs").read_text()
-supervisor = (root / "src/Zagent.Core/Supervision/NativeAgentSupervisor.cs").read_text()
-host = (root / "src/Zagent.Core/Manager/ManagerCoreHost.cs").read_text()
-writer = (root / "src/Zagent.Core/Agents/Tunnel/TunnelConfigurationWriter.cs").read_text()
+store = (root / "src/Zagent.Core/Manager/OAuthIntrospectionCredentialStore.cs").read_text(encoding='utf-8')
+factory = (root / "src/Zagent.Core/Agents/Tunnel/TunnelProcessFactory.cs").read_text(encoding='utf-8')
+supervisor = (root / "src/Zagent.Core/Supervision/NativeAgentSupervisor.cs").read_text(encoding='utf-8')
+host = (root / "src/Zagent.Core/Manager/ManagerCoreHost.cs").read_text(encoding='utf-8')
+writer = (root / "src/Zagent.Core/Agents/Tunnel/TunnelConfigurationWriter.cs").read_text(encoding='utf-8')
 for token in ('RSAEncryptionPadding.OaepSHA256', 'cert.GetRSAPrivateKey()', 'CngExportPolicies.None',
               'StoreLocation.CurrentUser', 'FileMode.CreateNew', 'FileShare.None', 'expires - now > 86400',
               'SHA256.HashData(cert.RawData)', 'CryptographicOperations.ZeroMemory(clear)',
@@ -22,9 +22,9 @@ assert 'definition.AgentId != Zagent.Core.Agents.Tunnel.TunnelProcessFactory.Rou
 assert 'merged[entry.Key] = entry.Value?.DeepClone()' in writer
 assert 'resource_server =' not in writer
 assert 'SetEnvironmentVariable' not in store + factory
-files_helpers = (root / 'src/Zagent.Core/Manager/FilesManagerReadModel.cs').read_text()
+files_helpers = (root / 'src/Zagent.Core/Manager/FilesManagerReadModel.cs').read_text(encoding='utf-8')
 assert files_helpers.count('startInfo.Environment.Remove(OAuthIntrospectionCredentialStore.EnvironmentName);') == 2, 'Both Files helper paths must strip OAuth before launch'
-program = (root / 'src/Zagent.Core/Program.cs').read_text()
+program = (root / 'src/Zagent.Core/Program.cs').read_text(encoding='utf-8')
 assert 'Environment.SetEnvironmentVariable(OAuthIntrospectionCredentialStore.EnvironmentName, null);' in program, 'Core must discard process-local ambient OAuth before dispatch'
 assert 'ExportParameters' not in store and 'ExportPkcs8PrivateKey' not in store
 for path in (root / 'tests/Zagent.OAuthCredentialTests/Zagent.OAuthCredentialTests.csproj',

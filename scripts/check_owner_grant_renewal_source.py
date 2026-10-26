@@ -7,7 +7,7 @@ class RenewalSource(unittest.TestCase):
     def test_expiry_only_private_renewal(self):
         p = ROOT / 'packaging/scripts/Renew-OwnerFilesGrant.ps1'
         self.assertTrue(p.exists(), 'Bounded owner renewal helper missing')
-        text = p.read_text()
+        text = p.read_text(encoding='utf-8')
         for required in ('[ValidateSet(7)]', 'Assert-CoreStopped', 'Read-StrictJson',
                          'Assert-SnapshotUnchanged $path $before',
                          '$grant.revoked -cne $false', '$entries.Count -ne 1',

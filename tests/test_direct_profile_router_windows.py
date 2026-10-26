@@ -112,7 +112,7 @@ def test_real_create_catalog_data_delete_receipt(setup, monkeypatch):
         assert catalog['default_profile_id'] == '_new'
         old = new_context(a.auth,a.place,'files:write','files_write',resource_authorizer=a.authorizer,selected_profile_id='_new',catalog=catalog)
         await invoke(a,'files_write',{'path':'new.txt','content':'paired','profile_id':'_new'},old)
-        assert (target/'new.txt').read_text() == 'paired'
+        assert (target/'new.txt').read_text(encoding='utf-8') == 'paired'
         second = a.tmp/'reroot'; second.mkdir()
         rerooted = await invoke(a,'files_profile_admin_update',{'target_profile_id':'_new',
             'changes':{'root':str(second)},'expected_revision':snapshot['revision'],'idempotency_key':'reroot'})
@@ -124,7 +124,7 @@ def test_real_create_catalog_data_delete_receipt(setup, monkeypatch):
         deleted_context = new_admin_context(a.auth,a.place,a.authorizer,'files_profile_admin_delete',delete_args)
         deleted = await invoke(a,'files_profile_admin_delete',delete_args,deleted_context)
         assert deleted['status'] == 'committed' and (target/'new.txt').exists()
-        assert (a.root/'marker.txt').read_text() == 'original'
+        assert (a.root/'marker.txt').read_text(encoding='utf-8') == 'original'
         current = validate_catalog(await a.registry.profile_catalog_snapshot(catalog_context(a.auth,a.place)),a.auth,a.place,a.authorizer)
         assert '_new' not in current['allowed_profile_ids']
         async def get(task):

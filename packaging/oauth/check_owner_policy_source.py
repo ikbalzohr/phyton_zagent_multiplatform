@@ -1,6 +1,6 @@
 """Non-executing source guards; NOT Windows parser/behavioral acceptance."""
 from pathlib import Path
-s=(Path(__file__).resolve().parents[1]/'scripts/Configure-OwnerOAuth.ps1').read_text()
+s=(Path(__file__).resolve().parents[1]/'scripts/Configure-OwnerOAuth.ps1').read_text(encoding='utf-8')
 assert '[switch]$ActivateReadOnlyGrant' in s
 assert '$revoked = -not $ActivateReadOnlyGrant' in s, 'Explicit read-only activation gate missing'
 assert 'Activation requires the exact staged policy' in s, 'Cannot activate an arbitrary policy'

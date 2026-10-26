@@ -133,7 +133,7 @@ with tempfile.TemporaryDirectory(prefix='zagent-profile-admin-') as temporary:
         delete = {'target_profile_id':'_new','expected_revision':result['revision'],'idempotency_key':'delete-1'}
         await denied('delete',delete,'EXPLICIT_REPLACEMENT_DEFAULT_REQUIRED')
         result = await call('delete',{**delete,'replacement_default_id':'appBridge'})
-        assert root.exists() and (original/'marker.txt').read_text() == 'unchanged'
+        assert root.exists() and (original/'marker.txt').read_text(encoding='utf-8') == 'unchanged'
         args = {**args,'expected_revision':result['revision'],'idempotency_key':'recreate-1'}
         result = await call('create',args)
         assert a.current_catalog()['generations']['_new'] != generation
@@ -195,7 +195,7 @@ with tempfile.TemporaryDirectory(prefix='zagent-profile-admin-') as temporary:
         finally:
             a.os.replace = replace
         assert manager.PROFILES_FILE.read_bytes() == previous
-        assert (original/'marker.txt').read_text() == 'unchanged'
+        assert (original/'marker.txt').read_text(encoding='utf-8') == 'unchanged'
         print('PASS Windows behavior: direct CRUD/default/CAS/idempotency/generation/no-ABA/private-roots/leases/atomic-fault/legacy-writer/token-serialization')
     try:
         asyncio.run(run())
