@@ -14,6 +14,9 @@ import httpx
 from .config import load_services, public_tool_name
 from .orchestration import ExecContext
 from .identity import internal_token
+from .files_selection import forward_files_arguments
+from .profile_admin import PROFILE_ADMIN_SCOPES, CATALOG_TOOL
+from .access import AuthorizationError, digest
 
 log = logging.getLogger("zagent.tunnel.router.registry")
 
@@ -266,6 +269,10 @@ class MCPRegistry:
                 if not upstream:
                     continue
                 public = public_tool_name(ns, upstream)
+                if public == CATALOG_TOOL:
+                    continue  # private authenticated adapter call only
+                if public in PROFILE_ADMIN_SCOPES and state.service['id'] not in {'zagent_files', 'zagent_files_v3'}:
+                    continue
                 if public in index:
                     raise RuntimeError(f"Tool collision '{public}'")
                 index[public] = (state.service["id"], upstream)
@@ -294,6 +301,10 @@ class MCPRegistry:
                     continue
                 item = dict(tool)
                 item["name"] = public_tool_name(ns, upstream)
+                if item['name'] == CATALOG_TOOL:
+                    continue
+                if item['name'] in PROFILE_ADMIN_SCOPES and state.service['id'] not in {'zagent_files', 'zagent_files_v3'}:
+                    continue
                 desc = str(item.get("description", "")).strip()
                 item["description"] = f"[{state.service['name']}] {desc}".strip()
                 tools.append(item)
@@ -322,12 +333,46 @@ class MCPRegistry:
             "services": services,
         }
 
+    async def profile_catalog_snapshot(self, context: dict[str, Any]) -> dict[str, Any]:
+        candidates = [s for s in self.enabled_states() if s.service['id'] in {'zagent_files', 'zagent_files_v3'}]
+        if len(candidates) != 1:
+            raise AuthorizationError('PROFILE_CATALOG_NOT_CONFIGURED', 503)
+        state = candidates[0]
+        await self.ensure_initialized(state)
+        response = await self._post(state, {'jsonrpc': '2.0', 'id': uuid.uuid4().hex,
+            'method': 'tools/call', 'params': {'name': CATALOG_TOOL, 'arguments': {},
+                '_meta': {'zagent.profile_catalog_context': context}}})
+        if 'error' in response:
+            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503)
+        result = response.get('result')
+        if not isinstance(result, dict) or result.get('isError') is True or result.get('ok') is False:
+            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503)
+        if isinstance(result.get('structuredContent'), dict):
+            return result['structuredContent']
+        content = result.get('content')
+        if isinstance(content, list) and len(content) == 1 and content[0].get('type') == 'text':
+            return json.loads(content[0]['text'])
+        return result
+
     async def invoke(self, service_id: str, upstream_name: str, arguments: dict[str, Any], ctx: ExecContext) -> dict[str, Any]:
         state = self.states[service_id]
         await self.ensure_initialized(state)
         started = time.time()
 
         call_arguments = dict(arguments or {})
+        selected_files_profile = None
+        envelope = {}
+        admin = ctx.execution_context.get('public_tool') in PROFILE_ADMIN_SCOPES
+        if admin:
+            if service_id not in {'zagent_files', 'zagent_files_v3'} or upstream_name != ctx.execution_context['public_tool']:
+                raise AuthorizationError('PROFILE_ADMIN_MAPPING_INVALID', 403)
+            envelope = ctx.execution_context['profile_admin_context']
+            if envelope['payload_digest'] != digest(call_arguments):
+                raise AuthorizationError('PROFILE_ADMIN_PAYLOAD_CHANGED', 403)
+        elif service_id in {'zagent_files', 'zagent_files_v3'}:
+            call_arguments = forward_files_arguments(ctx.execution_context['public_tool'],
+                                                     call_arguments, ctx.execution_context)
+            selected_files_profile = ctx.execution_context['effective_resources'][0]['profile_id']
         tool = next((item for item in state.tools if item.get("name") == upstream_name), {})
         properties = tool.get("inputSchema", {}).get("properties", {})
         capability = tool.get("_meta", {}).get("zagent.capability")
@@ -367,7 +412,8 @@ class MCPRegistry:
                 "jsonrpc": "2.0",
                 "id": ctx.request_id or uuid.uuid4().hex,
                 "method": "tools/call",
-                "params": {"name": upstream_name, "arguments": call_arguments, "_meta": {
+                "params": {"name": upstream_name, "arguments": call_arguments, "_meta":
+                    {'zagent.profile_admin_context': dict(envelope)} if admin else {
                     "zagent.session_id": ctx.session_id, "zagent.request_id": ctx.request_id,
                     "zagent.trace_id": ctx.trace_id, "zagent.task_id": ctx.task_id,
                     "zagent.device_id": _DEVICE_ID or None,
@@ -385,7 +431,7 @@ class MCPRegistry:
             meta.update({
                 "zagent.trace_id": ctx.trace_id,
                 "zagent.session_id": ctx.session_id,
-                "zagent.profile_id": ctx.profile_id or None,
+                "zagent.profile_id": selected_files_profile or ctx.profile_id or None,
                 "zagent.request_id": ctx.request_id,
                 "zagent.task_id": ctx.task_id,
                 "zagent.service_id": service_id,

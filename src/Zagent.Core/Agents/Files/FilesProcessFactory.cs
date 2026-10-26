@@ -10,6 +10,8 @@ public static class FilesProcessFactory
         FilesIntegrationOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        if (!string.IsNullOrEmpty(options.CoreDataRoot) && !Path.IsPathFullyQualified(options.CoreDataRoot))
+            throw new ArgumentException("Core DataRoot must be fully qualified when supplied.", nameof(options));
 
         return new AgentProcessDefinition(
             AgentId: ProcessId,
@@ -38,6 +40,11 @@ public static class FilesProcessFactory
                 ["ZAGENT_FILES_UPDATE_STATE_ROOT"] =
                     Path.GetFullPath(options.UpdateStateRoot),
                 ["ZAGENT_DEVICE_ID"] = options.DeviceId,
+                ["ZAGENT_INSTALLATION_ID"] = options.InstallationId,
+                // Legacy standalone callers remain usable for native operations; blank placement
+                // clears inherited authority and makes administration fail closed at Files.
+                ["ZAGENT_CORE_DATA_ROOT"] = string.IsNullOrEmpty(options.CoreDataRoot)
+                    ? "" : Path.GetFullPath(options.CoreDataRoot),
                 ["ZAGENT_DEVICE_NAME"] = options.DeviceName,
                 ["ZAGENT_INTERNAL_TOKEN"] =
                     Zagent.Core.Manager.InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_TOKEN"),

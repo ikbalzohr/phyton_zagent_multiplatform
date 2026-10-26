@@ -153,7 +153,7 @@ public static class DashboardHost
             Results.Ok(new { token = af.GetAndStoreTokens(ctx).RequestToken })).RequireAuthorization();
         foreach (var (path, method) in new[] { ("overview", "manager.dashboard"), ("agents", "manager.dashboard"),
             ("capabilities", "registry.capabilities"), ("connections", "integrations.snapshot"),
-            ("routes", "router.snapshot"), ("workspaces", "profiles.snapshot"), ("jobs", "monitoring.snapshot") })
+            ("routes", "router.snapshot"), ("jobs", "monitoring.snapshot") })
         {
             app.MapGet(api + "/" + path, async (HttpContext ctx) => {
                 var response = await queries.ReadAsync(method, method == "monitoring.snapshot" ? new ManagerRefreshRequest(true, 100) : null, ctx.RequestAborted);
@@ -166,10 +166,6 @@ public static class DashboardHost
                         tool = t.GetProperty("tool"), state = t.GetProperty("state"), progress = t.GetProperty("progress"),
                         canStop = t.GetProperty("canStop"), stopMode = t.GetProperty("stopMode") }).ToArray(),
                     queueDepth = data.GetProperty("queueDepth"), capturedAtUtc = data.GetProperty("capturedAtUtc") };
-                if (path == "workspaces") projection = new { workspaceId = options.WorkspaceId,
-                    revision = DashboardRevision.Profiles(data), profiles = data.GetProperty("profiles"), defaultProfile = data.GetProperty("defaultProfile"),
-                    pendingApprovals = data.GetProperty("pendingApprovals"), capturedAtUtc = data.GetProperty("capturedAtUtc"),
-                    unavailableDependencies = data.GetProperty("unavailableDependencies").EnumerateArray().Select(x => x.GetString() ?? "").ToArray() };
                 return Results.Ok(new { requestId = ctx.TraceIdentifier, capturedAtUtc = DateTimeOffset.UtcNow, data = projection });
             }).RequireAuthorization();
         }
@@ -228,14 +224,7 @@ public static class DashboardHost
         app.MapPost(api + "/jobs/{id}/cancel", async (string id, HttpContext ctx, ManagementOperations operations) =>
             await Accept(operations, ctx, "task.cancel", new ManagerTaskCancelRequest(id)))
             .RequireAuthorization("Operator").RequireRateLimiting("commands");
-        app.MapPost(api + "/workspaces/profiles", async (ManagerProfileAddRequest request, HttpContext ctx, ManagementOperations operations) =>
-            await Accept(operations, ctx, "profiles.add", request)).RequireAuthorization("Administrator").RequireRateLimiting("commands");
-        app.MapPut(api + "/workspaces/profiles/{id}", async (string id, ManagerProfileUpdateRequest request, HttpContext ctx, ManagementOperations operations) =>
-            id != request.Name ? Results.BadRequest() : await Accept(operations, ctx, "profiles.update", request))
-            .RequireAuthorization("Administrator").RequireRateLimiting("commands");
-        app.MapDelete(api + "/workspaces/profiles/{id}", async (string id, HttpContext ctx, ManagementOperations operations) =>
-            await Accept(operations, ctx, "profiles.remove", new ManagerProfileRemoveRequest(id)))
-            .RequireAuthorization("Administrator").RequireRateLimiting("commands");
+        app.MapProfileAdministration(runtime, options, queries);
         app.MapPost(api + "/approvals/{id}/decision", async (string id, ManagerApprovalActionRequest request, HttpContext ctx, ManagementOperations operations) => {
             if (id != request.RequestId || request.Source != "Files" || request.Action is not ("approve" or "deny")) return Results.BadRequest();
             return await Accept(operations, ctx, "approval.resolve", request);

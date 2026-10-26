@@ -388,7 +388,7 @@ class Engine:
         if op not in self.operations:
             raise ValueError('Unknown operation: '+op)
         inspect.signature(self.operations[op]).bind(**args)
-        sid = owner_key(meta)
+        sid = owner_key(metadata)
         self.ensure_session(sid, meta.get('profile_id'))
         # Resource selection is explicit and cannot silently change another root.
         profile = self.bind_named(sid, meta['profile_id'])
@@ -461,6 +461,14 @@ class Engine:
         return {'ok': True, 'data': value, '_meta': {'zagent.'+k: v for k,v in meta.items()}}
 
     async def _run(self, op, args, meta, profile, resources, flag):
+        # Independent task lease outlives a disconnected/shielded HTTP waiter.
+        # This work was already admitted by the frontdoor; do not block it
+        # behind a writer that is waiting for that same frontdoor read lease.
+        from app.profiles.administration import read_lease
+        async with read_lease(control=True):
+            return await self._run_with_catalog(op, args, meta, profile, resources, flag)
+
+    async def _run_with_catalog(self, op, args, meta, profile, resources, flag):
         opid = meta['operation_id']
         started = time.monotonic()
         try:
@@ -490,7 +498,8 @@ class Engine:
                             CURRENT.reset(authority_token)
                             WORK.reset(worktoken)
                             manager.BOUND_PROFILE.reset(token)
-                    result = await asyncio.get_running_loop().run_in_executor(self.pool, work)
+                    from app.profiles.administration import catalog_worker
+                    result = await catalog_worker(asyncio.get_running_loop().run_in_executor(self.pool, work))
                     meta.update(lock_wait_ms=round(lock_ms,3), duration_ms=round((time.monotonic()-started)*1000,3))
                     output = self.envelope(result, meta)
                     self.journal.update(opid, state='succeeded', result=output)

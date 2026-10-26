@@ -8,14 +8,30 @@ from mcp.types import ToolAnnotations
 from app.mcp import legacy
 from app.core.execution import Engine, READ
 from app.core.execution_context import CURRENT, current, verify, request_meta, validate_profile
+from app.profiles.administration import (PROFILE_ADMIN_TOOLS, CATALOG_TOOL,
+                                        admin_call, catalog_snapshot, read_lease)
 
 
 class TrustedFilesMCP(FastMCP):
     async def call_tool(self, name, arguments):
-        authority = verify(request_meta(self.get_context()), name, arguments or {})
+        metadata = request_meta(self.get_context())
+        if name in PROFILE_ADMIN_TOOLS or name == CATALOG_TOOL:
+            from mcp.types import TextContent
+            value = (await admin_call(name, arguments or {}, metadata) if name in PROFILE_ADMIN_TOOLS
+                     else await catalog_snapshot(arguments or {}, metadata))
+            return [TextContent(type='text', text=json.dumps(value, ensure_ascii=False, allow_nan=False))]
+        controls = {'files_command_cancel','files_process_stop','files_process_list','files_operation_cancel','files_operation_status','files_operation_list'}
+        async with read_lease(control=name in controls):
+            return await self._call_data_tool(name, arguments, metadata)
+
+    async def _call_data_tool(self, name, arguments, metadata):
+        authority = verify(metadata, name, arguments or {})
         if name.startswith('files_update_'):
             raise PermissionError('MANAGEMENT_PLANE_ONLY')
         validate_profile(authority, engine.approved(authority['profile_id']))
+        # Even a first workspace_switch must seed its resource-scoped session
+        # from verified selection, never an unrelated local default root.
+        engine.ensure_session(authority['session_id'], authority['profile_id'])
         # Import only for command calls: native startup does not require this
         # optional owner-managed facility. It takes explicit verified authority.
         from app.core.execution_context import COMMAND_TOOLS
@@ -46,6 +62,40 @@ operations = {name[6:]: fn for name,fn in vars(legacy).items()
               if name.startswith('files_') and callable(fn)}
 operations['copy_batch_between_profiles'] = copy_batch_between_profiles
 engine = Engine(operations)
+
+
+def register_profile_administration():
+    definitions = {
+        'list': [],
+        'get': [('target_profile_id', str, inspect.Parameter.empty)],
+        'create': [('target_profile_id', str, inspect.Parameter.empty), ('root', str, inspect.Parameter.empty),
+                   ('expected_revision', str, inspect.Parameter.empty), ('idempotency_key', str, inspect.Parameter.empty),
+                   ('mode', str, 'read-only'), ('enabled', bool, True), ('description', str, '')],
+        'update': [('target_profile_id', str, inspect.Parameter.empty), ('changes', dict, inspect.Parameter.empty),
+                   ('expected_revision', str, inspect.Parameter.empty), ('idempotency_key', str, inspect.Parameter.empty)],
+        'delete': [('target_profile_id', str, inspect.Parameter.empty), ('expected_revision', str, inspect.Parameter.empty),
+                   ('idempotency_key', str, inspect.Parameter.empty), ('replacement_default_id', str | None, None)],
+        'set_default': [('target_profile_id', str, inspect.Parameter.empty), ('expected_revision', str, inspect.Parameter.empty),
+                        ('idempotency_key', str, inspect.Parameter.empty)],
+    }
+    def make(tool, fields):
+        async def invoke(**kwargs):
+            metadata = request_meta(mcp.get_context())
+            if tool == CATALOG_TOOL:
+                return await catalog_snapshot(kwargs, metadata)
+            return await admin_call(tool, kwargs, metadata)
+        invoke.__name__ = tool
+        invoke.__signature__ = inspect.Signature([inspect.Parameter(k, inspect.Parameter.KEYWORD_ONLY, annotation=t, default=d) for k,t,d in fields], return_annotation=dict)
+        invoke.__annotations__ = {k:t for k,t,d in fields} | {'return':dict}
+        return invoke
+    for tool, action in PROFILE_ADMIN_TOOLS.items():
+        mcp.add_tool(make(tool, definitions[action]), description='Authenticated direct owner profile administration; no pending approval.',
+                     annotations=ToolAnnotations(readOnlyHint=action in ('list','get'), destructiveHint=action == 'delete', openWorldHint=False))
+    mcp.add_tool(make(CATALOG_TOOL, []), description='Private authenticated catalog snapshot; never publish as an OAuth tool.',
+                 annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False))
+
+
+register_profile_administration()
 
 
 def metadata_from(ctx, metadata):
@@ -143,7 +193,7 @@ def files_workspace_switch(workspace_id: str, profile_id: str) -> dict:
     result = engine.switch_session(scoped_owner(workspace_id), scoped_profile(profile_id))
     return {
         **workspace_view(result),
-        'scope': 'principal_workspace',
+        'scope': 'principal_workspace_resource_profile_placement',
         'global_default_profile': manager.default_profile_name(),
     }
 

@@ -102,7 +102,8 @@ class FilesResourcePolicyTests(unittest.TestCase):
         with patch.dict("os.environ", {"ZAGENT_INTERNAL_TOKEN": "k"*32, "ZAGENT_DEVICE_ID": "device"}):
             verified = consumer.verify(consumer.request_meta(request), "files_stat", {})
             self.assertEqual(verified["effective_resources"][0]["profile_id"], "approved-repo")
-            self.assertEqual(verified["session_id"], self.auth.owner)
+            self.assertEqual(verified["session_id"], consumer.owner_key(context))
+            self.assertNotEqual(verified["session_id"], self.auth.owner)
             with self.assertRaises(PermissionError):
                 consumer.verify(request.request_context.meta, "files_stat", {})
             request.request_context.request.headers["x-zagent-internal-token"] = "wrong"

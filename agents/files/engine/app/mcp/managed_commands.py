@@ -50,10 +50,12 @@ class CommandGrant:
     timeout: int
     output_limit: int
     expires_at: float
+    generation: str | None = None
 
     @property
     def owner(self):
-        return (self.principal, self.workspace, self.profile, self.resource, str(self.root))
+        owner = (self.principal, self.workspace, self.profile, self.resource, str(self.root))
+        return owner + (self.generation,) if self.generation is not None else owner
 
 
 def _json(path):
@@ -94,6 +96,42 @@ def _local_path(raw, directory=False):
         raise PermissionError('LOCAL_PATH_UNAVAILABLE') from exc
 
 
+def _policy_profiles(document):
+    """Read legacy v1 in memory only, or an exact bounded v2 profile map.
+
+    Validate every entry's envelope even when another profile is selected. Local
+    enabled/approval/path checks remain per selected entry: disabling A must not
+    deny an independently approved B. Never rewrite policy or infer a default.
+    """
+    if not isinstance(document, dict):
+        raise PermissionError('INVALID_COMMAND_POLICY_SCHEMA')
+    version = document.get('version')
+    if type(version) is not int:
+        raise PermissionError('INVALID_COMMAND_POLICY_SCHEMA')
+    if version == 1 and set(document) == _POLICY_KEYS:
+        profile_id = document['profile_id']
+        if not isinstance(profile_id, str):
+            raise PermissionError('INVALID_COMMAND_POLICY_PROFILE_ID')
+        profiles = {profile_id: document}
+    elif version == 2 and set(document) == {'version', 'profiles'}:
+        profiles = document['profiles']
+    else:
+        raise PermissionError('INVALID_COMMAND_POLICY_SCHEMA')
+    if not isinstance(profiles, dict) or not 1 <= len(profiles) <= 128:
+        raise PermissionError('INVALID_COMMAND_POLICY_PROFILES')
+    for profile_id, entry in profiles.items():
+        if (not isinstance(profile_id, str) or not profile_id or len(profile_id) > 256
+                or profile_id.strip() != profile_id or '*' in profile_id
+                or any(ord(char) < 32 for char in profile_id)):
+            raise PermissionError('INVALID_COMMAND_POLICY_PROFILE_ID')
+        if not isinstance(entry, dict) or set(entry) != _POLICY_KEYS:
+            raise PermissionError('INVALID_COMMAND_POLICY_SCHEMA')
+        if (type(entry['version']) is not int or entry['version'] != 1
+                or entry['profile_id'] != profile_id):
+            raise PermissionError('COMMAND_POLICY_PROFILE_MISMATCH')
+    return profiles
+
+
 def authorize_command_call(tool, arguments, authority):
     """Server preflight AND tool-time check; no caller metadata can grant rights."""
     if type(authority) is not VerifiedContext:
@@ -121,14 +159,15 @@ def authorize_command_call(tool, arguments, authority):
         raise PermissionError('FILES_PROFILE_SCOPE_REQUIRED')
     if authority.get('profile_id', profile_id) != profile_id:
         raise PermissionError('CONTEXT_PROFILE_MISMATCH')
-    if not isinstance(arguments, dict) or arguments.get('profile', profile_id) != profile_id:
+    if not isinstance(arguments, dict) or (arguments.get('profile') is not None and arguments['profile'] != profile_id):
         raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
     for key in ('principal_id', 'workspace_id'):
         if not isinstance(authority.get(key), str) or not authority[key]:
             raise PermissionError('OWNER_REQUIRED')
-    policy = _json(POLICY_FILE)
-    if not isinstance(policy, dict) or set(policy) != _POLICY_KEYS:
-        raise PermissionError('INVALID_COMMAND_POLICY_SCHEMA')
+    policies = _policy_profiles(_json(POLICY_FILE))
+    if profile_id not in policies:
+        raise PermissionError('COMMAND_POLICY_PROFILE_MISMATCH')
+    policy = policies[profile_id]
     if type(policy['version']) is not int or policy['version'] != 1 or policy['enabled'] is not True or policy['acknowledge_host_access'] is not True or policy['execution_mode'] != 'owner-account':
         raise PermissionError('EXPLICIT_OWNER_ACCOUNT_APPROVAL_REQUIRED')
     if policy['profile_id'] != profile_id:
@@ -147,6 +186,11 @@ def authorize_command_call(tool, arguments, authority):
     if len(matches) != 1:
         raise PermissionError('LOCAL_PROFILE_REQUIRED')
     profile = matches[0]
+    generation = resource.get('profile_generation')
+    if 'owner_management' in profiles or 'profile_generation' in resource:
+        from app.profiles.administration import profile_generation
+        if not isinstance(generation, str) or not generation or generation != profile_generation(profile, profiles):
+            raise PermissionError('PROFILE_GENERATION_MISMATCH')
     for field in ('device_id', 'installation_id'):
         if field in resource and resource[field] != authority.get(field):
             raise PermissionError('RESOURCE_IDENTITY_MISMATCH')
@@ -163,7 +207,7 @@ def authorize_command_call(tool, arguments, authority):
     executables = tuple(_local_path(p) for p in raw_exes)
     return CommandGrant(authority['principal_id'], authority['workspace_id'], profile_id,
                         resource['resource_id'], root, executables, policy['max_timeout_seconds'],
-                        policy['max_output_chars'], float(expiry))
+                        policy['max_output_chars'], float(expiry), generation)
 
 
 def resolve_cwd(grant, cwd):
@@ -315,7 +359,11 @@ def _drain(stream, limit, target):
         stream.close()
 
 
-def _run_owned(tool, arguments, grant, cancel, record_id):
+def _run_owned(tool, arguments, grant, cancel, record_id, authority):
+    # A thread may start later than public preflight. Re-read approvals against
+    # the original verified resource; never retarget to a new local default.
+    if authorize_command_call(tool, arguments, authority) != grant:
+        raise PermissionError('COMMAND_APPROVAL_CHANGED')
     exe, argv = _command(tool, arguments, grant)
     workdir = resolve_cwd(grant, arguments.get('cwd', '.'))
     timeout = arguments.get('timeout_seconds', 120)
@@ -343,6 +391,10 @@ def _run_owned(tool, arguments, grant, cancel, record_id):
                 raise PermissionError('COMMAND_RECORD_COLLISION')
             if cancel.is_set():
                 raise InterruptedError('COMMAND_CANCELLED_BEFORE_RESUME')
+            # The child is still suspended; revocation or changed bounds since
+            # worker entry deny before any owner-account code can execute.
+            if authorize_command_call(tool, arguments, authority) != grant:
+                raise PermissionError('COMMAND_APPROVAL_CHANGED')
             _RECORDS[record_id] = dict(owner=grant.owner, pid=proc.pid, job=job, cancel=cancel)
             job.assign_and_resume(proc)
         for stream, target in ((proc.stdout, stdout), (proc.stderr, stderr)):
@@ -484,7 +536,11 @@ async def execute(tool, arguments):
         raise PermissionError('INVALID_COMMAND_RECORD_ID')
     cancel = threading.Event()
     # Shield the worker: cancelling asyncio.to_thread does NOT stop its thread.
-    worker = asyncio.create_task(asyncio.to_thread(_run_owned, tool, arguments, grant, cancel, record_id))
+    from app.profiles.administration import catalog_worker
+    worker = asyncio.create_task(catalog_worker(asyncio.to_thread(_run_owned, tool, arguments, grant, cancel, record_id, authority)))
+    # A repeatedly cancelled HTTP waiter may leave before cleanup finishes.
+    # The independent worker retains its lease and owns exception retrieval.
+    worker.add_done_callback(lambda task: None if task.cancelled() else task.exception())
     try:
         return await asyncio.shield(worker)
     except asyncio.CancelledError:

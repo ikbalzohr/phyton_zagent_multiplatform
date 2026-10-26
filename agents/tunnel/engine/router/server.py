@@ -24,6 +24,10 @@ from .artifacts import read_artifact
 from .config import load_tunnel_config
 from .execution_context import authority_arguments, new_context, policy_resources, reject_authority, scheduler_meta, validate_context
 from .files_policy import scope_for_files_tool, validate_files_tool_scope
+from .files_selection import files_tool_schema, selected_profile
+from .files_policy import FILES_TOOL_SCOPES
+from .profile_admin import (PROFILE_ADMIN_SCOPES, require_profile_management, catalog_context,
+                            validate_catalog, new_admin_context, revalidate_admin)
 from .identity import Placement, internal_token, verify_internal_token
 from .orchestration import Orchestrator
 from .registry import MCPRegistry
@@ -76,7 +80,9 @@ def _remember(context: dict[str, Any], bearer: str) -> None:
 
 
 async def _revalidate(context: dict[str, Any]) -> AuthContext:
-    context = validate_context(context, placement)
+    is_admin = context.get('public_tool') in PROFILE_ADMIN_SCOPES
+    if not is_admin:
+        context = validate_context(context, placement)
     entry = _credentials.get(context["request_id"])
     if entry is None or entry[1] <= time.time() or _auth_client is None:
         raise AuthorizationError("AUTHORIZATION_EXPIRED", 403)
@@ -86,10 +92,16 @@ async def _revalidate(context: dict[str, Any]) -> AuthContext:
             or auth.policy_revision != context["policy_revision"]):
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
     auth.require(context["required_scope"], context["public_tool"])
+    if is_admin:
+        revalidate_admin(context, auth, placement, current_authorizer)
     if context["public_tool"].startswith("files_"):
         validate_files_tool_scope(context["public_tool"], context["required_scope"], auth.scopes)
-    if context["effective_resources"] != policy_resources(
-            auth, placement, context["required_scope"], current_authorizer):
+    if not is_admin and context["effective_resources"] != policy_resources(
+            auth, placement, context["required_scope"], current_authorizer,
+            selected_profile_id=context["effective_resources"][0]["profile_id"]
+            if context["effective_resources"][0]['kind'] == 'files' else None,
+            catalog=await _files_catalog(auth, current_authorizer)
+            if context['public_tool'] in FILES_TOOL_SCOPES else None):
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
     try:
         policy = _policy(context["public_tool"])
@@ -98,6 +110,22 @@ async def _revalidate(context: dict[str, Any]) -> AuthContext:
     if policy["scope"] != context["required_scope"] or policy.get("enabled", True) is not True:
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
     return auth
+
+
+async def _files_catalog(auth, current_authorizer):
+    current_authorizer.current_grant(auth)
+    snapshot = await registry.profile_catalog_snapshot(catalog_context(auth, placement))
+    return validate_catalog(snapshot, auth, placement, current_authorizer)
+
+
+async def _request_context(auth, policy, name, arguments):
+    current_authorizer = authorizer()
+    if name in PROFILE_ADMIN_SCOPES:
+        return new_admin_context(auth, placement, current_authorizer, name, arguments)
+    catalog = await _files_catalog(auth, current_authorizer) if name in FILES_TOOL_SCOPES else None
+    return new_context(auth, placement, policy['scope'], name,
+                       resource_authorizer=current_authorizer,
+                       selected_profile_id=selected_profile(name, arguments), catalog=catalog)
 
 
 async def _executor(service: str, tool: str, arguments: dict[str, Any], ctx):
@@ -242,6 +270,7 @@ def _management_tools():
 def _visible(auth: AuthContext):
     tools = []
     for tool in [*registry.list_public_tools(), *_management_tools()]:
+        tool = files_tool_schema(tool)
         name = tool["name"]
         # Management tools have no upstream mapping (get_mapping would raise).
         mapping = registry.tool_index.get(name)
@@ -255,6 +284,8 @@ def _visible(auth: AuthContext):
         try:
             policy = _policy(name)
             auth.require(policy["scope"], name)
+            if name in PROFILE_ADMIN_SCOPES:
+                require_profile_management(auth, placement, authorizer(), name)
             if name.startswith("files_"):
                 validate_files_tool_scope(name, policy["scope"], auth.scopes)
             if policy.get("enabled", True) is True:
@@ -283,6 +314,7 @@ def _validate_tool(name: str, arguments: dict[str, Any], auth: AuthContext):
             selected = {key: value for key, value in selected.items() if key != "task_id"}
         reject_authority(selected)
     Draft202012Validator(tool["inputSchema"]).validate(arguments)
+    selected_profile(name, arguments)
 
 
 async def _owned_task(task_id: str, auth: AuthContext):
@@ -291,10 +323,26 @@ async def _owned_task(task_id: str, auth: AuthContext):
         raise KeyError("TASK_NOT_FOUND")
     context = json.loads(row.get("execution_context_json") or "{}")
     public_tool = context.get("public_tool", "")
-    scope = _policy(public_tool)["scope"]
+    policy = _policy(public_tool)
+    if policy.get('enabled', True) is not True:
+        raise AuthorizationError('TOOL_NOT_AUTHORIZED', 403)
+    scope = policy['scope']
     auth.require(scope, public_tool)
-    if public_tool.startswith("files_"):
+    if public_tool in PROFILE_ADMIN_SCOPES:
+        # Actor-bound receipts survive target deletion; no profile lookup.
+        require_profile_management(auth, placement, authorizer(), public_tool)
+        if (context.get('device_id') != placement.device_id
+                or context.get('installation_id') != placement.installation_id):
+            raise AuthorizationError('AUTHORIZATION_CHANGED', 403)
+    elif public_tool.startswith("files_"):
         validate_files_tool_scope(public_tool, scope, auth.scopes)
+        # Receipt/result ownership remains principal/workspace, but removed or
+        # revoked profile authorization must not expose old paths/results.
+        if context.get('effective_resources') != policy_resources(
+                auth, placement, scope, authorizer(),
+                selected_profile_id=context['effective_resources'][0]['profile_id'],
+                catalog=await _files_catalog(auth, authorizer())):
+            raise AuthorizationError('AUTHORIZATION_CHANGED', 403)
     return row
 
 
@@ -352,8 +400,7 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
         return _text(await getattr(workflow_runtime, name.removeprefix("zagent_workflow_"))(run_id, auth.owner))
     service, upstream = registry.get_mapping(name)
     if name in _FILES_IMMEDIATE_CONTROLS:
-        context = new_context(auth, placement, policy["scope"], name,
-                              resource_authorizer=authorizer())
+        context = await _request_context(auth, policy, name, arguments)
         _remember(context, bearer)
         try:
             control = orchestrator.context(service, upstream,
@@ -366,8 +413,7 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
         queued = orchestrator.journal.conn.execute("SELECT COUNT(*) FROM tasks WHERE session_id=? AND state IN ('accepted','queued','waiting_capacity','waiting_lock','running','cancelling')", (auth.owner,)).fetchone()[0]
     if queued >= 64 or orchestrator.queue_depth() >= 1024:
         raise AuthorizationError("OVERLOADED", 429)
-    context = new_context(auth, placement, policy["scope"], name,
-                          resource_authorizer=authorizer())
+    context = await _request_context(auth, policy, name, arguments)
     _remember(context, bearer)
     meta = scheduler_meta(context, auth.owner, key, arguments)
     if submit:
@@ -429,6 +475,9 @@ async def mcp(request: Request):
             name, arguments = params.get("name"), params.get("arguments", {})
             if not isinstance(name, str) or not isinstance(arguments, dict):
                 raise ValueError("INVALID_TOOL_ARGUMENTS")
+            target = arguments.get('tool_name') if name == 'zagent_task_submit' else name
+            if isinstance(target, str) and target in PROFILE_ADMIN_SCOPES and set(params) - {'name', 'arguments'}:
+                raise ValueError('PROFILE_ADMIN_PUBLIC_META_DENIED')
             result = await _dispatch(name, arguments, auth, request.headers.get("authorization", ""),
                                      request.headers.get("idempotency-key", ""))
             return rpc_result(req_id, result)

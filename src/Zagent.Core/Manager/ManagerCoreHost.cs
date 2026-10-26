@@ -202,7 +202,9 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                         options.FilesDefaultProfile),
                 DefaultProfileMode: "read-only",
                 DeviceId: machineIdentity.DeviceId,
-                DeviceName: machineIdentity.DeviceName);
+                DeviceName: machineIdentity.DeviceName,
+                InstallationId: machineIdentity.InstallationId,
+                CoreDataRoot: data);
 
             var webOptions = new WebIntegrationOptions(
                 NodeExecutable: webNode,

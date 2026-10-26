@@ -1,13 +1,15 @@
 """Canonical Files operation authority; names/configuration never confer authority.
 
-Only exact entries are publishable. Profile administration, cross-profile transfer
-and updates stay local-management-only, including their informational controls.
+Only exact entries are publishable. Direct owner administration has a separate
+exact capability catalog; legacy requests, cross-profile transfer and updates stay
+local-management-only, including their informational controls.
 Command tools require BOTH execute and write; files_execute is a mutating wrapper
 whose inner operation must additionally be authorized by the Files backend.
 """
 from __future__ import annotations
 from collections.abc import Collection
 from .access import AuthorizationError
+from .profile_admin import PROFILE_ADMIN_SCOPES
 
 
 FILES_TOOL_SCOPES = {
@@ -76,6 +78,8 @@ MANAGEMENT_ONLY_TOOLS = {
 
 def scope_for_files_tool(tool: str) -> str:
     """Resolve an exact canonical public name; never infer from a name prefix."""
+    if isinstance(tool, str) and tool in PROFILE_ADMIN_SCOPES:
+        return PROFILE_ADMIN_SCOPES[tool]
     if not isinstance(tool, str) or tool not in FILES_TOOL_SCOPES:
         raise AuthorizationError('FILES_TOOL_NOT_AUTHORIZED', 403)
     return FILES_TOOL_SCOPES[tool]

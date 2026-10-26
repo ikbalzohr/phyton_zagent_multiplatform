@@ -15,7 +15,9 @@ public sealed record FilesIntegrationOptions(
     string DefaultProfileRoot,
     string DefaultProfileMode = "read-write",
     string DeviceId = "",
-    string DeviceName = "");
+    string DeviceName = "",
+    string InstallationId = "",
+    string CoreDataRoot = "");
 
 public sealed record FilesHealthSnapshot(
     bool Ready,

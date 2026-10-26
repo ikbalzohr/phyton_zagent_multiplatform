@@ -23,9 +23,21 @@ class TrustedMetadata(dict):
 
 
 def owner_key(context):
-    encoded = json.dumps([context['principal_id'], context['workspace_id']],
-                         ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    return 'owner_v1_' + hashlib.sha256(encoded).hexdigest()
+    # Compatibility for direct private/local callers of this historical utility.
+    # Remote verify() always requires context_version + one resource BEFORE
+    # reaching here, so malformed remote authority cannot take this branch.
+    if 'context_version' not in context and 'effective_resources' not in context:
+        encoded = json.dumps([context['principal_id'], context['workspace_id']],
+                             ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        return 'owner_v1_' + hashlib.sha256(encoded).hexdigest()
+    resource = context['effective_resources'][0]
+    owner = [context['principal_id'], context['workspace_id'],
+             resource['resource_id'], resource['profile_id'],
+             context['device_id'], context['installation_id']]
+    if 'profile_generation' in resource:
+        owner.append(resource['profile_generation'])
+    encoded = json.dumps(owner, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    return 'owner_files_v2_' + hashlib.sha256(encoded).hexdigest()
 
 
 def request_meta(ctx):
@@ -93,6 +105,9 @@ def _operation(tool, arguments):
         if not isinstance(inner, str):
             raise PermissionError('UNKNOWN_FILES_OPERATION')
         inner = inner.removeprefix('files_')
+        if (not isinstance(arguments['arguments'], dict)
+                or {'profile', 'profile_id', 'active_profile', 'profiles'}.intersection(arguments['arguments'])):
+            raise PermissionError('CLIENT_AUTHORITY_NOT_ALLOWED')
         if inner not in NATIVE_READ | NATIVE_WRITE:
             if inner in {'copy_between_profiles', 'copy_batch_between_profiles'}:
                 raise PermissionError('CROSS_PROFILE_COPY_DISABLED')
@@ -124,6 +139,12 @@ def validate_profile(context, profile):
             or profile.get('enabled') is not True or profile.get('authorized_by_user') is not True
             or profile.get('mode') not in ('read-only', 'read-write')):
         raise PermissionError('FILES_PROFILE_NOT_APPROVED')
+    resource = context['effective_resources'][0]
+    from app.profiles.administration import profile_generation
+    from app.profiles import manager
+    state = manager.load_profiles()
+    if ('owner_management' in state or 'profile_generation' in resource) and resource.get('profile_generation') != profile_generation(profile, state):
+        raise PermissionError('PROFILE_GENERATION_MISMATCH')
     if context['effective_access'] == 'write' and profile['mode'] != 'read-write':
         raise PermissionError('WRITE_PROFILE_REQUIRED')
     for field in ('device_id', 'installation_id'):
@@ -194,7 +215,7 @@ def verify(meta, tool, arguments):
     profile_id = resource['profile_id']
     if context.get('profile_id', profile_id) != profile_id:
         raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
-    for field in ('profile_id', 'active_profile'):
+    for field in ('profile_id', 'active_profile', 'profile'):
         if arguments.get(field) is not None and arguments[field] != profile_id:
             raise PermissionError('PROFILE_NOT_IN_RESOURCE_SCOPE')
     if 'profiles' in arguments and arguments['profiles'] != [profile_id]:

@@ -1,0 +1,25 @@
+{
+  "fixture_only": true,
+  "tool": "files_profile_admin_create",
+  "arguments": {
+    "target_profile_id": "_-fixture",
+    "root": "D:\\Fixture\\é",
+    "mode": "read-write",
+    "enabled": true,
+    "description": "Uji é 🚀 <>&\nbaris",
+    "expected_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "idempotency_key": "fixture-key"
+  },
+  "canonical": "{\"description\":\"Uji é 🚀 <>&\\nbaris\",\"enabled\":true,\"expected_revision\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"idempotency_key\":\"fixture-key\",\"mode\":\"read-write\",\"root\":\"D:\\\\Fixture\\\\é\",\"target_profile_id\":\"_-fixture\"}",
+  "sha256": "2c58ea5b0940ca54d2c70f11d2f2025f99918a22825266aaa00ac13e992e6d47",
+  "admin_meta": "zagent.profile_admin_context",
+  "catalog_meta": "zagent.profile_catalog_context",
+  "actions": [
+    "list",
+    "get",
+    "create",
+    "update",
+    "delete",
+    "set_default"
+  ]
+}

@@ -31,6 +31,15 @@ public static class InternalManagementChannel
         };
     }
 
+    internal static ProfileAdministrationClient CreateProfileAdministrationClient(Uri endpoint)
+    {
+        ValidateProvisioning();
+        var p = _provisioning!;
+        var dataRoot = Path.GetFullPath(Path.Combine(p.FilesConfigRoot, "..", ".."));
+        return new ProfileAdministrationClient(endpoint, () => OwnerProfileAdministrationBinding.Load(
+            dataRoot, p.WorkspaceId, p.DeviceId, p.InstallationId));
+    }
+
     public static HttpClient CreateClient(TimeSpan timeout) => new(new ManagementHandler {
         InnerHandler = new SocketsHttpHandler { UseProxy = false, AllowAutoRedirect = false }
     }) { Timeout = timeout };
@@ -127,7 +136,7 @@ public static class InternalManagementChannel
     {
         var b = new StringBuilder("\"");
         foreach (var c in value) b.Append(c switch { '"' => "\\\"", '\\' => "\\\\", '\b' => "\\b", '\f' => "\\f", '\n' => "\\n", '\r' => "\\r", '\t' => "\\t",
-            < ' ' or > '~' => "\\u" + ((int)c).ToString("x4", CultureInfo.InvariantCulture), _ => c.ToString() });
+            < ' ' => "\\u" + ((int)c).ToString("x4", CultureInfo.InvariantCulture), _ => c.ToString() });
         return b.Append('"').ToString();
     }
 }

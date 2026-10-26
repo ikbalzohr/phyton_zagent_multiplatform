@@ -6,6 +6,7 @@ from typing import Any
 from .access import AuthContext, AuthorizationError, ResourceAuthorizer, digest
 from .identity import Placement
 from .files_policy import validate_files_tool_scope
+from .files_selection import profile_id
 
 AUTHORITY_FIELDS = frozenset({"_meta", "metadata", "session_id", "owner_session_id",
     "operator_alias", "principal_id", "workspace_id", "grant_id", "scopes", "policy_revision",
@@ -58,7 +59,8 @@ def _kind_from_scope(scope: Any) -> str:
 
 
 def policy_resources(auth: AuthContext, placement: Placement, scope: str,
-                     resource_authorizer: ResourceAuthorizer | None = None) -> list[dict[str, str]]:
+                     resource_authorizer: ResourceAuthorizer | None = None, *,
+                     selected_profile_id: str | None = None, catalog: dict | None = None) -> list[dict[str, str]]:
     kind = _kind_from_scope(scope)
     if kind != "files":
         return [{"resource_id": "installation:"+placement.installation_id, "kind": kind}]
@@ -73,12 +75,32 @@ def policy_resources(auth: AuthContext, placement: Placement, scope: str,
             or not all(isinstance(resource.get(k), str) and resource[k].strip()
                        and len(resource[k]) <= 256 for k in ("resource_id", "profile_id"))):
         raise AuthorizationError("FILES_RESOURCE_NOT_AUTHORIZED", 403)
-    return [{k: resource[k] for k in ("resource_id", "kind", "profile_id")}]
+    default = profile_id(resource['profile_id'])
+    allowed = resource.get('allowed_profile_ids', [default])
+    if catalog is not None:
+        default = profile_id(catalog['default_profile_id'])
+        allowed = catalog['allowed_profile_ids']
+    if (not isinstance(allowed, list) or not 1 <= len(allowed) <= (512 if catalog is not None else 128)
+            or any(profile_id(item) != item for item in allowed)
+            or len(set(allowed)) != len(allowed) or (catalog is None and default not in allowed)):
+        raise AuthorizationError("FILES_RESOURCE_NOT_AUTHORIZED", 403)
+    # The catalog filters disabled/deleted rows. A disabled default blocks
+    # omission, not an explicit authorized selection (including queued work).
+    if selected_profile_id is None and default not in allowed:
+        raise AuthorizationError("FILES_RESOURCE_NOT_AUTHORIZED", 403)
+    selected = default if selected_profile_id is None else profile_id(selected_profile_id)
+    if selected not in allowed:
+        raise AuthorizationError("FILES_RESOURCE_NOT_AUTHORIZED", 403)
+    result = {"resource_id": resource['resource_id'], "kind": "files", "profile_id": selected}
+    if catalog is not None:
+        result['profile_generation'] = catalog['generations'][selected]
+    return [result]
 
 
 def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
                 lifetime: float = 300, *,
-                resource_authorizer: ResourceAuthorizer | None = None) -> dict[str, Any]:
+                resource_authorizer: ResourceAuthorizer | None = None,
+                selected_profile_id: str | None = None, catalog: dict | None = None) -> dict[str, Any]:
     # Renewing a token does not extend this effect window. Long publish/ArcPy
     # operations need an explicitly provisioned lifetime, not silent extension.
     placement.validate()
@@ -86,7 +108,8 @@ def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
     effective_access = "write"
     if _kind_from_scope(scope) == "files" or tool.startswith("files_"):
         effective_access = validate_files_tool_scope(tool, scope, auth.scopes)
-    resources = policy_resources(auth, placement, scope, resource_authorizer)
+    resources = policy_resources(auth, placement, scope, resource_authorizer,
+                                 selected_profile_id=selected_profile_id, catalog=catalog)
     return {"context_version": 1, "principal_id": auth.principal_id,
         "workspace_id": auth.workspace_id, "device_id": placement.device_id,
         "installation_id": placement.installation_id,

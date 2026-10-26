@@ -8,7 +8,11 @@ const visualMetadata = (value) => value ? { source: value.source, label: value.l
 async function request(path, options = {}) {
   const response = await fetch(path.startsWith('/') ? path : base + path, { credentials: 'same-origin', cache: 'no-store', ...options });
   if (response.status === 401) { location.assign('/Login'); throw new Error('Session expired'); }
-  if (!response.ok) throw new Error(`Request unavailable (${response.status}); no success is assumed.`);
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    const code = typeof failure?.code === 'string' && /^[A-Z0-9_]{1,80}$/.test(failure.code) ? ` ${failure.code}` : '';
+    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.`); error.status = response.status; throw error;
+  }
   return response.status === 204 ? null : response.json();
 }
 async function mutate(path, body, method = 'POST') {
@@ -19,7 +23,7 @@ async function mutate(path, body, method = 'POST') {
 function notice(text, error = false) { $('notice').textContent = text; $('notice').classList.toggle('error', error); }
 function button(label, action, danger = false) {
   const b = node('button', label); b.type = 'button'; if (danger) b.className = 'danger';
-  b.addEventListener('click', async () => { b.disabled = true; try { await action(); } catch (e) { notice(e.message, true); } finally { b.disabled = false; } }); return b;
+  b.addEventListener('click', async () => { b.disabled = true; try { await action(); } catch (e) { if (!e.profileUncertain) notice(e.message, true); } finally { b.disabled = false; } }); return b;
 }
 function table(target, rows, fields, actions) {
   target.replaceChildren();
@@ -47,6 +51,47 @@ async function command(path, body, method) {
   }
   notice('Operation still pending. Do not replay it; inspect its operation ID later.', true);
 }
+let pendingProfileCommand;
+async function profileCommand(path, body, method = 'POST') {
+  if (pendingProfileCommand) {
+    notice('Resolve the previous uncertain profile command before submitting another.', true);
+    $('notice').append(button('Retry exact command', sendProfileCommand));
+    const error = new Error('Previous profile outcome unresolved.'); error.profileUncertain = true; throw error;
+  }
+  pendingProfileCommand = { path, body: JSON.stringify(body), method, key: crypto.randomUUID(), revision: profileRevision };
+  return sendProfileCommand();
+}
+async function sendProfileCommand() {
+  const cmd = pendingProfileCommand;
+  try {
+    if (!csrf) csrf = (await request('csrf')).token;
+    const result = await request(cmd.path, { method: cmd.method, headers: {
+      'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'Idempotency-Key': cmd.key, 'If-Match': cmd.revision
+    }, body: cmd.body });
+    if (result.status !== 'committed' || result.access_sync !== 'committed') throw new Error('No committed backend outcome.');
+    pendingProfileCommand = null; notice(`Profile committed · access synchronized · revision ${result.revision}`); await refresh();
+  } catch (error) {
+    if ([400,403,409,428,429].includes(error.status)) { pendingProfileCommand = null; await refresh(); throw error; }
+    notice(error.message + ' Outcome not assumed. Same actor/key/payload is retained.', true);
+    $('notice').append(button('Retry exact command', sendProfileCommand));
+    error.profileUncertain = true;
+    throw error;
+  }
+}
+function profileEditor(row, target) {
+  if (target.querySelector('form')) { notice('Resolve the current edit before starting another.', true); return; }
+  const form = node('form'); form.className = 'form-row';
+  const root = node('input'); root.value = row.root; root.required = true;
+  const mode = node('select'); ['read-only','read-write'].forEach(value => { const option = node('option',value); option.value = value; mode.append(option); }); mode.value = row.mode;
+  const enabled = node('input'); enabled.type = 'checkbox'; enabled.checked = row.enabled;
+  const description = node('input'); description.value = row.description || ''; description.maxLength = 512;
+  [['Root',root],['Mode',mode],['Enabled',enabled],['Description',description]].forEach(([text,input]) => { const label = node('label',text); label.append(input); form.append(label); });
+  form.append(button('Save profile', async () => { await profileCommand('workspaces/profiles/' + encodeURIComponent(row.name),
+    { changes: { root: root.value, mode: mode.value, enabled: enabled.checked, description: description.value } }, 'PUT'); form.remove(); }));
+  form.append(button('Cancel edit', () => form.remove()));
+  form.addEventListener('submit', e => e.preventDefault());
+  return form;
+}
 const data = async path => (await request(path)).data;
 async function render(current, stamp) {
   // Fetch everything needed for a page before touching DOM; old-page requests cannot overwrite a newer page.
@@ -63,10 +108,12 @@ async function render(current, stamp) {
       profileRevision = d.revision;
       const target = $('workspaces-content'); target.replaceChildren(node('p', `Workspace: ${d.workspaceId} · default profile: ${d.defaultProfile} · unavailable dependencies: ${display(d.unavailableDependencies)}`));
       const profiles = node('div'); target.append(profiles);
-      table(profiles, d.profiles, ['name','root','mode','enabled','authorizedByUser'], row => [
-        button('Change mode', async () => { const mode = prompt('Access mode: read-only or read-write', row.mode); if (!mode || !['read-only','read-write'].includes(mode)) return;
-          await command('workspaces/profiles/' + encodeURIComponent(row.name), { name: row.name, mode }, 'PUT'); }),
-        button('Remove', async () => { if (confirm(`Remove profile ${row.name}? Existing safety rules still apply.`)) await command('workspaces/profiles/' + encodeURIComponent(row.name), undefined, 'DELETE'); }, true)]);
+      table(profiles, d.profiles, ['name','root','mode','enabled','description','authorized_by_user'], row => [
+        button('Edit', () => { const editor = profileEditor(row, target); if (!editor) return; target.append(editor); editor.querySelector('input').focus(); }),
+        button('Set default', () => profileCommand('workspaces/profiles/' + encodeURIComponent(row.name) + '/default', {})),
+        button('Remove', async () => { let replacement_default_id;
+          if (row.name === d.defaultProfile) { replacement_default_id = prompt('Exact replacement default profile ID (required)', ''); if (!replacement_default_id) return; }
+          await profileCommand('workspaces/profiles/' + encodeURIComponent(row.name), replacement_default_id ? { replacement_default_id } : {}, 'DELETE'); }, true)]);
       target.append(node('h2','Action approvals')); const approvals = node('div'); target.append(approvals);
       table(approvals, d.pendingApprovals, ['requestId','kind','source','status','summary'], row => row.source === 'Files' && row.canResolveLocally ?
         ['approve','deny'].map(action => button(action, async () => { if (confirm(`${action} this exact Files request?`)) await command('approvals/' + encodeURIComponent(row.requestId) + '/decision', { requestId: row.requestId, action, source: 'Files' }); })) : [node('span','Use the owning agent consent UI; no dashboard grant.')]);
@@ -80,6 +127,7 @@ async function render(current, stamp) {
 }
 async function refresh() {
   if (busy || document.hidden) return;
+  if (page === 'workspaces' && $('workspaces-content').querySelector('form')) { clearTimeout(timer); timer = setTimeout(refresh, 3000); return; }
   busy = true; const current = page, stamp = generation;
   try { await render(current, stamp); if (stamp === generation) { $('freshness').textContent = `Last successful response: ${new Date().toLocaleTimeString()} · bounded polling · installation scope`; $('freshness').classList.remove('offline'); } }
   catch (e) { if (stamp === generation) { $('freshness').textContent = 'OFFLINE / UNAVAILABLE — previous data is stale. ' + e.message; $('freshness').classList.add('offline'); } }
@@ -97,7 +145,10 @@ document.querySelectorAll('[data-runtime]').forEach(b => b.addEventListener('cli
 document.querySelectorAll('[data-integration]').forEach(b => b.addEventListener('click', () => command('connections/actions', { action: b.dataset.integration }).catch(e => notice(e.message, true))));
 $('shutdown').addEventListener('click', async () => { if (prompt('Stops agents and the dashboard. Type STOP CORE to confirm.') !== 'STOP CORE') return; try { await command('runtime/shutdown', { confirmation: 'STOP CORE' }); clearTimeout(timer); } catch (e) { notice('Shutdown response unavailable. Do not assume success: ' + e.message, true); } });
 $('logout').addEventListener('click', async () => { try { await mutate('/auth/logout', {}); location.assign('/Login'); } catch (e) { notice(e.message, true); } });
-$('profile-form').addEventListener('submit', async e => { e.preventDefault(); try { await command('workspaces/profiles', Object.fromEntries(new FormData(e.target))); e.target.reset(); } catch (err) { notice(err.message, true); } });
+$('profile-form').addEventListener('submit', async e => { e.preventDefault(); try {
+  const values = Object.fromEntries(new FormData(e.target)); values.enabled = e.target.elements.enabled.checked;
+  await profileCommand('workspaces/profiles', values); e.target.reset();
+} catch (err) { if (!err.profileUncertain) notice(err.message, true); } });
 $('workflow-form').addEventListener('submit', async e => { e.preventDefault(); const values = Object.fromEntries(new FormData(e.target));
   try { const path = values.runId ? 'workflows/' + encodeURIComponent(values.runId) + '/evidence' : 'workflows'; const result = await request(path + '?principalId=' + encodeURIComponent(values.principalId)); record($('workflows-content'), result); }
   catch (err) { notice(err.message, true); } });

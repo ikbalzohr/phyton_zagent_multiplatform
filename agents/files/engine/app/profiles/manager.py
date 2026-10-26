@@ -71,11 +71,16 @@ def _validate_name(name: str) -> str:
 
 def load_profiles() -> Dict[str, Any]:
     with _LOCK:
-        return _read_json(PROFILES_FILE, {"schema_version": "2.0", "active_profile": None, "profiles": []})
+        if PROFILES_FILE.exists():
+            from app.profiles.administration import _load
+            return _load()
+        return {"schema_version": "2.0", "active_profile": None, "profiles": []}
 
 
 def save_profiles(data: Dict[str, Any]) -> None:
     with _LOCK:
+        if 'owner_management' in load_profiles() or 'owner_management' in data:
+            raise PermissionError('MANAGED_PROFILE_SINGLE_WRITER_REQUIRED')
         _write_json_atomic(PROFILES_FILE, data)
 
 
@@ -117,6 +122,8 @@ def list_requests(status: str | None = None) -> List[Dict[str, Any]]:
 
 def _new_request(kind: str, payload: Dict[str, Any], requested_by: str = "chatgpt") -> Dict[str, Any]:
     with _LOCK:
+        if 'owner_management' in load_profiles():
+            raise PermissionError('MANAGED_PROFILE_SINGLE_WRITER_REQUIRED')
         data = load_requests()
         request = {
             "request_id": "PRF-" + uuid.uuid4().hex[:12].upper(),
