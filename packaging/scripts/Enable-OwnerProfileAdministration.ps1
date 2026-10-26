@@ -56,7 +56,9 @@ Assert-SnapshotUnchanged $candidate $next
 $rechecked = New-ProfileAdministrationPlan $before $OwnerPrincipal $WorkspaceId $DeviceId $InstallationId
 if ([Convert]::ToBase64String($next) -cne [Convert]::ToBase64String($rechecked)) { throw 'Capability plan changed before publish.' }
 Assert-ProfileAdminCoreStopped
-[IO.File]::Replace($candidate,$target,$null,$false)
+# PowerShell binds $null to an empty string for this .NET string parameter.
+# NullString passes a real null; the verified independent backup already exists.
+[IO.File]::Replace($candidate,$target,[System.Management.Automation.Language.NullString]::Value,$false)
 Assert-MigrationPrivatePath $target
 Assert-SnapshotUnchanged $target $next
 Assert-SnapshotUnchanged $backup $before
