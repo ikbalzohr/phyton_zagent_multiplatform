@@ -358,4 +358,3 @@ def test_task_submit_uses_augmented_schema_and_journals_original_arguments(appro
     assert captured[0][0] == arguments
     assert captured[0][1]['execution_context']['effective_resources'][0]['profile_id'] == 'otherApproved'
     assert captured[0][1]['session_id'] == a.auth.owner
-
