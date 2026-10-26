@@ -2,6 +2,7 @@
 const base = '/api/management/v1/';
 // Match only the static administrator hint; never display upstream exception/title/detail text.
 const profileDependencyHint = 'Use authenticated local-owner diagnostics with this request ID to check owner profile authorization, private management connectivity, and catalog validation. This response does not identify the failed check or prove Files is stopped. Do not bypass authorization. For uncertain mutations, retain the same payload and idempotency key.';
+const profileBindingReasons = new Set(['BINDING_IDENTIFIERS', 'CAPABILITY_ACTIONS', 'CAPABILITY_AMBIGUOUS', 'CAPABILITY_DEVICE', 'CAPABILITY_INSTALLATION', 'CAPABILITY_MISSING', 'CAPABILITY_REVISION', 'CAPABILITY_SCHEMA', 'CAPABILITY_VERSION', 'CAPABILITY_WORKSPACE', 'CONFIG_ACL', 'CONFIG_CHANGED', 'CONFIG_DUPLICATE_KEY', 'CONFIG_IDENTITY', 'CONFIG_JSON', 'CONFIG_PATH', 'CONFIG_PLATFORM', 'CONFIG_PRIVATE_PATH', 'CONFIG_READ', 'CONFIG_REPARSE', 'CONFIG_SCHEMA', 'CONFIG_SIZE', 'GRANTS_SCHEMA', 'GRANT_EXPIRY', 'GRANT_REVOKED', 'GRANT_SCOPES', 'GRANT_TOOLS', 'RESOURCE_DEFAULT', 'RESOURCE_DEVICE', 'RESOURCE_ID', 'RESOURCE_INSTALLATION', 'RESOURCE_KIND', 'RESOURCE_MEMBERSHIP', 'RESOURCE_PROFILE_ID', 'RESOURCE_REVOKED', 'RESOURCE_SCHEMA', 'TOOL_POLICY', 'WORKSPACE_MISMATCH', 'UNKNOWN']);
 let csrf, profileRevision, page = '', generation = 0, timer, busy = false;
 const $ = id => document.getElementById(id);
 const node = (tag, text) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); return n; };
@@ -17,7 +18,8 @@ async function request(path, options = {}) {
     const hint = failure?.hint === profileDependencyHint ? ` ${profileDependencyHint}` : '';
     // Administrator profile envelope only; a boundary is not a diagnosis or health claim.
     const stage = hint && ['OWNER_BINDING', 'PRIVATE_REQUEST', 'RESPONSE_VALIDATION', 'UNKNOWN'].includes(failure?.stage) ? ` Failure stage: ${failure.stage}.` : '';
-    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.${requestId}${stage}${hint}`); error.status = response.status; throw error;
+    const reason = hint && failure?.stage === 'OWNER_BINDING' && profileBindingReasons.has(failure?.reason) ? ` Failure reason: ${failure.reason}.` : '';
+    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.${requestId}${stage}${reason}${hint}`); error.status = response.status; throw error;
   }
   return response.status === 204 ? null : response.json();
 }

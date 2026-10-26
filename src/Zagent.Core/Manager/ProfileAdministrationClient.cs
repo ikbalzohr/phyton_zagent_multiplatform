@@ -145,62 +145,139 @@ public sealed record OwnerProfileAdministrationBinding(string PrincipalId, strin
 {
     public static OwnerProfileAdministrationBinding Load(string dataRoot, string workspaceId, string deviceId, string installationId)
     {
-        var path = Path.Combine(dataRoot, "tunnel", "config", "tunnel.json");
-        ValidatePrivateConfig(dataRoot, path);
-        using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (file.Length is < 2 or > 1048576) throw new InvalidDataException("Profile capability configuration size invalid.");
-        var bytes = new byte[(int)file.Length]; file.ReadExactly(bytes);
-        if (file.ReadByte() != -1) throw new InvalidDataException("Profile capability configuration changed.");
-        using var doc = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });
-        RejectDuplicates(doc.RootElement);
-        return Parse(doc.RootElement, workspaceId, deviceId, installationId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var reason = "CONFIG_PATH";
+        try
+        {
+            var path = Path.Combine(dataRoot, "tunnel", "config", "tunnel.json");
+            reason = "CONFIG_PRIVATE_PATH";
+            ValidatePrivateConfig(dataRoot, path);
+            reason = "CONFIG_READ";
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            reason = "CONFIG_SIZE";
+            if (file.Length is < 2 or > 1048576) throw new InvalidDataException("Profile capability configuration size invalid.");
+            reason = "CONFIG_READ";
+            var bytes = new byte[(int)file.Length]; file.ReadExactly(bytes);
+            reason = "CONFIG_CHANGED";
+            if (file.ReadByte() != -1) throw new InvalidDataException("Profile capability configuration changed.");
+            reason = "CONFIG_JSON";
+            using var doc = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 32 });
+            reason = "CONFIG_DUPLICATE_KEY";
+            RejectDuplicates(doc.RootElement);
+            return Parse(doc.RootElement, workspaceId, deviceId, installationId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        }
+        catch (System.Exception ex)
+        {
+            // Preserve a more precise gate supplied by Parse or the ACL validator.
+            if (!ex.Data.Contains("ZagentProfileReason")) ex.Data["ZagentProfileReason"] = reason;
+            throw;
+        }
     }
     public static OwnerProfileAdministrationBinding Parse(JsonElement config, string workspaceId, string deviceId, string installationId, long now)
     {
-        RejectDuplicates(config);
-        var rs = config.GetProperty("resource_server");
-        if (rs.GetProperty("workspace_id").GetString() != workspaceId) throw new InvalidDataException("Owner workspace mismatch.");
-        var owners = rs.GetProperty("grants").EnumerateObject().Where(g =>
-            g.Value.TryGetProperty("profile_management", out var c) && c.ValueKind == JsonValueKind.Object &&
-            c.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.True).ToArray();
-        if (owners.Length != 1) throw new InvalidDataException("Exactly one explicit enabled owner capability mapping required.");
-        var owner = owners[0]; var grant = owner.Value; var cap = grant.GetProperty("profile_management");
-        ExactKeys(cap, "version", "enabled", "workspace_id", "device_id", "installation_id", "actions");
-        if (!cap.GetProperty("version").TryGetInt32(out var version) || version != 1 ||
-            cap.GetProperty("workspace_id").GetString() != workspaceId || cap.GetProperty("device_id").GetString() != deviceId ||
-            cap.GetProperty("installation_id").GetString() != installationId ||
-            grant.GetProperty("revoked").ValueKind != JsonValueKind.False ||
-            !grant.GetProperty("expires_at").TryGetInt64(out var expiry) || expiry <= now)
-            throw new InvalidDataException("Inactive or mismatched owner capability.");
-        foreach (var value in new[] { owner.Name, workspaceId, deviceId, installationId })
-            if (value.Length is < 1 or > 256 || string.IsNullOrWhiteSpace(value)) throw new InvalidDataException("Invalid owner binding.");
-        var actions = Strings(cap.GetProperty("actions"), 6);
-        if (!actions.Order(StringComparer.Ordinal).SequenceEqual(ProfileAdministrationClient.Actions.Order(StringComparer.Ordinal)))
-            throw new InvalidDataException("Exact owner action set required.");
-        var scopes = Strings(grant.GetProperty("scopes"), 128); var tools = Strings(grant.GetProperty("tools"), 512);
-        foreach (var action in ProfileAdministrationClient.Actions) {
-            var tool = "files_profile_admin_" + action; var scope = action is "list" or "get" ? "files:read" : "files:write";
-            var policy = config.GetProperty("tool_policy").GetProperty(tool);
-            if (!scopes.Contains(scope) || !tools.Contains(tool) || policy.GetProperty("scope").GetString() != scope ||
-                (policy.TryGetProperty("enabled", out var enabled) && enabled.ValueKind != JsonValueKind.True))
-                throw new InvalidDataException("Exact enabled profile management scope/tool policy required.");
+        // Code-only diagnostic labels are set at the failing gate, never derived from JSON,
+        // exception messages, identities or paths. Keep the original exception and stack.
+        var reason = "CONFIG_DUPLICATE_KEY";
+        try
+        {
+            RejectDuplicates(config);
+            reason = "CONFIG_SCHEMA";
+            var rs = config.GetProperty("resource_server");
+            reason = "WORKSPACE_MISMATCH";
+            if (rs.GetProperty("workspace_id").GetString() != workspaceId) throw new InvalidDataException("Owner workspace mismatch.");
+            reason = "GRANTS_SCHEMA";
+            var owners = rs.GetProperty("grants").EnumerateObject().Where(g =>
+                g.Value.TryGetProperty("profile_management", out var c) && c.ValueKind == JsonValueKind.Object &&
+                c.TryGetProperty("enabled", out var e) && e.ValueKind == JsonValueKind.True).ToArray();
+            if (owners.Length != 1)
+            {
+                // MISSING means no explicit enabled mapping (including an explicitly disabled capability).
+                reason = owners.Length == 0 ? "CAPABILITY_MISSING" : "CAPABILITY_AMBIGUOUS";
+                throw new InvalidDataException("Exactly one explicit enabled owner capability mapping required.");
+            }
+            var owner = owners[0]; var grant = owner.Value; var cap = grant.GetProperty("profile_management");
+            reason = "CAPABILITY_SCHEMA";
+            ExactKeys(cap, "version", "enabled", "workspace_id", "device_id", "installation_id", "actions");
+            reason = "CAPABILITY_VERSION";
+            if (!cap.GetProperty("version").TryGetInt32(out var version) || version != 1)
+                throw new InvalidDataException("Inactive or mismatched owner capability.");
+            reason = "CAPABILITY_WORKSPACE";
+            if (cap.GetProperty("workspace_id").GetString() != workspaceId)
+                throw new InvalidDataException("Inactive or mismatched owner capability.");
+            reason = "CAPABILITY_DEVICE";
+            if (cap.GetProperty("device_id").GetString() != deviceId)
+                throw new InvalidDataException("Inactive or mismatched owner capability.");
+            reason = "CAPABILITY_INSTALLATION";
+            if (cap.GetProperty("installation_id").GetString() != installationId)
+                throw new InvalidDataException("Inactive or mismatched owner capability.");
+            reason = "GRANT_REVOKED";
+            if (grant.GetProperty("revoked").ValueKind != JsonValueKind.False)
+                throw new InvalidDataException("Inactive or mismatched owner capability.");
+            reason = "GRANT_EXPIRY";
+            if (!grant.GetProperty("expires_at").TryGetInt64(out var expiry) || expiry <= now)
+                throw new InvalidDataException("Inactive or mismatched owner capability.");
+            reason = "BINDING_IDENTIFIERS";
+            foreach (var value in new[] { owner.Name, workspaceId, deviceId, installationId })
+                if (value.Length is < 1 or > 256 || string.IsNullOrWhiteSpace(value)) throw new InvalidDataException("Invalid owner binding.");
+            reason = "CAPABILITY_ACTIONS";
+            var actions = Strings(cap.GetProperty("actions"), 6);
+            if (!actions.Order(StringComparer.Ordinal).SequenceEqual(ProfileAdministrationClient.Actions.Order(StringComparer.Ordinal)))
+                throw new InvalidDataException("Exact owner action set required.");
+            reason = "GRANT_SCOPES";
+            var scopes = Strings(grant.GetProperty("scopes"), 128);
+            reason = "GRANT_TOOLS";
+            var tools = Strings(grant.GetProperty("tools"), 512);
+            foreach (var action in ProfileAdministrationClient.Actions)
+            {
+                var tool = "files_profile_admin_" + action; var scope = action is "list" or "get" ? "files:read" : "files:write";
+                // Retain the existing validation order, including policy lookup before membership checks.
+                reason = "TOOL_POLICY";
+                var policy = config.GetProperty("tool_policy").GetProperty(tool);
+                reason = "GRANT_SCOPES";
+                if (!scopes.Contains(scope)) throw new InvalidDataException("Exact enabled profile management scope/tool policy required.");
+                reason = "GRANT_TOOLS";
+                if (!tools.Contains(tool)) throw new InvalidDataException("Exact enabled profile management scope/tool policy required.");
+                reason = "TOOL_POLICY";
+                if (policy.GetProperty("scope").GetString() != scope ||
+                    (policy.TryGetProperty("enabled", out var enabled) && enabled.ValueKind != JsonValueKind.True))
+                    throw new InvalidDataException("Exact enabled profile management scope/tool policy required.");
+            }
+            reason = "RESOURCE_SCHEMA";
+            var resource = grant.GetProperty("files_resource");
+            reason = "RESOURCE_KIND";
+            if (resource.GetProperty("kind").GetString() != "files") throw new InvalidDataException("Owner resource placement mismatch.");
+            reason = "RESOURCE_REVOKED";
+            if (resource.GetProperty("revoked").ValueKind != JsonValueKind.False) throw new InvalidDataException("Owner resource placement mismatch.");
+            reason = "RESOURCE_DEVICE";
+            if (resource.GetProperty("device_id").GetString() != deviceId) throw new InvalidDataException("Owner resource placement mismatch.");
+            reason = "RESOURCE_INSTALLATION";
+            if (resource.GetProperty("installation_id").GetString() != installationId) throw new InvalidDataException("Owner resource placement mismatch.");
+            reason = "RESOURCE_DEFAULT";
+            var defaultId = resource.GetProperty("profile_id").GetString() ?? throw new InvalidDataException("Missing owner default profile.");
+            reason = "RESOURCE_MEMBERSHIP";
+            var allowed = resource.TryGetProperty("allowed_profile_ids", out var ids) ? Strings(ids, 128) : new[] { defaultId };
+            if (!allowed.Contains(defaultId)) throw new InvalidDataException("Owner default outside membership.");
+            reason = "RESOURCE_PROFILE_ID";
+            foreach (var id in allowed) if (id.Length is < 1 or > 256 || !id.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-'))
+                throw new InvalidDataException("Invalid profile identifier.");
+            reason = "RESOURCE_ID";
+            var resourceId = resource.GetProperty("resource_id").GetString();
+            if (resourceId is null || resourceId.Length is < 1 or > 256) throw new InvalidDataException("Invalid owner resource.");
+            reason = "CAPABILITY_REVISION";
+            var capNode = JsonNode.Parse(cap.GetRawText())!;
+            var revision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(InternalManagementChannel.Canonicalize(capNode)))).ToLowerInvariant();
+            return new(owner.Name, workspaceId, deviceId, installationId, revision,
+                new JsonObject
+                {
+                    ["resource_id"] = resourceId,
+                    ["default_profile_id"] = defaultId,
+                    ["allowed_profile_ids"] = new JsonArray(allowed.Select(x => (JsonNode?)JsonValue.Create(x)).ToArray())
+                }, expiry);
         }
-        var resource = grant.GetProperty("files_resource");
-        if (resource.GetProperty("kind").GetString() != "files" || resource.GetProperty("revoked").ValueKind != JsonValueKind.False ||
-            resource.GetProperty("device_id").GetString() != deviceId || resource.GetProperty("installation_id").GetString() != installationId)
-            throw new InvalidDataException("Owner resource placement mismatch.");
-        var defaultId = resource.GetProperty("profile_id").GetString() ?? throw new InvalidDataException("Missing owner default profile.");
-        var allowed = resource.TryGetProperty("allowed_profile_ids", out var ids) ? Strings(ids, 128) : new[] { defaultId };
-        if (!allowed.Contains(defaultId)) throw new InvalidDataException("Owner default outside membership.");
-        foreach (var id in allowed) if (id.Length is < 1 or > 256 || !id.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-'))
-            throw new InvalidDataException("Invalid profile identifier.");
-        var resourceId = resource.GetProperty("resource_id").GetString();
-        if (resourceId is null || resourceId.Length is < 1 or > 256) throw new InvalidDataException("Invalid owner resource.");
-        var capNode = JsonNode.Parse(cap.GetRawText())!;
-        var revision = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(InternalManagementChannel.Canonicalize(capNode)))).ToLowerInvariant();
-        return new(owner.Name, workspaceId, deviceId, installationId, revision,
-            new JsonObject { ["resource_id"] = resourceId, ["default_profile_id"] = defaultId,
-                ["allowed_profile_ids"] = new JsonArray(allowed.Select(x => (JsonNode?)JsonValue.Create(x)).ToArray()) }, expiry);
+        catch (System.Exception ex)
+        {
+            ex.Data["ZagentProfileReason"] = reason;
+            throw;
+        }
     }
     private static string[] Strings(JsonElement array, int max)
     {
@@ -223,24 +300,40 @@ public sealed record OwnerProfileAdministrationBinding(string PrincipalId, strin
     }
     private static void ValidatePrivateConfig(string dataRoot, string path)
     {
-        // Mirror the platform guard used by InternalSecretStore.ValidatePrivatePath so the
-        // analyzer can prove this Windows-only ACL walk is unreachable on other platforms.
-        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Owner ACL validation requires Windows.");
-        InternalSecretStore.ValidatePrivatePath(dataRoot, directory: true);
-        var owner = WindowsIdentity.GetCurrent().User ?? throw new InvalidDataException();
-        for (var walk = path; !string.Equals(walk, dataRoot, StringComparison.OrdinalIgnoreCase); walk = Path.GetDirectoryName(walk) ?? throw new InvalidDataException()) {
-            // Configs produced by Core may inherit the protected owner's ACL.
-            for (var ancestor = walk; ancestor is not null; ancestor = Path.GetDirectoryName(ancestor))
-                if ((File.GetAttributes(ancestor) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Reparse private config.");
-            var directory = Directory.Exists(walk);
-            System.Security.AccessControl.FileSystemSecurity acl = directory
-                ? new DirectoryInfo(walk).GetAccessControl() : new FileInfo(walk).GetAccessControl();
-            var rules = acl.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier)).Cast<System.Security.AccessControl.FileSystemAccessRule>().ToArray();
-            var inheritance = directory ? System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit : System.Security.AccessControl.InheritanceFlags.None;
-            if (!owner.Equals(acl.GetOwner(typeof(System.Security.Principal.SecurityIdentifier))) || rules.Length != 1 ||
-                !owner.Equals(rules[0].IdentityReference) || rules[0].AccessControlType != System.Security.AccessControl.AccessControlType.Allow ||
-                rules[0].FileSystemRights != System.Security.AccessControl.FileSystemRights.FullControl || rules[0].InheritanceFlags != inheritance ||
-                rules[0].PropagationFlags != System.Security.AccessControl.PropagationFlags.None) throw new InvalidDataException("Private owner ACL required.");
+        var reason = "CONFIG_PLATFORM";
+        try
+        {
+            // Mirror the platform guard used by InternalSecretStore.ValidatePrivatePath so the
+            // analyzer can prove this Windows-only ACL walk is unreachable on other platforms.
+            if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Owner ACL validation requires Windows.");
+            reason = "CONFIG_PRIVATE_PATH";
+            InternalSecretStore.ValidatePrivatePath(dataRoot, directory: true);
+            reason = "CONFIG_IDENTITY";
+            var owner = WindowsIdentity.GetCurrent().User ?? throw new InvalidDataException();
+            reason = "CONFIG_PATH";
+            for (var walk = path; !string.Equals(walk, dataRoot, StringComparison.OrdinalIgnoreCase); walk = Path.GetDirectoryName(walk) ?? throw new InvalidDataException())
+            {
+                // Configs produced by Core may inherit the protected owner's ACL.
+                reason = "CONFIG_REPARSE";
+                for (var ancestor = walk; ancestor is not null; ancestor = Path.GetDirectoryName(ancestor))
+                    if ((File.GetAttributes(ancestor) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Reparse private config.");
+                reason = "CONFIG_ACL";
+                var directory = Directory.Exists(walk);
+                System.Security.AccessControl.FileSystemSecurity acl = directory
+                    ? new DirectoryInfo(walk).GetAccessControl() : new FileInfo(walk).GetAccessControl();
+                var rules = acl.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier)).Cast<System.Security.AccessControl.FileSystemAccessRule>().ToArray();
+                var inheritance = directory ? System.Security.AccessControl.InheritanceFlags.ContainerInherit | System.Security.AccessControl.InheritanceFlags.ObjectInherit : System.Security.AccessControl.InheritanceFlags.None;
+                if (!owner.Equals(acl.GetOwner(typeof(System.Security.Principal.SecurityIdentifier))) || rules.Length != 1 ||
+                    !owner.Equals(rules[0].IdentityReference) || rules[0].AccessControlType != System.Security.AccessControl.AccessControlType.Allow ||
+                    rules[0].FileSystemRights != System.Security.AccessControl.FileSystemRights.FullControl || rules[0].InheritanceFlags != inheritance ||
+                    rules[0].PropagationFlags != System.Security.AccessControl.PropagationFlags.None) throw new InvalidDataException("Private owner ACL required.");
+                reason = "CONFIG_PATH";
+            }
+        }
+        catch (System.Exception ex)
+        {
+            ex.Data["ZagentProfileReason"] = reason;
+            throw;
         }
     }
 }

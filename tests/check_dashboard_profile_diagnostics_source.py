@@ -18,7 +18,7 @@ class DashboardProfileDiagnosticsSource(unittest.TestCase):
         catch_filter = text.split('private static bool DependencyFailure(Exception ex) =>', 1)[1].split(';', 1)[0]
         # InvalidDataException derives from SystemException, NOT IOException.
         self.assertRegex(catch_filter, r'\bInvalidDataException\b')
-        self.assertEqual(text.count('DependencyStage(ex)'), 3)
+        self.assertEqual(text.count('DependencyStage(ex)'), 4)
         stage_helper = text.split('private static string DependencyStage(Exception ex)', 1)[1].split('private static bool DependencyFailure', 1)[0]
         self.assertIn('ex.Data["ZagentProfileStage"] as string', stage_helper)
         self.assertIn('"OWNER_BINDING" or "PRIVATE_REQUEST" or "RESPONSE_VALIDATION" => stage', stage_helper)
@@ -32,7 +32,7 @@ class DashboardProfileDiagnosticsSource(unittest.TestCase):
     def test_problem_extensions_are_static_and_preserve_route_semantics(self):
         text = CS.read_text(encoding='utf-8')
         self.assertIn(f'private const string DependencyHint = "{HINT}";', text)
-        self.assertIn('private static IResult DependencyProblem(HttpContext ctx, int statusCode, string title, string stage = "UNKNOWN")', text)
+        self.assertIn('private static IResult DependencyProblem(HttpContext ctx, int statusCode, string title, string stage = "UNKNOWN", string reason = "UNKNOWN")', text)
         helper = text.split('private static IResult DependencyProblem', 1)[1].split('private static string Actor', 1)[0]
         self.assertIn('Results.Problem(statusCode: statusCode, title: title,', helper)
         self.assertIn('["requestId"] = ctx.TraceIdentifier', helper)
@@ -46,7 +46,7 @@ class DashboardProfileDiagnosticsSource(unittest.TestCase):
             (502, 'Backend did not report a committed profile outcome.'),
             (503, 'Profile outcome unavailable. Retry only the same payload and idempotency key.'),
         ):
-            stage = '"RESPONSE_VALIDATION"' if status == 502 else 'DependencyStage(ex)'
+            stage = '"RESPONSE_VALIDATION"' if status == 502 else 'DependencyStage(ex), DependencyReason(ex)'
             self.assertIn(f'DependencyProblem(ctx, {status}, "{title}", {stage})', text)
         self.assertEqual(text.count('.RequireAuthorization("Administrator")'), 6)
         self.assertEqual(text.count('.RequireRateLimiting("commands")'), 4)
@@ -96,6 +96,11 @@ async function message(failure, status = 503) {
   }
   assert.ok((await message({code:'DEPENDENCY_UNAVAILABLE'})).includes('DEPENDENCY_UNAVAILABLE'));
   assert.ok((await message({stage:'RESPONSE_VALIDATION', hint:profileDependencyHint}, 502)).includes('Failure stage: RESPONSE_VALIDATION.'));
+  assert.ok((await message({stage:'OWNER_BINDING', reason:'CAPABILITY_MISSING', hint:profileDependencyHint})).includes('Failure reason: CAPABILITY_MISSING.'));
+  for (const reason of ['<secret>', 'CONFIG_ACL\nsecret', {}, null]) {
+    assert.ok(!(await message({stage:'OWNER_BINDING',reason,hint:profileDependencyHint})).includes('Failure reason:'));
+  }
+  assert.ok(!(await message({stage:'PRIVATE_REQUEST',reason:'CONFIG_ACL',hint:profileDependencyHint})).includes('Failure reason:'));
   console.log('isolated request stage/textContent checks passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 '''
@@ -111,7 +116,7 @@ async function message(failure, status = 503) {
         self.assertIn('typeof failure?.requestId === \'string\'', request)
         self.assertIn('/^[A-Za-z0-9_.:-]{1,128}$/.test(failure.requestId)', request)
         self.assertIn('Request ID: ${failure.requestId}', request)
-        self.assertIn('${code}; no success is assumed.${requestId}${stage}${hint}', request)
+        self.assertIn('${code}; no success is assumed.${requestId}${stage}${reason}${hint}', request)
         self.assertIn("['OWNER_BINDING', 'PRIVATE_REQUEST', 'RESPONSE_VALIDATION', 'UNKNOWN'].includes(failure?.stage)", request)
         self.assertNotIn('failure.title', request)
         self.assertNotIn('failure.detail', request)

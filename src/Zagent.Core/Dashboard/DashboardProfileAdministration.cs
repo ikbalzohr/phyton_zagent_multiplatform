@@ -31,12 +31,12 @@ public static class DashboardProfileAdministration
                     unavailableDependencies = legacy.Success ? Array.Empty<string>() : new[] { "Other agent approvals unavailable." }
                 } });
             } catch (Exception ex) when (DependencyFailure(ex)) {
-                return DependencyProblem(ctx, 503, "Trusted profile catalog unavailable; no local fallback.", DependencyStage(ex));
+                return DependencyProblem(ctx, 503, "Trusted profile catalog unavailable; no local fallback.", DependencyStage(ex), DependencyReason(ex));
             }
         }).RequireAuthorization("Administrator");
         app.MapGet(route + "/profiles/{id}", async (string id, HttpContext ctx) => {
             try { using var client = Client(); return Results.Ok(await client.AdminAsync("get", new JsonObject { ["target_profile_id"] = id }, Actor(ctx), ctx.RequestAborted)); }
-            catch (Exception ex) when (DependencyFailure(ex)) { return DependencyProblem(ctx, 503, "Trusted profile unavailable.", DependencyStage(ex)); }
+            catch (Exception ex) when (DependencyFailure(ex)) { return DependencyProblem(ctx, 503, "Trusted profile unavailable.", DependencyStage(ex), DependencyReason(ex)); }
         }).RequireAuthorization("Administrator");
         app.MapPost(route + "/profiles", async (JsonObject request, HttpContext ctx) =>
             await Mutate("create", null, request, ctx, Client)).RequireAuthorization("Administrator").RequireRateLimiting("commands");
@@ -48,12 +48,13 @@ public static class DashboardProfileAdministration
             await Mutate("set_default", id, request, ctx, Client)).RequireAuthorization("Administrator").RequireRateLimiting("commands");
     }
     // Administrator routes only. Stage names a boundary, not a cause or dependency health.
-    private static IResult DependencyProblem(HttpContext ctx, int statusCode, string title, string stage = "UNKNOWN") =>
+    private static IResult DependencyProblem(HttpContext ctx, int statusCode, string title, string stage = "UNKNOWN", string reason = "UNKNOWN") =>
         Results.Problem(statusCode: statusCode, title: title,
             extensions: new Dictionary<string, object?> {
                 ["requestId"] = ctx.TraceIdentifier,
                 ["hint"] = DependencyHint,
-                ["stage"] = stage
+                ["stage"] = stage,
+                ["reason"] = reason
             });
     private static string Actor(HttpContext ctx) => ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? throw new InvalidOperationException("Authenticated Administrator session actor required.");
@@ -62,6 +63,14 @@ public static class DashboardProfileAdministration
         var stage = ex.Data["ZagentProfileStage"] as string;
         return stage switch {
             "OWNER_BINDING" or "PRIVATE_REQUEST" or "RESPONSE_VALIDATION" => stage,
+            _ => "UNKNOWN"
+        };
+    }
+    private static string DependencyReason(Exception ex)
+    {
+        if (DependencyStage(ex) != "OWNER_BINDING") return "UNKNOWN";
+        return (ex.Data["ZagentProfileReason"] as string) switch {
+            "BINDING_IDENTIFIERS" or "CAPABILITY_ACTIONS" or "CAPABILITY_AMBIGUOUS" or "CAPABILITY_DEVICE" or "CAPABILITY_INSTALLATION" or "CAPABILITY_MISSING" or "CAPABILITY_REVISION" or "CAPABILITY_SCHEMA" or "CAPABILITY_VERSION" or "CAPABILITY_WORKSPACE" or "CONFIG_ACL" or "CONFIG_CHANGED" or "CONFIG_DUPLICATE_KEY" or "CONFIG_IDENTITY" or "CONFIG_JSON" or "CONFIG_PATH" or "CONFIG_PLATFORM" or "CONFIG_PRIVATE_PATH" or "CONFIG_READ" or "CONFIG_REPARSE" or "CONFIG_SCHEMA" or "CONFIG_SIZE" or "GRANTS_SCHEMA" or "GRANT_EXPIRY" or "GRANT_REVOKED" or "GRANT_SCOPES" or "GRANT_TOOLS" or "RESOURCE_DEFAULT" or "RESOURCE_DEVICE" or "RESOURCE_ID" or "RESOURCE_INSTALLATION" or "RESOURCE_KIND" or "RESOURCE_MEMBERSHIP" or "RESOURCE_PROFILE_ID" or "RESOURCE_REVOKED" or "RESOURCE_SCHEMA" or "TOOL_POLICY" or "WORKSPACE_MISMATCH" => (string)ex.Data["ZagentProfileReason"]!,
             _ => "UNKNOWN"
         };
     }
@@ -92,7 +101,7 @@ public static class DashboardProfileAdministration
                 ex.Code is "REVISION_CONFLICT" or "IDEMPOTENCY_CONFLICT" ? 409 : 400);
         } catch (Exception ex) when (DependencyFailure(ex)) {
             // A lost response may follow a commit: expose uncertainty, not a fabricated failed/successful receipt.
-            return DependencyProblem(ctx, 503, "Profile outcome unavailable. Retry only the same payload and idempotency key.", DependencyStage(ex));
+            return DependencyProblem(ctx, 503, "Profile outcome unavailable. Retry only the same payload and idempotency key.", DependencyStage(ex), DependencyReason(ex));
         }
     }
 }
