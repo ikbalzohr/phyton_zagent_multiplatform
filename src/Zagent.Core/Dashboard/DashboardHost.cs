@@ -1,4 +1,5 @@
 using System.Net;
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,10 +7,8 @@ using System.Text.Json;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Identity;
 using Zagent.Core.Manager;
 using Zagent.Shared;
 using Zagent.Shared.Manager;
@@ -49,43 +48,29 @@ public static class DashboardHost
             af.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             af.Cookie.SameSite = SameSiteMode.Strict;
         });
-        builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(cookie => {
-            cookie.Cookie.Name = "__Host-Zagent.Dashboard";
-            cookie.Cookie.HttpOnly = true; cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-            cookie.Cookie.SameSite = SameSiteMode.Strict; cookie.Cookie.Path = "/";
-            cookie.ExpireTimeSpan = TimeSpan.FromMinutes(20); cookie.SlidingExpiration = false;
-            cookie.LoginPath = "/Login";
-            cookie.Events.OnRedirectToLogin = ctx => {
-                if (ctx.Request.Path.StartsWithSegments("/api")) ctx.Response.StatusCode = 401;
-                else ctx.Response.Redirect("/Login");
-                return Task.CompletedTask;
-            };
-            cookie.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
-            cookie.Events.OnValidatePrincipal = async ctx => {
-                try {
-                    var current = DashboardOptions.Load(configPath);
-                    if (ctx.Principal?.FindFirstValue("security_stamp") != current.SecurityStamp ||
-                        current.PasswordHash != options.PasswordHash || current.Administrator != options.Administrator)
-                        ctx.RejectPrincipal();
-                } catch { ctx.RejectPrincipal(); }
-                if (ctx.Principal?.Identity?.IsAuthenticated != true) await ctx.HttpContext.SignOutAsync();
-            };
-        });
+        builder.Services.AddSingleton(DashboardOwnerIdentity.Capture(runtime.Options.DataRoot, configPath));
+        builder.Services.AddAuthentication(DashboardOwnerAuthenticationHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, DashboardOwnerAuthenticationHandler>(
+                DashboardOwnerAuthenticationHandler.SchemeName, _ => { });
         builder.Services.AddAuthorization(auth => {
             auth.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
             auth.AddPolicy("Operator", p => p.RequireRole("Operator", "Administrator"));
             auth.AddPolicy("Administrator", p => p.RequireRole("Administrator"));
         });
-        builder.Services.AddRazorPages(pages => pages.Conventions.AllowAnonymousToPage("/Login"));
+        builder.Services.AddRazorPages();
         builder.Services.AddRateLimiter(limits => {
             limits.RejectionStatusCode = 429;
-            limits.AddPolicy("login", _ => RateLimitPartition.GetFixedWindowLimiter("local-login", _ =>
-                new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             limits.AddPolicy("commands", _ => RateLimitPartition.GetFixedWindowLimiter("local-commands", _ =>
                 new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
         await using var app = builder.Build();
         runtime.ShutdownRequested += (_, _) => _ = app.StopAsync();
+        // Fresh startup opens once, only after Kestrel is listening. Existing-Core
+        // activation is already handled by Program's --dashboard lease path.
+        app.Lifetime.ApplicationStarted.Register(() => {
+            try { Process.Start(new ProcessStartInfo(options.Origin.AbsoluteUri) { UseShellExecute = true })?.Dispose(); }
+            catch (Exception) { app.Logger.LogWarning("Dashboard is listening; automatic browser launch failed."); }
+        });
         app.Use(async (ctx, next) => {
             ctx.Response.Headers.CacheControl = "no-store";
             ctx.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
@@ -115,30 +100,6 @@ public static class DashboardHost
         });
         app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-store" });
         app.MapRazorPages();
-        // Login needs this single public stylesheet before a session exists. Keep
-        // all other static files and management routes behind fallback authorization.
-        app.MapMethods("/dashboard.css", ["GET", "HEAD"], () => Results.File(
-            Path.Combine(app.Environment.WebRootPath, "dashboard.css"), contentType: "text/css")).AllowAnonymous();
-        app.MapPost("/auth/login", async (HttpContext ctx) => {
-            var form = await ctx.Request.ReadFormAsync();
-            var name = form["account"].ToString(); var password = form["password"].ToString();
-            // Always perform the password hash check, including unknown account names.
-            var verified = password.Length <= 256 && new PasswordHasher<string>().VerifyHashedPassword(
-                options.Administrator, options.PasswordHash, password) != PasswordVerificationResult.Failed;
-            if (!verified || !string.Equals(name, options.Administrator, StringComparison.Ordinal))
-                return Results.Redirect("/Login?failed=1");
-            var stamp = options.SecurityStamp;
-            var claims = new[] { new Claim(ClaimTypes.NameIdentifier, options.Administrator),
-                new Claim(ClaimTypes.Name, options.Administrator), new Claim(ClaimTypes.Role, "Administrator"),
-                new Claim("security_stamp", stamp) };
-            await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)),
-                new AuthenticationProperties { IsPersistent = false, AllowRefresh = false });
-            return Results.Redirect("/");
-        }).AllowAnonymous().RequireRateLimiting("login");
-        app.MapPost("/auth/logout", async (HttpContext ctx) => {
-            await ctx.SignOutAsync(); return Results.Ok(new { signedOut = true });
-        }).RequireAuthorization();
         MapManagement(app, runtime, options);
         // Only this process owns runtime. Browser unload/disconnect has no shutdown handler.
         await app.RunAsync();

@@ -9,13 +9,15 @@ const display = value => value == null ? 'unknown' : typeof value === 'object' ?
 const visualMetadata = (value) => value ? { source: value.source, label: value.label, mimeType: value.mimeType, bytes: value.bytes, capturedAtUtc: value.capturedAtUtc } : null;
 async function request(path, options = {}) {
   const response = await fetch(path.startsWith('/') ? path : base + path, { credentials: 'same-origin', cache: 'no-store', ...options });
-  if (response.status === 401) { location.assign('/Login'); throw new Error('Session expired'); }
+  if (response.status === 401) { throw new Error('Local Windows owner authentication unavailable; no success is assumed.'); }
   if (!response.ok) {
     const failure = await response.json().catch(() => null);
     const code = typeof failure?.code === 'string' && /^[A-Z0-9_]{1,80}$/.test(failure.code) ? ` ${failure.code}` : '';
     const requestId = typeof failure?.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(failure.requestId) ? ` Request ID: ${failure.requestId}.` : '';
     const hint = failure?.hint === profileDependencyHint ? ` ${profileDependencyHint}` : '';
-    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.${requestId}${hint}`); error.status = response.status; throw error;
+    // Administrator profile envelope only; a boundary is not a diagnosis or health claim.
+    const stage = hint && ['OWNER_BINDING', 'PRIVATE_REQUEST', 'RESPONSE_VALIDATION', 'UNKNOWN'].includes(failure?.stage) ? ` Failure stage: ${failure.stage}.` : '';
+    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.${requestId}${stage}${hint}`); error.status = response.status; throw error;
   }
   return response.status === 204 ? null : response.json();
 }
@@ -148,7 +150,7 @@ function navigate() {
 document.querySelectorAll('[data-runtime]').forEach(b => b.addEventListener('click', () => { if (confirm(`Request ${b.dataset.runtime}?`)) command('runtime/actions', { operation: b.dataset.runtime }).catch(e => notice(e.message, true)); }));
 document.querySelectorAll('[data-integration]').forEach(b => b.addEventListener('click', () => command('connections/actions', { action: b.dataset.integration }).catch(e => notice(e.message, true))));
 $('shutdown').addEventListener('click', async () => { if (prompt('Stops agents and the dashboard. Type STOP CORE to confirm.') !== 'STOP CORE') return; try { await command('runtime/shutdown', { confirmation: 'STOP CORE' }); clearTimeout(timer); } catch (e) { notice('Shutdown response unavailable. Do not assume success: ' + e.message, true); } });
-$('logout').addEventListener('click', async () => { try { await mutate('/auth/logout', {}); location.assign('/Login'); } catch (e) { notice(e.message, true); } });
+
 $('profile-form').addEventListener('submit', async e => { e.preventDefault(); try {
   const values = Object.fromEntries(new FormData(e.target)); values.enabled = e.target.elements.enabled.checked;
   await profileCommand('workspaces/profiles', values); e.target.reset();

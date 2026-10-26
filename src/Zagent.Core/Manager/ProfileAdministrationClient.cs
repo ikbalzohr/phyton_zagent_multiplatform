@@ -57,7 +57,13 @@ public sealed class ProfileAdministrationClient : IDisposable
     private async Task<JsonObject> SendAsync(string tool, JsonObject arguments, string actor, string? action, CancellationToken cancellationToken)
     {
         // Re-read the exact active owner mapping on EVERY call. No owner selection by browser argument.
-        var binding = _binding();
+        OwnerProfileAdministrationBinding binding;
+        try {
+            binding = _binding();
+        } catch (System.Exception ex) {
+            ex.Data["ZagentProfileStage"] = "OWNER_BINDING";
+            throw;
+        }
         var id = Guid.NewGuid().ToString("N");
         var context = BuildContext(binding, actor, tool, action, arguments,
             Math.Min(DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 300, binding.ExpiresAt), id, id);
@@ -66,16 +72,29 @@ public sealed class ProfileAdministrationClient : IDisposable
                 ["_meta"] = new JsonObject { [action is null ? "zagent.profile_catalog_context" : "zagent.profile_admin_context"] = context } } };
         using var request = new HttpRequestMessage(HttpMethod.Post, _endpoint) { Content = JsonContent.Create(body) };
         request.Headers.Add("X-Zagent-Internal-Token", InternalManagementChannel.GetChildSecret("ZAGENT_INTERNAL_TOKEN"));
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var bytes = new MemoryStream();
-        var buffer = new byte[8192]; int count;
-        while ((count = await stream.ReadAsync(buffer, cancellationToken)) != 0) {
-            if (bytes.Length + count > 262144) throw new InvalidDataException("Private profile response too large.");
-            bytes.Write(buffer, 0, count);
+        byte[] responseBytes;
+        try {
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var bytes = new MemoryStream();
+            var buffer = new byte[8192]; int count;
+            while ((count = await stream.ReadAsync(buffer, cancellationToken)) != 0) {
+                if (bytes.Length + count > 262144) throw new InvalidDataException("Private profile response too large.");
+                bytes.Write(buffer, 0, count);
+            }
+            responseBytes = bytes.ToArray();
+        } catch (System.Exception ex) {
+            ex.Data["ZagentProfileStage"] = "PRIVATE_REQUEST";
+            throw;
         }
-        var outcome = DecodeResponse(bytes.ToArray());
+        JsonObject outcome;
+        try {
+            outcome = DecodeResponse(responseBytes);
+        } catch (System.Exception ex) {
+            ex.Data["ZagentProfileStage"] = "RESPONSE_VALIDATION";
+            throw;
+        }
         if (action is null) outcome["default_profile_id"] = outcome["owner"]?["default_profile_id"]?.DeepClone()
             ?? binding.BootstrapResource["default_profile_id"]!.DeepClone();
         return outcome;
