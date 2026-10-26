@@ -98,6 +98,8 @@ server {{
     location = /realms/zagent/.well-known/openid-configuration {{ include /etc/nginx/snippets/zagent-keycloak-proxy.conf; }}
     location ^~ /realms/zagent/protocol/openid-connect/ {{ include /etc/nginx/snippets/zagent-keycloak-proxy.conf; }}
     location ^~ /realms/zagent/login-actions/ {{ include /etc/nginx/snippets/zagent-keycloak-proxy.conf; }}
+    location = /realms/zagent/device {{ include /etc/nginx/snippets/zagent-keycloak-proxy.conf; }}
+    location = /realms/zagent/device/status {{ include /etc/nginx/snippets/zagent-keycloak-proxy.conf; }}
     location ^~ /resources/ {{ include /etc/nginx/snippets/zagent-keycloak-proxy.conf; }}
     # master realm, Admin API/UI, health, metrics, account and DCR are NOT public.
     location / {{ return 404; }}
