@@ -8,7 +8,12 @@ class RenewalSource(unittest.TestCase):
         p = ROOT / 'packaging/scripts/Renew-OwnerFilesGrant.ps1'
         self.assertTrue(p.exists(), 'Bounded owner renewal helper missing')
         text = p.read_text(encoding='utf-8')
-        for required in ('[ValidateSet(7)]', 'Assert-CoreStopped', 'Read-StrictJson',
+        for required in ('[ValidateSet(7, 30)][int]$Days = 30',
+                         'Assert-ZagentOwnerConsole', 'Assert-ZagentOwnerAcl $data',
+                         'Assert-CoreStopped', 'Read-StrictJson',
+                         '$newExpiry -le $oldExpiry', '$entries[0].Name -cne $principal',
+                         '$rs.issuer -cne', '$rs.resource_uri -cne',
+                         '$grant.expires_at -le 0', 'Unrelated configuration bytes changed.',
                          'Assert-SnapshotUnchanged $path $before',
                          '$grant.revoked -cne $false', '$entries.Count -ne 1',
                          '[IO.File]::Replace($temp, $path, $backup)',

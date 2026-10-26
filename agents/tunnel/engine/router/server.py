@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse, Response
 from jsonschema import Draft202012Validator
 
 from .access import AuthContext, AuthorizationError, ResourceAuthorizer, owner_key
+from .diagnostics import public_error
 from .artifacts import read_artifact
 from .config import load_tunnel_config
 from .execution_context import authority_arguments, new_context, policy_resources, reject_authority, scheduler_meta, validate_context
@@ -196,7 +197,7 @@ def _auth_error(exc: AuthorizationError) -> JSONResponse:
         metadata = p.scheme+"://"+p.netloc+"/.well-known/oauth-protected-resource"
         if exc.status in (401, 403):
             headers["WWW-Authenticate"] = 'Bearer resource_metadata="'+metadata+'", error="'+("insufficient_scope" if exc.status == 403 else "invalid_token")+'"'
-    return JSONResponse({"error": {"code": exc.code}}, status_code=exc.status, headers=headers)
+    return JSONResponse({"error": public_error(exc.code)}, status_code=exc.status, headers=headers)
 
 
 @app.middleware("http")

@@ -87,6 +87,9 @@ class UpstreamState:
     initialized: bool = False
     tools: list[dict[str, Any]] = field(default_factory=list)
     last_error: str = ""
+    # Code-only catalog attempt outcome, exposed only on authenticated /router/status.
+    # RESPONSE_RECEIVED is not catalog validation, data access or process health.
+    profile_catalog_diagnostic: str = 'NOT_CHECKED'
     last_ok: float = 0.0
     init_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -324,6 +327,7 @@ class MCPRegistry:
                 "tools": len(state.tools),
                 "last_ok": state.last_ok or None,
                 "last_error": state.last_error or None,
+                'profile_catalog_diagnostic': state.profile_catalog_diagnostic,
             })
         return {
             "ok": True,
@@ -338,21 +342,52 @@ class MCPRegistry:
         if len(candidates) != 1:
             raise AuthorizationError('PROFILE_CATALOG_NOT_CONFIGURED', 503)
         state = candidates[0]
-        await self.ensure_initialized(state)
-        response = await self._post(state, {'jsonrpc': '2.0', 'id': uuid.uuid4().hex,
-            'method': 'tools/call', 'params': {'name': CATALOG_TOOL, 'arguments': {},
-                '_meta': {'zagent.profile_catalog_context': context}}})
-        if 'error' in response:
-            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503)
-        result = response.get('result')
-        if not isinstance(result, dict) or result.get('isError') is True or result.get('ok') is False:
-            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503)
-        if isinstance(result.get('structuredContent'), dict):
-            return result['structuredContent']
-        content = result.get('content')
-        if isinstance(content, list) and len(content) == 1 and content[0].get('type') == 'text':
-            return json.loads(content[0]['text'])
-        return result
+        state.profile_catalog_diagnostic = 'REQUEST_STARTED'
+        try:
+            await self.ensure_initialized(state)
+            response = await self._post(state, {'jsonrpc': '2.0', 'id': uuid.uuid4().hex,
+                'method': 'tools/call', 'params': {'name': CATALOG_TOOL, 'arguments': {},
+                    '_meta': {'zagent.profile_catalog_context': context}}})
+            if not isinstance(response, dict):
+                raise ValueError('INVALID_RESPONSE')
+            if 'error' in response:
+                state.profile_catalog_diagnostic = 'RPC_ERROR'
+                raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503)
+            result = response.get('result')
+            if not isinstance(result, dict):
+                raise ValueError('INVALID_RESPONSE')
+            if result.get('isError') is True or result.get('ok') is False:
+                state.profile_catalog_diagnostic = 'DOMAIN_ERROR'
+                raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503)
+            if isinstance(result.get('structuredContent'), dict):
+                result = result['structuredContent']
+            else:
+                content = result.get('content')
+                if isinstance(content, list) and len(content) == 1 and content[0].get('type') == 'text':
+                    result = json.loads(content[0]['text'])
+            if not isinstance(result, dict):
+                raise ValueError('INVALID_RESPONSE')
+            state.profile_catalog_diagnostic = 'RESPONSE_RECEIVED'
+            return result  # Caller still validates catalog shape and current authority.
+        except httpx.HTTPStatusError as exc:
+            state.profile_catalog_diagnostic = ('PRIVATE_CHANNEL_REJECTED'
+                if exc.response.status_code in (401, 403) else 'HTTP_FAILURE')
+            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503) from None
+        except httpx.RequestError:
+            state.profile_catalog_diagnostic = 'TRANSPORT_UNAVAILABLE'
+            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503) from None
+        except AuthorizationError:
+            # Preserve internal credential/placement denials and stable status codes.
+            if state.profile_catalog_diagnostic == 'REQUEST_STARTED':
+                state.profile_catalog_diagnostic = 'LOCAL_AUTHORIZATION_DENIED'
+            raise
+        except (ValueError, TypeError, AttributeError, KeyError):
+            state.profile_catalog_diagnostic = 'INVALID_RESPONSE'
+            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503) from None
+        except RuntimeError:
+            # initialize may return a private JSON-RPC error; never forward its text.
+            state.profile_catalog_diagnostic = 'RPC_ERROR'
+            raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503) from None
 
     async def invoke(self, service_id: str, upstream_name: str, arguments: dict[str, Any], ctx: ExecContext) -> dict[str, Any]:
         state = self.states[service_id]

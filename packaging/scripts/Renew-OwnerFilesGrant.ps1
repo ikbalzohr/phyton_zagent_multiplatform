@@ -3,7 +3,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$InstallRoot,
     [Parameter(Mandatory=$true)][string]$DataRoot,
-    [ValidateSet(7)][int]$Days = 7
+    [ValidateSet(7, 30)][int]$Days = 30
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest

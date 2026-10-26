@@ -1,5 +1,7 @@
 'use strict';
 const base = '/api/management/v1/';
+// Match only the static administrator hint; never display upstream exception/title/detail text.
+const profileDependencyHint = 'Use authenticated local-owner diagnostics with this request ID to check owner profile authorization, private management connectivity, and catalog validation. This response does not identify the failed check or prove Files is stopped. Do not bypass authorization. For uncertain mutations, retain the same payload and idempotency key.';
 let csrf, profileRevision, page = '', generation = 0, timer, busy = false;
 const $ = id => document.getElementById(id);
 const node = (tag, text) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); return n; };
@@ -11,7 +13,9 @@ async function request(path, options = {}) {
   if (!response.ok) {
     const failure = await response.json().catch(() => null);
     const code = typeof failure?.code === 'string' && /^[A-Z0-9_]{1,80}$/.test(failure.code) ? ` ${failure.code}` : '';
-    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.`); error.status = response.status; throw error;
+    const requestId = typeof failure?.requestId === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(failure.requestId) ? ` Request ID: ${failure.requestId}.` : '';
+    const hint = failure?.hint === profileDependencyHint ? ` ${profileDependencyHint}` : '';
+    const error = new Error(`Request unavailable (${response.status})${code}; no success is assumed.${requestId}${hint}`); error.status = response.status; throw error;
   }
   return response.status === 204 ? null : response.json();
 }

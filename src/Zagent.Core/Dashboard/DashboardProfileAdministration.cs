@@ -7,6 +7,7 @@ namespace Zagent.Core.Dashboard;
 /// <summary>Administrator session adapter; all state and CAS authority remain in Files.</summary>
 public static class DashboardProfileAdministration
 {
+    private const string DependencyHint = "Use authenticated local-owner diagnostics with this request ID to check owner profile authorization, private management connectivity, and catalog validation. This response does not identify the failed check or prove Files is stopped. Do not bypass authorization. For uncertain mutations, retain the same payload and idempotency key.";
     public static void MapProfileAdministration(this WebApplication app, ManagerCoreHost runtime, DashboardOptions options,
         ManagementReadCache queries)
     {
@@ -30,12 +31,12 @@ public static class DashboardProfileAdministration
                     unavailableDependencies = legacy.Success ? Array.Empty<string>() : new[] { "Other agent approvals unavailable." }
                 } });
             } catch (Exception ex) when (DependencyFailure(ex)) {
-                return Results.Problem(statusCode: 503, title: "Trusted profile catalog unavailable; no local fallback.");
+                return DependencyProblem(ctx, 503, "Trusted profile catalog unavailable; no local fallback.");
             }
         }).RequireAuthorization("Administrator");
         app.MapGet(route + "/profiles/{id}", async (string id, HttpContext ctx) => {
             try { using var client = Client(); return Results.Ok(await client.AdminAsync("get", new JsonObject { ["target_profile_id"] = id }, Actor(ctx), ctx.RequestAborted)); }
-            catch (Exception ex) when (DependencyFailure(ex)) { return Results.Problem(statusCode: 503, title: "Trusted profile unavailable."); }
+            catch (Exception ex) when (DependencyFailure(ex)) { return DependencyProblem(ctx, 503, "Trusted profile unavailable."); }
         }).RequireAuthorization("Administrator");
         app.MapPost(route + "/profiles", async (JsonObject request, HttpContext ctx) =>
             await Mutate("create", null, request, ctx, Client)).RequireAuthorization("Administrator").RequireRateLimiting("commands");
@@ -46,6 +47,13 @@ public static class DashboardProfileAdministration
         app.MapPost(route + "/profiles/{id}/default", async (string id, JsonObject request, HttpContext ctx) =>
             await Mutate("set_default", id, request, ctx, Client)).RequireAuthorization("Administrator").RequireRateLimiting("commands");
     }
+    // Additive ProblemDetails extensions only; never diagnose a specific check from a generic exception.
+    private static IResult DependencyProblem(HttpContext ctx, int statusCode, string title) =>
+        Results.Problem(statusCode: statusCode, title: title,
+            extensions: new Dictionary<string, object?> {
+                ["requestId"] = ctx.TraceIdentifier,
+                ["hint"] = DependencyHint
+            });
     private static string Actor(HttpContext ctx) => ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
         ?? throw new InvalidOperationException("Authenticated Administrator session actor required.");
     private static bool DependencyFailure(Exception ex) => ex is HttpRequestException or IOException or InvalidOperationException or
@@ -68,14 +76,14 @@ public static class DashboardProfileAdministration
             using var client = clientFactory();
             var outcome = await client.AdminAsync(action, request, Actor(ctx), ctx.RequestAborted);
             if (outcome["status"]?.GetValue<string>() != "committed" || outcome["access_sync"]?.GetValue<string>() != "committed")
-                return Results.Problem(statusCode: 502, title: "Backend did not report a committed profile outcome.");
+                return DependencyProblem(ctx, 502, "Backend did not report a committed profile outcome.");
             return Results.Ok(outcome);
         } catch (ProfileAdministrationDeniedException ex) {
             return Results.Json(new { code = ex.Code, status = "rejected" }, statusCode:
                 ex.Code is "REVISION_CONFLICT" or "IDEMPOTENCY_CONFLICT" ? 409 : 400);
         } catch (Exception ex) when (DependencyFailure(ex)) {
             // A lost response may follow a commit: expose uncertainty, not a fabricated failed/successful receipt.
-            return Results.Problem(statusCode: 503, title: "Profile outcome unavailable. Retry only the same payload and idempotency key.");
+            return DependencyProblem(ctx, 503, "Profile outcome unavailable. Retry only the same payload and idempotency key.");
         }
     }
 }
