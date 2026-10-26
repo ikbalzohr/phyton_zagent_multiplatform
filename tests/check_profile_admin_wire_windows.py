@@ -14,6 +14,15 @@ def main():
     if len(sys.argv) != 3:
         raise SystemExit('usage: check_profile_admin_wire_windows.py EMITTED_WIRE_JSON DISPOSABLE_ROOT')
     root = Path(sys.argv[2]).resolve()
+    # Fail with an actionable message instead of a raw WinError traceback.
+    if root.exists():
+        raise SystemExit('DISPOSABLE_ROOT_ALREADY_EXISTS: ' + str(root) +
+                         '\nRemove that directory or pass a fresh path; this test never reuses a fixture root.')
+    wire_path = Path(sys.argv[1]).resolve()
+    if not wire_path.is_file():
+        raise SystemExit('EMITTED_WIRE_JSON_MISSING: ' + str(wire_path) +
+                         '\nRun: dotnet run --project tests\\Zagent.ProfileAdministrationTests -- '
+                         'tests\\contracts\\profile-admin-wire-v1.json <EMITTED_WIRE_JSON>')
     root.mkdir(parents=True, exist_ok=False)
     # Set EVERY product directory before importing any product module.
     paths = {'ZAGENT_FILES_CONFIG_DIR':'config', 'ZAGENT_FILES_DATA_ROOT':'data',
