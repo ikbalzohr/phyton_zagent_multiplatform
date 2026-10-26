@@ -203,8 +203,11 @@ public sealed record OwnerProfileAdministrationBinding(string PrincipalId, strin
     }
     private static void ValidatePrivateConfig(string dataRoot, string path)
     {
+        // Mirror the platform guard used by InternalSecretStore.ValidatePrivatePath so the
+        // analyzer can prove this Windows-only ACL walk is unreachable on other platforms.
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Owner ACL validation requires Windows.");
         InternalSecretStore.ValidatePrivatePath(dataRoot, directory: true);
-        var owner = System.Security.Principal.WindowsIdentity.GetCurrent().User ?? throw new InvalidDataException();
+        var owner = WindowsIdentity.GetCurrent().User ?? throw new InvalidDataException();
         for (var walk = path; !string.Equals(walk, dataRoot, StringComparison.OrdinalIgnoreCase); walk = Path.GetDirectoryName(walk) ?? throw new InvalidDataException()) {
             // Configs produced by Core may inherit the protected owner's ACL.
             for (var ancestor = walk; ancestor is not null; ancestor = Path.GetDirectoryName(ancestor))
