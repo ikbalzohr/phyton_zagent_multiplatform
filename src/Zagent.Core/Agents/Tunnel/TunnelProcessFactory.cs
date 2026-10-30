@@ -24,6 +24,8 @@ public static class TunnelProcessFactory
             EnvironmentVariables: new Dictionary<string, string>(
                 StringComparer.Ordinal)
             {
+                ["ZAGENT_CORE_DATA_ROOT"] = string.IsNullOrWhiteSpace(options.CoreDataRoot)
+                    ? "" : Path.GetFullPath(options.CoreDataRoot),
                 ["ZAGENT_TUNNEL_CONFIG_DIR"] =
                     Path.GetFullPath(options.ConfigRoot),
                 ["ZAGENT_TUNNEL_RUNTIME_DIR"] =

@@ -12,11 +12,14 @@ public sealed class NativeAgentSupervisor : IAgentSupervisor
     private readonly SupervisorInstanceLease? _instanceLease;
     private int _shutdownRequested;
     private int _disposed;
+    private readonly Zagent.Core.Diagnostics.DiagnosticEventStore? _diagnostics;
 
     public NativeAgentSupervisor(
         bool acquireInstanceLease = true,
-        string? instanceLeaseName = null)
+        string? instanceLeaseName = null,
+        Zagent.Core.Diagnostics.DiagnosticEventStore? diagnostics = null)
     {
+        _diagnostics = diagnostics;
         if (!acquireInstanceLease)
         {
             return;
@@ -345,6 +348,7 @@ public sealed class NativeAgentSupervisor : IAgentSupervisor
                 process.Dispose();
                 slot.State = AgentProcessState.Faulted;
                 slot.LastError = "Process.Start returned false.";
+                _diagnostics?.Record("supervisor.start", "CORE_AGENT_START_FAILED", "error");
 
                 return new LifecycleOperationResult(
                     false,
@@ -388,6 +392,7 @@ public sealed class NativeAgentSupervisor : IAgentSupervisor
         }
         catch (Exception ex)
         {
+            _diagnostics?.Record("supervisor.start", "CORE_AGENT_START_FAILED", "error");
             slot.State = AgentProcessState.Faulted;
             slot.LastError = ex.Message;
             DisposeProcess(slot);
@@ -574,6 +579,7 @@ public sealed class NativeAgentSupervisor : IAgentSupervisor
                         return;
                     }
 
+                    _diagnostics?.Record("supervisor.exit", "CORE_AGENT_EXITED", "error");
                     if (!slot.Definition.AutoRestart)
                     {
                         slot.State = AgentProcessState.Faulted;

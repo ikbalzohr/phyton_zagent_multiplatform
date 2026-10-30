@@ -80,11 +80,7 @@ public static class DashboardHost
                 ctx.Connection.RemoteIpAddress is not { } address || !IPAddress.IsLoopback(address)) {
                 ctx.Response.StatusCode = 403; return;
             }
-            try { await next(); }
-            catch (Exception) when (!ctx.Response.HasStarted) {
-                ctx.Response.StatusCode = 503;
-                await ctx.Response.WriteAsJsonAsync(new { code = "DEPENDENCY_UNAVAILABLE", requestId = ctx.TraceIdentifier });
-            }
+            await DashboardDiagnostics.HandleRequestAsync(ctx, _ => next(), runtime.Diagnostics);
         });
         // No forwarded-headers/CORS middleware: neither proxy identity nor cross-origin access is trusted.
         app.UseRouting(); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization();
@@ -101,6 +97,7 @@ public static class DashboardHost
         app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-store" });
         app.MapRazorPages();
         MapManagement(app, runtime, options);
+        app.MapDiagnostics(runtime.Diagnostics, runtime.GetDiagnosticsSnapshot);
         // Only this process owns runtime. Browser unload/disconnect has no shutdown handler.
         await app.RunAsync();
     }

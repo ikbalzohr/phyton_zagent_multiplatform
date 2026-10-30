@@ -7,6 +7,7 @@ from mcp.server.fastmcp import FastMCP, Context
 from mcp.types import ToolAnnotations
 from app.mcp import legacy
 from app.core.execution import Engine, READ
+from app.core.diagnostic_events import CURRENT_ID, new_request_id, record
 from app.core.execution_context import CURRENT, current, verify, request_meta, validate_profile
 from app.profiles.administration import (PROFILE_ADMIN_TOOLS, CATALOG_TOOL,
                                         admin_call, catalog_snapshot, read_lease)
@@ -14,7 +15,26 @@ from app.profiles.administration import (PROFILE_ADMIN_TOOLS, CATALOG_TOOL,
 
 class TrustedFilesMCP(FastMCP):
     async def call_tool(self, name, arguments):
-        metadata = request_meta(self.get_context())
+        from mcp.types import CallToolResult, TextContent
+        correlation = new_request_id()
+        token = CURRENT_ID.set(correlation)
+        stage = 'files.authentication'
+        try:
+            # Metadata verification precedes all execution; diagnostics confer
+            # no authority and never inspect supplied arguments or context.
+            metadata = request_meta(self.get_context())
+            stage = 'files.tool_dispatch'
+            return await self._call_authenticated_tool(name, arguments, metadata)
+        except Exception:
+            record(stage, 'FILES_OPERATION_FAILED', correlation)
+            error = {'code': 'FILES_OPERATION_FAILED', 'data': {'requestId': correlation}}
+            return CallToolResult(isError=True,
+                content=[TextContent(type='text', text='Files operation failed. Inspect owner diagnostics using the requestId.')],
+                structuredContent={'error': error})
+        finally:
+            CURRENT_ID.reset(token)
+
+    async def _call_authenticated_tool(self, name, arguments, metadata):
         if name in PROFILE_ADMIN_TOOLS or name == CATALOG_TOOL:
             from mcp.types import TextContent
             value = (await admin_call(name, arguments or {}, metadata) if name in PROFILE_ADMIN_TOOLS

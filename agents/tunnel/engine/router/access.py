@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
+from .diagnostic_events import record, traced
 
 
 class AuthorizationError(ValueError):
@@ -93,6 +94,7 @@ class ResourceAuthorizer:
                 "bearer_methods_supported": ["header"],
                 "scopes_supported": sorted(set(self.config.get("scopes_supported", [])))}
 
+    @traced('auth.current_grant', 'AUTH_NOT_AUTHORIZED')
     def current_grant(self, auth: AuthContext) -> dict[str, Any]:
         c = self.config
         grant = (c.get("grants") or {}).get(auth.principal_id)
@@ -104,15 +106,19 @@ class ResourceAuthorizer:
             raise AuthorizationError("grant_revoked", 403)
         return grant
 
+    @traced('auth.token', 'AUTH_INVALID_TOKEN')
     async def authenticate(self, authorization: str, client: httpx.AsyncClient) -> AuthContext:
         if not self.configured:
+            record('auth.configuration', 'ROUTER_CONFIGURATION_ERROR')
             raise AuthorizationError("NOT_CONFIGURED", 503)
         scheme, separator, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not separator or not token or len(token) > 8192 or any(ch.isspace() for ch in token):
+            record('auth.token_header', 'AUTH_REQUIRED' if not authorization else 'AUTH_INVALID_TOKEN')
             raise AuthorizationError("invalid_token", 401)
         c = self.config
         secret = os.environ.get(c["introspection_secret_env"], "")
         if not secret:
+            record('auth.introspection_configuration', 'ROUTER_CONFIGURATION_ERROR')
             raise AuthorizationError("NOT_CONFIGURED", 503)
         try:
             # Streaming bounds the actual bytes, including chunked responses.
@@ -122,16 +128,19 @@ class ResourceAuthorizer:
                     headers={"Accept": "application/json"}, timeout=5.0,
                     follow_redirects=False) as response:
                 if response.status_code != 200:
+                    record('auth.introspection_status', 'AUTH_INTROSPECTION_FAILED')
                     raise AuthorizationError("authorization_unavailable", 503)
                 payload = bytearray()
                 async for chunk in response.aiter_bytes():
                     payload.extend(chunk)
                     if len(payload) > 65536:
+                        record('auth.introspection_size', 'AUTH_INTROSPECTION_FAILED')
                         raise AuthorizationError("authorization_unavailable", 503)
                 claims = json.loads(payload)
         except AuthorizationError:
             raise
         except (httpx.HTTPError, ValueError, TypeError):
+            record('auth.introspection', 'AUTH_INTROSPECTION_FAILED')
             raise AuthorizationError("authorization_unavailable", 503) from None
         try:
             stamp = time.time()
@@ -143,6 +152,7 @@ class ResourceAuthorizer:
                     or not math.isfinite(exp) or exp <= stamp
                     or not isinstance(nbf, (int, float)) or isinstance(nbf, bool)
                     or not math.isfinite(nbf) or nbf > stamp):
+                record('auth.token_claims', 'AUTH_INVALID_TOKEN')
                 raise AuthorizationError("invalid_token", 401)
             audience = claims.get("aud")
             if not (isinstance(audience, str) or (isinstance(audience, list)

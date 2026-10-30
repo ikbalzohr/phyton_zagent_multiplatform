@@ -21,6 +21,7 @@ from jsonschema import Draft202012Validator
 
 from .access import AuthContext, AuthorizationError, ResourceAuthorizer, owner_key
 from .diagnostics import public_error
+from .diagnostic_events import CURRENT_ID, new_request_id, request_id, record, failure_code, traced
 from .artifacts import read_artifact
 from .config import load_tunnel_config
 from .execution_context import authority_arguments, new_context, policy_resources, reject_authority, scheduler_meta, validate_context
@@ -195,6 +196,8 @@ app = FastAPI(title="Zagent Tunnel1", version="1.0.0", lifespan=lifespan,
 
 
 def _auth_error(exc: AuthorizationError) -> JSONResponse:
+    correlation = request_id()
+    record('auth.rejection', failure_code(exc, 'AUTH_NOT_AUTHORIZED'), correlation)
     headers = {"Cache-Control": "no-store"}
     resource = authorizer().config.get("resource_uri", "")
     if resource.startswith("https://"):
@@ -203,11 +206,14 @@ def _auth_error(exc: AuthorizationError) -> JSONResponse:
         metadata = p.scheme+"://"+p.netloc+"/.well-known/oauth-protected-resource"
         if exc.status in (401, 403):
             headers["WWW-Authenticate"] = 'Bearer resource_metadata="'+metadata+'", error="'+("insufficient_scope" if exc.status == 403 else "invalid_token")+'"'
-    return JSONResponse({"error": public_error(exc.code)}, status_code=exc.status, headers=headers)
+    return JSONResponse({"error": {**public_error(exc.code), 'data': {'requestId': correlation}}}, status_code=exc.status, headers=headers)
 
 
 @app.middleware("http")
 async def boundary(request: Request, call_next):
+    correlation = new_request_id()
+    token = CURRENT_ID.set(correlation)
+    stage = 'router.configuration'
     try:
         cfg = load_tunnel_config()
         origin = request.headers.get("origin")
@@ -219,6 +225,7 @@ async def boundary(request: Request, call_next):
             verify_internal_token(request.headers.get("x-zagent-internal-token", ""))
             request.state.internal = True
         if request.url.path == "/mcp":
+            stage = 'auth.token'
             if _auth_client is None:
                 raise AuthorizationError("NOT_READY", 503)
         if request.url.path in ("/broker/allowlist", "/broker/allowlist/catalog"):
@@ -229,9 +236,16 @@ async def boundary(request: Request, call_next):
         response.headers["Cache-Control"] = "no-store"
         return response
     except AuthorizationError as exc:
+        record(stage, failure_code(exc, 'AUTH_NOT_AUTHORIZED'))
         return _auth_error(exc)
     except (OSError, ValueError, TypeError):
-        return JSONResponse({"error":{"code":"CONFIGURATION_INVALID"}}, status_code=503)
+        record(stage, 'ROUTER_CONFIGURATION_ERROR')
+        return JSONResponse({"error":{"code":"CONFIGURATION_INVALID", 'data': {'requestId': correlation}}}, status_code=503)
+    except Exception:
+        record(stage, 'UNEXPECTED_ERROR')
+        return JSONResponse({'error': {'code': 'REQUEST_FAILED', 'data': {'requestId': correlation}}}, status_code=500)
+    finally:
+        CURRENT_ID.reset(token)
 
 
 async def bounded_json(request: Request) -> dict[str, Any]:
@@ -253,8 +267,10 @@ def rpc_result(req_id: Any, result: Any):
     return JSONResponse({"jsonrpc":"2.0", "id": req_id, "result":result})
 
 
-def rpc_error(req_id: Any, code: int, message: str):
-    return JSONResponse({"jsonrpc":"2.0", "id":req_id, "error":{"code":code,"message":message}})
+def rpc_error(req_id: Any, code: int, message: str, stage='mcp.protocol'):
+    correlation = request_id()
+    record(stage, 'UNEXPECTED_ERROR' if code == -32603 else 'ROUTER_PROTOCOL_ERROR', correlation)
+    return JSONResponse({"jsonrpc":"2.0", "id":req_id, "error":{"code":code,"message":message, 'data': {'requestId': correlation}}})
 
 
 def _text(value: Any) -> dict[str, Any]:
@@ -453,8 +469,10 @@ async def mcp_unsupported():
 
 
 @app.post("/mcp")
+@traced('mcp.handler', 'UNEXPECTED_ERROR')
 async def mcp(request: Request):
     req_id = None
+    stage = 'mcp.request'
     try:
         body = await bounded_json(request)
         req_id, method = body.get("id"), body.get("method")
@@ -465,6 +483,12 @@ async def mcp(request: Request):
         version = request.headers.get("mcp-protocol-version")
         if version and version != PROTOCOL:
             return rpc_error(req_id, -32600, "Unsupported protocol version")
+        stage = {'initialize': 'mcp.initialize', 'tools/list': 'mcp.tools_list',
+                 'tools/call': 'mcp.tools_call'}.get(method, 'mcp.request')
+        if not hasattr(request.state, 'auth'):
+            # Missing middleware authority is not anonymous initialization.
+            # Preserve the sanitized protocol failure while tagging this gate.
+            record('mcp.auth_context', 'AUTH_REQUIRED')
         auth = request.state.auth
         if method == "initialize":
             return rpc_result(req_id, {"protocolVersion":PROTOCOL,"serverInfo":SERVER_INFO,
@@ -496,13 +520,14 @@ async def mcp(request: Request):
             return rpc_result(req_id, {key:[]})
         return rpc_error(req_id, -32601, "Method not found")
     except AuthorizationError as exc:
+        record(stage, failure_code(exc, 'AUTH_NOT_AUTHORIZED'))
         return _auth_error(exc)
     except (ValueError, KeyError):
-        return rpc_error(req_id, -32602, "Invalid arguments or inaccessible resource")
+        return rpc_error(req_id, -32602, "Invalid arguments or inaccessible resource", stage)
     except Exception:
         # Validation and backend diagnostics are local; never return traceback,
         # bearer, private topology or file paths as protocol errors.
-        return rpc_error(req_id, -32603, "Request failed")
+        return rpc_error(req_id, -32603, "Request failed", stage)
 
 
 async def _internal_auth(request: Request) -> tuple[dict[str, Any], AuthContext]:
