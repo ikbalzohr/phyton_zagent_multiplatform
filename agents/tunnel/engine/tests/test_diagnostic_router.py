@@ -67,6 +67,22 @@ class RouterDiagnosticTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(e['requestId'] == correlation and e['stage'] == 'auth.token' for e in self.records()))
         self.assertEqual(response.headers['cache-control'], 'no-store')
 
+    async def test_mcp_initialize_reaches_handler_only_after_authentication(self):
+        from router.access import AuthContext
+        auth = AuthContext('fixture-principal', 'fixture-workspace', frozenset(), frozenset(), '1', time.time()+60)
+        authenticate = AsyncMock(return_value=auth)
+        with patch.object(self.server.ResourceAuthorizer, 'authenticate', authenticate):
+            response = await self.client.post('/mcp',
+                json={'jsonrpc':'2.0','id':17,'method':'initialize'},
+                headers={'Authorization':'Bearer fixture'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('result', response.json(), 'authenticated initialize must not lose request.state.auth')
+        self.assertIn('protocolVersion', response.json()['result'])
+        authenticate.assert_awaited_once()
+        assert authenticate.await_args is not None
+        self.assertEqual(authenticate.await_args.args[0], 'Bearer fixture')
+        self.assertFalse(any(e['stage'] == 'mcp.auth_context' for e in self.records()))
+
     async def test_tools_list_failure_preserves_jsonrpc_and_never_serializes_exception(self):
         from router.access import AuthContext
         auth = AuthContext('p','w',frozenset(),frozenset(),'1',time.time()+60)

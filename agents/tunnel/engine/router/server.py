@@ -228,6 +228,7 @@ async def boundary(request: Request, call_next):
             stage = 'auth.token'
             if _auth_client is None:
                 raise AuthorizationError("NOT_READY", 503)
+            request.state.auth = await authorizer().authenticate(request.headers.get("authorization", ""), _auth_client)
         if request.url.path in ("/broker/allowlist", "/broker/allowlist/catalog"):
             if _auth_client is None:
                 raise AuthorizationError("NOT_READY", 503)
