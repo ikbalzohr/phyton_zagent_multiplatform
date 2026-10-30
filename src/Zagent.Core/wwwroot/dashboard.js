@@ -4,13 +4,14 @@ const base = '/api/management/v1/';
 const profileDependencyHint = 'Use authenticated local-owner diagnostics with this request ID to check owner profile authorization, private management connectivity, and catalog validation. This response does not identify the failed check or prove Files is stopped. Do not bypass authorization. For uncertain mutations, retain the same payload and idempotency key.';
 const profileBindingReasons = new Set(['BINDING_IDENTIFIERS', 'CAPABILITY_ACTIONS', 'CAPABILITY_AMBIGUOUS', 'CAPABILITY_DEVICE', 'CAPABILITY_INSTALLATION', 'CAPABILITY_MISSING', 'CAPABILITY_REVISION', 'CAPABILITY_SCHEMA', 'CAPABILITY_VERSION', 'CAPABILITY_WORKSPACE', 'CONFIG_ACL', 'CONFIG_CHANGED', 'CONFIG_DUPLICATE_KEY', 'CONFIG_IDENTITY', 'CONFIG_JSON', 'CONFIG_PATH', 'CONFIG_PLATFORM', 'CONFIG_PRIVATE_PATH', 'CONFIG_READ', 'CONFIG_REPARSE', 'CONFIG_SCHEMA', 'CONFIG_SIZE', 'GRANTS_SCHEMA', 'GRANT_EXPIRY', 'GRANT_REVOKED', 'GRANT_SCOPES', 'GRANT_TOOLS', 'RESOURCE_DEFAULT', 'RESOURCE_DEVICE', 'RESOURCE_ID', 'RESOURCE_INSTALLATION', 'RESOURCE_KIND', 'RESOURCE_MEMBERSHIP', 'RESOURCE_PROFILE_ID', 'RESOURCE_REVOKED', 'RESOURCE_SCHEMA', 'TOOL_POLICY', 'WORKSPACE_MISMATCH', 'UNKNOWN']);
 let csrf, profileRevision, page = '', generation = 0, timer, busy = false;
+let shutdownPhase = 'idle';
 const $ = id => document.getElementById(id);
 const node = (tag, text) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); return n; };
 const display = value => value == null ? 'unknown' : typeof value === 'object' ? JSON.stringify(value) : String(value);
 const visualMetadata = (value) => value ? { source: value.source, label: value.label, mimeType: value.mimeType, bytes: value.bytes, capturedAtUtc: value.capturedAtUtc } : null;
 async function request(path, options = {}) {
   const response = await fetch(path.startsWith('/') ? path : base + path, { credentials: 'same-origin', cache: 'no-store', ...options });
-  if (response.status === 401) { throw new Error('Local Windows owner authentication unavailable; no success is assumed.'); }
+  if (response.status === 401) { const error = new Error('Local Windows owner authentication unavailable; no success is assumed.'); error.status = 401; throw error; }
   if (!response.ok) {
     const failure = await response.json().catch(() => null);
     const code = typeof failure?.code === 'string' && /^[A-Z0-9_]{1,80}$/.test(failure.code) ? ` ${failure.code}` : '';
@@ -157,14 +158,15 @@ async function render(current, stamp) {
   if (current === 'settings') { const d = await request('settings'); apply(() => record($('settings-content'), d)); }
 }
 async function refresh() {
-  if (busy || document.hidden) return;
+  if (shutdownPhase !== 'idle' || busy || document.hidden) return;
   if (page === 'workspaces' && $('workspaces-content').querySelector('form')) { clearTimeout(timer); timer = setTimeout(refresh, 3000); return; }
   busy = true; const current = page, stamp = generation;
   try { await render(current, stamp); if (stamp === generation) { $('freshness').textContent = `Last successful response: ${new Date().toLocaleTimeString()} · bounded polling · installation scope`; $('freshness').classList.remove('offline'); } }
   catch (e) { if (stamp === generation) { $('freshness').textContent = 'OFFLINE / UNAVAILABLE — previous data is stale. ' + e.message; $('freshness').classList.add('offline'); } }
-  finally { busy = false; clearTimeout(timer); timer = setTimeout(refresh, $('freshness').classList.contains('offline') ? 10000 : 3000); }
+  finally { busy = false; clearTimeout(timer); if (shutdownPhase === 'idle') timer = setTimeout(refresh, $('freshness').classList.contains('offline') ? 10000 : 3000); }
 }
 function navigate() {
+  if (shutdownPhase !== 'idle') return;
   const allowed = ['overview','agents','workspaces','connections','jobs','artifacts','diagnostics','logs','settings'];
   page = allowed.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview'; generation++;
   document.querySelectorAll('.page').forEach(s => { s.hidden = s.id !== page; });
@@ -174,7 +176,47 @@ function navigate() {
 }
 document.querySelectorAll('[data-runtime]').forEach(b => b.addEventListener('click', () => { if (confirm(`Request ${b.dataset.runtime}?`)) command('runtime/actions', { operation: b.dataset.runtime }).catch(e => notice(e.message, true)); }));
 document.querySelectorAll('[data-integration]').forEach(b => b.addEventListener('click', () => command('connections/actions', { action: b.dataset.integration }).catch(e => notice(e.message, true))));
-$('shutdown').addEventListener('click', async () => { if (prompt('Stops agents and the dashboard. Type STOP CORE to confirm.') !== 'STOP CORE') return; try { await command('runtime/shutdown', { confirmation: 'STOP CORE' }); clearTimeout(timer); } catch (e) { notice('Shutdown response unavailable. Do not assume success: ' + e.message, true); } });
+function bindShutdownDialog() {
+  const dialog = $('shutdown-dialog'), trigger = $('shutdown');
+  const confirmButton = $('shutdown-confirm'), cancelButton = $('shutdown-cancel');
+  trigger.addEventListener('click', () => {
+    if (shutdownPhase !== 'idle' || dialog.open) return;
+    $('shutdown-status').textContent = '';
+    dialog.showModal(); cancelButton.focus();
+  });
+  cancelButton.addEventListener('click', () => { if (shutdownPhase === 'idle') dialog.close(); });
+  dialog.addEventListener('cancel', event => { if (shutdownPhase !== 'idle') event.preventDefault(); });
+  confirmButton.addEventListener('click', async () => {
+    if (shutdownPhase !== 'idle' || !dialog.open) return;
+    shutdownPhase = 'requesting'; generation++; clearTimeout(timer);
+    trigger.disabled = confirmButton.disabled = cancelButton.disabled = true;
+    $('shutdown-status').textContent = 'Mengirim permintaan Stop Core…';
+    try {
+      // Keep the existing authenticated/CSRF-protected endpoint and server confirmation contract.
+      // Shutdown is not a queued management operation; never poll it or replay it automatically.
+      const result = await mutate('runtime/shutdown', { confirmation: 'STOP CORE' });
+      if (result?.state !== 'accepted') throw new Error('shutdown_outcome_unknown');
+      shutdownPhase = 'accepted'; dialog.close();
+      document.querySelectorAll('button, input, select').forEach(control => { control.disabled = true; });
+      notice('Permintaan Stop Core diterima. Core dan agen sedang berhenti; dashboard akan terputus. Gunakan launcher untuk memulai kembali.');
+      $('freshness').textContent = 'Shutdown diterima — pemantauan dihentikan. Ini bukan verifikasi bahwa proses sudah keluar.';
+    } catch (error) {
+      if ([400, 401, 403, 409, 428, 429].includes(error.status)) {
+        shutdownPhase = 'idle'; trigger.disabled = confirmButton.disabled = cancelButton.disabled = false;
+        $('shutdown-status').textContent = 'Permintaan Stop Core ditolak. Periksa otorisasi sebelum mencoba kembali.';
+        notice('Permintaan Stop Core ditolak; tidak ada keberhasilan yang diasumsikan.', true);
+        cancelButton.focus(); refresh();
+      } else {
+        shutdownPhase = 'uncertain'; dialog.close();
+        document.querySelectorAll('button, input, select').forEach(control => { control.disabled = true; });
+        notice('Status penghentian Core belum terkonfirmasi. Koneksi mungkin terputus saat shutdown; periksa proses di laptop. Permintaan tidak dikirim ulang otomatis.', true);
+        $('freshness').textContent = 'Status shutdown belum terkonfirmasi — pemantauan dihentikan.';
+        $('freshness').classList.add('offline');
+      }
+    }
+  });
+}
+bindShutdownDialog();
 
 $('profile-form').addEventListener('submit', async e => { e.preventDefault(); try {
   const values = Object.fromEntries(new FormData(e.target)); values.enabled = e.target.elements.enabled.checked;

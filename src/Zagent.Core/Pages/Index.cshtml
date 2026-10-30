@@ -23,4 +23,9 @@
 <section id="logs" class="page" hidden><p class="muted">Bounded operational log, not a conversation history. Sensitive values are redacted.</p><div id="logs-content"></div></section>
 <section id="settings" class="page" hidden><p class="muted">Credentials and TLS are provisioned offline by the Windows account owner; no password, token or enrollment endpoint is exposed here.</p><div id="settings-content"></div></section>
 <noscript>JavaScript is required for live management data. No cached or sample status is shown.</noscript>
-</main></body></html>
+</main><dialog id="shutdown-dialog" class="shutdown-dialog" aria-labelledby="shutdown-title" aria-describedby="shutdown-description">
+<h2 id="shutdown-title">Hentikan Core?</h2>
+<p id="shutdown-description">Core dan seluruh agen akan dihentikan. Dashboard akan terputus. Gunakan launcher untuk menjalankan Zagent kembali.</p>
+<p id="shutdown-status" role="status" aria-live="polite"></p>
+<div class="shutdown-actions"><button id="shutdown-cancel" type="button" class="secondary" autofocus>Batalkan</button><button id="shutdown-confirm" type="button" class="danger">Stop Core</button></div>
+</dialog></body></html>
