@@ -1,5 +1,6 @@
 """RFC7662/Keycloak contract test SOURCE. NOT_RUN: owner Windows gate."""
 import os
+import json
 import time
 import unittest
 from unittest.mock import patch
@@ -32,7 +33,10 @@ class IntrospectionContractTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(request.headers["authorization"].startswith("Basic "))
             self.assertEqual(parse_qs(request.content.decode()),
                              {"token": ["contract-test"], "token_type_hint": ["access_token"]})
-            return httpx.Response(status, json=claims)
+            # Send deliberately malformed nonfinite claims to the real parser;
+            # httpx's strict json= encoder rejects Infinity before dispatch.
+            return httpx.Response(status, content=json.dumps(claims).encode('utf-8'),
+                                  headers={'content-type': 'application/json'})
         with patch.dict(os.environ, {"TEST_AS_SECRET": "unit-test-not-a-real-secret"}):
             async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
                 return await ResourceAuthorizer(config or self.config()).authenticate(

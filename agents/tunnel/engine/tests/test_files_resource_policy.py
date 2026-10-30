@@ -120,6 +120,7 @@ class FilesResourcePolicyTests(unittest.TestCase):
              patch.object(server, "_auth_client", object()), \
              patch.object(server, "_credentials", {context["request_id"]: ("Bearer fixture-not-a-token", context["deadline"])}), \
              patch.object(server, "_policy", return_value={"scope": "files:read"}), \
+             patch.object(server, "_files_catalog", new=unittest.mock.AsyncMock(return_value=None)), \
              patch.object(self.policy, "authenticate", new=unittest.mock.AsyncMock(return_value=self.auth)):
             asyncio.run(server._revalidate(context))
             self.policy.config["grants"]["p"]["files_resource"]["profile_id"] = "changed"

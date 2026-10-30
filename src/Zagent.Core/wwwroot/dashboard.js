@@ -100,6 +100,17 @@ function profileEditor(row, target) {
   form.addEventListener('submit', e => e.preventDefault());
   return form;
 }
+let diagnosticEvents = [], diagnosticFilters = '';
+function diagnosticQuery() {
+  const values = new FormData($('diagnostics-form')), query = new URLSearchParams({ limit: '200' });
+  ['component','severity','requestId'].forEach(key => { const value = values.get(key); if (value) query.set(key, value); });
+  return query.toString();
+}
+function diagnosticTable() {
+  const text = $('diagnostics-search').value.toLowerCase();
+  const rows = diagnosticEvents.filter(row => ['timestampUtc','requestId','component','stage','code','severity','message'].some(key => String(row[key] || '').toLowerCase().includes(text)));
+  table($('diagnostics-events'), rows, ['timestampUtc','requestId','component','stage','code','severity','message']);
+}
 const data = async path => (await request(path)).data;
 async function render(current, stamp) {
   // Fetch everything needed for a page before touching DOM; old-page requests cannot overwrite a newer page.
@@ -130,6 +141,18 @@ async function render(current, stamp) {
   if (current === 'connections') { const [d, routes] = await Promise.all([data('connections'), data('routes')]); apply(() => { record($('connections-content'), d); table($('routes-content'), routes.services, ['name','namespace','agentStatus','mcpStatus','routing','tools','lastError']); }); }
   if (current === 'jobs') { const d = await data('jobs'); apply(() => table($('jobs-content'), d.tasks, ['taskId','principalId','workspaceId','agent','tool','state','progress','stopMode'], row => row.canStop ? [button('Request cancel', () => command('jobs/' + encodeURIComponent(row.taskId) + '/cancel', {}), true)] : [])); }
   if (current === 'artifacts') { const visual = await request('visuals').catch(() => ({ available: false })); const d = await request('artifacts'); apply(() => { record($('artifacts-content'), { latest: visualMetadata(visual), download: d.available ? d.contentUrl : null }); if (d.available && d.contentUrl?.startsWith(base + 'artifacts/')) { const a = node('a', 'Download verified artifact'); a.href = d.contentUrl; a.download = ''; $('artifacts-content').append(a); } }); }
+  if (current === 'diagnostics') {
+    const filters = diagnosticFilters || 'limit=200';
+    const d = await request('diagnostics?' + filters);
+    apply(() => {
+      diagnosticEvents = d.events || [];
+      $('diagnostics-status').textContent = `Diagnostics: ${d.status}. Captured: ${d.capturedAtUtc}. ${d.coverage}`;
+      $('diagnostics-export').href = base + 'diagnostics/export?' + filters;
+      record($('diagnostics-runtime'), d.runtime);
+      table($('diagnostics-sources'), d.sources, ['component','status','accepted','ignored','truncated']);
+      diagnosticTable();
+    });
+  }
   if (current === 'logs') { const d = await request('logs'); apply(() => table($('logs-content'), d.technical, ['timestampUtc','level','source','event','message'])); }
   if (current === 'settings') { const d = await request('settings'); apply(() => record($('settings-content'), d)); }
 }
@@ -142,7 +165,7 @@ async function refresh() {
   finally { busy = false; clearTimeout(timer); timer = setTimeout(refresh, $('freshness').classList.contains('offline') ? 10000 : 3000); }
 }
 function navigate() {
-  const allowed = ['overview','agents','workspaces','connections','jobs','artifacts','logs','settings'];
+  const allowed = ['overview','agents','workspaces','connections','jobs','artifacts','diagnostics','logs','settings'];
   page = allowed.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview'; generation++;
   document.querySelectorAll('.page').forEach(s => { s.hidden = s.id !== page; });
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.hash === '#' + page));
@@ -160,4 +183,6 @@ $('profile-form').addEventListener('submit', async e => { e.preventDefault(); tr
 $('workflow-form').addEventListener('submit', async e => { e.preventDefault(); const values = Object.fromEntries(new FormData(e.target));
   try { const path = values.runId ? 'workflows/' + encodeURIComponent(values.runId) + '/evidence' : 'workflows'; const result = await request(path + '?principalId=' + encodeURIComponent(values.principalId)); record($('workflows-content'), result); }
   catch (err) { notice(err.message, true); } });
+$('diagnostics-form').addEventListener('submit', async e => { e.preventDefault(); diagnosticFilters = diagnosticQuery(); generation++; await refresh(); });
+$('diagnostics-search').addEventListener('input', diagnosticTable);
 addEventListener('hashchange', navigate); document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); }); navigate();

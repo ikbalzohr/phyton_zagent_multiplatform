@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Zagent.Core.Diagnostics;
+using Zagent.Core.Dashboard;
 using Zagent.Core.Agents.ArcMap;
 using Zagent.Core.Agents.Files;
 using Zagent.Core.Agents.Tunnel;
@@ -51,11 +53,14 @@ public sealed class ManagerCoreHost : IAsyncDisposable
         _pipeServer = pipeServer;
         ControlService = controlService;
         Options = options;
+        Diagnostics = new DiagnosticEventStore(options.DataRoot);
     }
 
     public ManagerControlService ControlService { get; }
 
     public ManagerCoreHostOptions Options { get; }
+    public DiagnosticEventStore Diagnostics { get; }
+    public DiagnosticRuntimeSnapshot GetDiagnosticsSnapshot() => DashboardDiagnostics.CaptureRuntime(Options, _supervisor, IsStopping);
 
     public bool IsStopping => _stopTask is not null;
     public event EventHandler? ShutdownRequested
@@ -68,6 +73,22 @@ public sealed class ManagerCoreHost : IAsyncDisposable
         ManagerCoreHostOptions options,
         bool acquireSupervisorLease = true,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var diagnostics = new DiagnosticEventStore(options.DataRoot);
+        try {
+            var host = await CreateInternalAsync(options, acquireSupervisorLease, cancellationToken);
+            diagnostics.Record("core.lifecycle", "CORE_STARTED", "info");
+            return host;
+        } catch (Exception) {
+            diagnostics.Record("core.lifecycle", "CORE_START_FAILED", "error");
+            throw;
+        }
+    }
+    private static async Task<ManagerCoreHost> CreateInternalAsync(
+        ManagerCoreHostOptions options,
+        bool acquireSupervisorLease,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
 
@@ -159,7 +180,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
             acquireInstanceLease: acquireSupervisorLease,
             instanceLeaseName: options.SupervisorLeaseName ??
                 ZagentInstallationProfile.SupervisorLeaseName(
-                    ZagentInstallationProfile.InferRole(root)));
+                    ZagentInstallationProfile.InferRole(root)),
+            diagnostics: new DiagnosticEventStore(data));
 
         try
         {
@@ -350,7 +372,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                 PluginParentAudience:
                     pluginAccessConfig.ParentAudience,
                 ArcMapMcpUrl: $"http://{options.BindHost}:{options.ArcMapPort}/mcp",
-                OAuthCredentialDataRoot: data);
+                OAuthCredentialDataRoot: data,
+                CoreDataRoot: data);
 
             var credentialScope =
                 options.Environment.ToString().ToLowerInvariant();
@@ -837,6 +860,7 @@ public sealed class ManagerCoreHost : IAsyncDisposable
     }
     private async Task StopCoreAsync()
     {
+        Diagnostics.Record("core.lifecycle", "CORE_STOPPING", "info");
         await ControlService.StopForShutdownAsync();
         await _pipeServer.DisposeAsync();
 

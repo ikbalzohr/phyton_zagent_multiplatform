@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable
+from .diagnostic_events import record, request_id, traced
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_DIR = Path(os.environ.get("ZAGENT_TUNNEL_RUNTIME_DIR", str(ROOT / "runtime"))).resolve()
@@ -913,6 +914,7 @@ class Orchestrator:
                     self._active_tasks.pop(item.task_id, None)
                 queue.task_done()
 
+    @traced('job.scheduler', 'UNEXPECTED_ERROR')
     async def _run_task(
         self, task_id: str, worker_id: int, lane: str
     ) -> None:
@@ -1029,6 +1031,8 @@ class Orchestrator:
             result_json = json.dumps(result, ensure_ascii=False)
             upstream_error = upstream_error_summary(result)
             terminal_state = "failed" if upstream_error else "succeeded"
+            if upstream_error:
+                record('job.upstream_result', 'ROUTER_UPSTREAM_UNAVAILABLE')
             finished = now()
 
             await self.journal.update(
@@ -1068,15 +1072,18 @@ class Orchestrator:
                 self.telemetry.emit(ctx, "cancelled")
             raise
 
-        except Exception as exc:
+        except Exception:
+            correlation = request_id()
+            record('job.execution', 'UNEXPECTED_ERROR', correlation)
+            safe_error = 'Job execution failed. requestId=' + correlation
             await self.journal.update(
                 task_id,
                 state="orphaned" if ctx.access_mode == "write" and effect_started else "failed",
-                error=str(exc),
+                error=safe_error,
                 finished_at=now(),
                 heartbeat_at=now(),
             )
-            self.telemetry.emit(ctx, "agent_done", error=str(exc))
+            self.telemetry.emit(ctx, "agent_done", error=safe_error)
 
     def public_task(
         self, row: dict[str, Any] | None

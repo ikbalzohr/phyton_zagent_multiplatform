@@ -20,6 +20,7 @@ from app.core.execution_context import (VerifiedContext, owner_key, CURRENT,
                                        authorize_operation, validate_profile)
 from app.profiles import manager
 from app.paths import CONFIG_DIR, RUNTIME_DIR
+from app.core.diagnostic_events import request_id, traced
 READ = {'ping','runtime_info','get_root','exists','list','tree','stat','read',
         'read_bytes_b64','search','hash','diff','syntax_check','backup_list',
         'cross_profile_capabilities','profile_list','profile_get','profile_default_get','profile_reload',
@@ -468,6 +469,7 @@ class Engine:
         async with read_lease(control=True):
             return await self._run_with_catalog(op, args, meta, profile, resources, flag)
 
+    @traced('files.operation', 'FILES_OPERATION_FAILED')
     async def _run_with_catalog(self, op, args, meta, profile, resources, flag):
         opid = meta['operation_id']
         started = time.monotonic()
@@ -507,11 +509,11 @@ class Engine:
         except asyncio.CancelledError:
             self.journal.update(opid, state='cancelled', error='Cancelled before worker thread started')
             raise
-        except InterruptedError as exc:
-            self.journal.update(opid, state='cancelled', error=str(exc))
+        except InterruptedError:
+            self.journal.update(opid, state='cancelled', error='Operation interrupted')
             raise
-        except Exception as exc:
-            self.journal.update(opid, state='failed', error=str(exc))
+        except Exception:
+            self.journal.update(opid, state='failed', error='Files operation failed. requestId=' + request_id())
             raise
 
     def cancel(self, operation_id=None, session_id=None, task_id=None):

@@ -17,6 +17,7 @@ from .identity import internal_token
 from .files_selection import forward_files_arguments
 from .profile_admin import PROFILE_ADMIN_SCOPES, CATALOG_TOOL
 from .access import AuthorizationError, digest
+from .diagnostic_events import traced
 
 log = logging.getLogger("zagent.tunnel.router.registry")
 
@@ -389,6 +390,7 @@ class MCPRegistry:
             state.profile_catalog_diagnostic = 'RPC_ERROR'
             raise AuthorizationError('PROFILE_CATALOG_UNAVAILABLE', 503) from None
 
+    @traced('upstream.dispatch', 'ROUTER_UPSTREAM_UNAVAILABLE')
     async def invoke(self, service_id: str, upstream_name: str, arguments: dict[str, Any], ctx: ExecContext) -> dict[str, Any]:
         state = self.states[service_id]
         await self.ensure_initialized(state)
