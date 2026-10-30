@@ -20,6 +20,11 @@ TERMINAL = {"succeeded", "failed", "cancelled", "orphaned"}
 INTERACTIVE_PRIORITIES = {0, 1}
 
 
+class PreDispatchRejected(RuntimeError):
+    """Trusted executor preflight rejected before backend invocation; no effect was dispatched."""
+
+
+
 def now() -> float:
     return time.time()
 
@@ -1047,6 +1052,13 @@ class Orchestrator:
                 upstream_is_error=bool(upstream_error),
                 payload_bytes=len(result_json.encode("utf-8")),
             )
+
+        except PreDispatchRejected as exc:
+            await self.journal.update(
+                task_id, state="failed", error=str(exc),
+                finished_at=now(), heartbeat_at=now(),
+            )
+            self.telemetry.emit(ctx, "pre_dispatch_rejected", error=str(exc))
 
         except asyncio.CancelledError:
             if self._stopping and task_id not in self._cancel:

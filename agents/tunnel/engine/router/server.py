@@ -30,7 +30,7 @@ from .files_policy import FILES_TOOL_SCOPES
 from .profile_admin import (PROFILE_ADMIN_SCOPES, require_profile_management, catalog_context,
                             validate_catalog, new_admin_context, revalidate_admin)
 from .identity import Placement, internal_token, verify_internal_token
-from .orchestration import Orchestrator
+from .orchestration import Orchestrator, PreDispatchRejected
 from .registry import MCPRegistry
 from .workflow_domain import WorkflowDomainJournal
 from .workflow_runtime import WorkflowRuntimeService
@@ -130,14 +130,17 @@ async def _request_context(auth, policy, name, arguments):
 
 
 async def _executor(service: str, tool: str, arguments: dict[str, Any], ctx):
-    async with orchestrator.journal._lock:
-        isolated = orchestrator.journal.conn.execute("SELECT 1 FROM tasks WHERE resource_key=? AND state='orphaned' AND started_at IS NOT NULL AND task_id<>? LIMIT 1", (ctx.resource_key, ctx.task_id)).fetchone()
-    if isolated and tool not in _FILES_IMMEDIATE_CONTROLS:
-        raise AuthorizationError("RESOURCE_RECONCILIATION_REQUIRED", 409)
-    auth = await _revalidate(ctx.execution_context)
-    if ctx.session_id != auth.owner:
-        raise AuthorizationError("OWNER_MISMATCH", 403)
-    placement.validate(ctx.target_device_id)
+    try:
+        async with orchestrator.journal._lock:
+            isolated = orchestrator.journal.conn.execute("SELECT 1 FROM tasks WHERE resource_key=? AND state='orphaned' AND started_at IS NOT NULL AND task_id<>? LIMIT 1", (ctx.resource_key, ctx.task_id)).fetchone()
+        if isolated and tool not in _FILES_IMMEDIATE_CONTROLS:
+            raise AuthorizationError("RESOURCE_RECONCILIATION_REQUIRED", 409)
+        auth = await _revalidate(ctx.execution_context)
+        if ctx.session_id != auth.owner:
+            raise AuthorizationError("OWNER_MISMATCH", 403)
+        placement.validate(ctx.target_device_id)
+    except AuthorizationError as exc:
+        raise PreDispatchRejected(str(exc)) from exc
     if service == "__workflow__":
         loop = asyncio.get_running_loop()
         def authorize_step():
@@ -145,12 +148,15 @@ async def _executor(service: str, tool: str, arguments: dict[str, Any], ctx):
             future.result(timeout=7)
         with execution_authority(ctx.execution_context, authorize_step):
             return await workflow_runtime.execute_internal(tool, arguments, ctx)
-    configured = _policy(ctx.execution_context["public_tool"])
-    workflow_validation = (ctx.execution_context.get("run_id") and service == "zagent_arcmap" and tool == "arcmap_goal_validate")
-    if not workflow_validation and registry.get_mapping(ctx.execution_context["public_tool"]) != (service, tool):
-        raise AuthorizationError("TOOL_MAPPING_CHANGED", 403)
-    if configured.get("enabled", True) is not True:
-        raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
+    try:
+        configured = _policy(ctx.execution_context["public_tool"])
+        workflow_validation = (ctx.execution_context.get("run_id") and service == "zagent_arcmap" and tool == "arcmap_goal_validate")
+        if not workflow_validation and registry.get_mapping(ctx.execution_context["public_tool"]) != (service, tool):
+            raise AuthorizationError("TOOL_MAPPING_CHANGED", 403)
+        if configured.get("enabled", True) is not True:
+            raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
+    except AuthorizationError as exc:
+        raise PreDispatchRejected(str(exc)) from exc
     return await registry.invoke(service, tool, arguments, ctx)
 
 
@@ -213,6 +219,9 @@ async def boundary(request: Request, call_next):
             verify_internal_token(request.headers.get("x-zagent-internal-token", ""))
             request.state.internal = True
         if request.url.path == "/mcp":
+            if _auth_client is None:
+                raise AuthorizationError("NOT_READY", 503)
+        if request.url.path in ("/broker/allowlist", "/broker/allowlist/catalog"):
             if _auth_client is None:
                 raise AuthorizationError("NOT_READY", 503)
             request.state.auth = await authorizer().authenticate(request.headers.get("authorization", ""), _auth_client)
@@ -581,6 +590,11 @@ async def workflow_control(run_id: str, action: str, request: Request):
         return await getattr(workflow_runtime, action)(run_id, auth.owner)
     except AuthorizationError as exc:
         return _auth_error(exc)
+
+
+from .allowlist_admin import install_routes as _install_allowlist_routes
+import sys as _sys
+allowlist_routes = _install_allowlist_routes(_sys.modules[__name__])
 
 
 def run():

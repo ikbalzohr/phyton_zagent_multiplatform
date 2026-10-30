@@ -316,5 +316,10 @@ def files_update_rollback(update_id: str):
 def files_update_abort(update_id: str):
     return updater.abort(update_id)
 
+# Co-host on the existing Core-owned Files listener; not a discovered MCP tool.
+from app.allowlist.host import install_core_routes
+allowlist_host = install_core_routes(mcp)
+
+
 if __name__ == '__main__':
     mcp.run(transport='streamable-http')
