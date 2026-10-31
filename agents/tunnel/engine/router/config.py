@@ -21,10 +21,12 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
+    from .allowlist_access import writer, publish
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    with writer(path):
+        expected = path.read_bytes() if path.exists() else None
+        raw = (json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8')
+        publish(path, raw, expected, lambda: None)
 
 
 def load_tunnel_config() -> dict[str, Any]:

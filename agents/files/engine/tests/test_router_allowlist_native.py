@@ -216,6 +216,8 @@ def test_http_perimeter_exposes_allowlist_and_enforces_scope(state, monkeypatch)
             class ReadOnlyAuthorizer:
                 configured = True
                 config = {'resource_uri': ''}
+                def current_grant(self, auth):
+                    return state.grant
                 async def authenticate(self, authorization, client):
                     return read_only
             router.authorizer = lambda: ReadOnlyAuthorizer()

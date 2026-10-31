@@ -36,7 +36,7 @@ from .registry import MCPRegistry
 from .workflow_domain import WorkflowDomainJournal
 from .workflow_runtime import WorkflowRuntimeService
 from .workflow_security import execution_authority
-from . import task_recovery
+from . import task_recovery, allowlist_access
 
 SERVER_INFO = {"name": "Zagent Tunnel", "version": "1.0.0"}
 PROTOCOL = "2025-11-25"  # candidate; client conformance NOT_RUN
@@ -302,7 +302,9 @@ def _tool(name: str, properties=None, required=()):
 
 def _management_tools():
     string = {"type":"string", "minLength":1,"maxLength":512}
-    return [{"name": task_recovery.TOOL,
+    return [{"name": allowlist_access.TOOL,
+        "description": "Explicit owner-only enablement of four native allowlist memberships on your existing grant. Plan first; apply requires exact revision and plan. No other grant or policy changes.",
+        "inputSchema": allowlist_access.SCHEMA}, {"name": task_recovery.TOOL,
         "description": "Immediate owned orphaned read-only Files search recovery. Plan first; apply with expected_plan. Never replays the search or returns a durable receipt.",
         "inputSchema": task_recovery.SCHEMA},
         _tool("zagent_access_status"), _tool("zagent_capabilities"),
@@ -328,6 +330,9 @@ def _visible(auth: AuthContext):
         if name in _ALWAYS:
             tools.append(tool); continue
         try:
+            if name == allowlist_access.TOOL:
+                allowlist_access.require_available(auth, placement, authorizer(), _policy)
+                tools.append(tool); continue
             if name == task_recovery.TOOL:
                 task_recovery.require_available(auth, authorizer(), _policy)
                 tools.append(tool); continue
@@ -405,6 +410,9 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
         return _text({"ok":True,"version":"1.0.0","tools":[t["name"] for t in _visible(auth)],
                       "allowlist_diagnostics": allowlist_diagnostics(auth, registry, _policy),
                       "workflow_execution_blocker": workflow_runtime.execution_unavailable()})
+    if name == allowlist_access.TOOL:
+        import sys
+        return _text(await allowlist_access.control(sys.modules[__name__], arguments, auth, bearer))
     if name == task_recovery.TOOL:
         return _text(await task_recovery.recover(orchestrator, arguments, auth, placement,
                                                 authorizer, _policy))

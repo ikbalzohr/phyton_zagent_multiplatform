@@ -135,7 +135,9 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
                 state['dedicated']=True;state['revoke']=True
                 result=await client.post('/broker/allowlist',json=original,headers=headers)
                 assert result.status_code==403 and route.active=={}
-                assert not any('allowlist' in t['name'] for t in server._management_tools())
+                # Legacy signed broker dispatch remains absent; the explicit
+                # owner-capability membership control is a separate native API.
+                assert {t['name'] for t in server._management_tools() if 'allowlist' in t['name']} == {'zagent_allowlist_access'}
         finally:
             await server.registry.close();await server._auth_client.aclose();server._auth_client=None
             server.orchestrator.journal.conn.close();server.workflow_journal.conn.close()
