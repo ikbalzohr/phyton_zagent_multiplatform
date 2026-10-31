@@ -4,7 +4,9 @@ param(
  [Parameter(Mandatory=$true)][string]$InstallRoot,
  [Parameter(Mandatory=$true)][string]$DataRoot,
  [Parameter(Mandatory=$true)][string]$OwnerPrincipal,
- [Parameter(Mandatory=$true)][int]$RecoveryPid
+ [Parameter(Mandatory=$true)][int]$RecoveryPid,
+ [Parameter(Mandatory=$true)][string]$RecoveryLauncher,
+ [Parameter(Mandatory=$true)][string]$RecoveryExecutable
 )
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
@@ -29,9 +31,23 @@ try {
  # Actual Core factories supervise Python (Router/Files/ArcMap) and Node (Web).
  # Deny ambiguous hosts anywhere, not just ones whose path we can identify.
  $hosts=@(Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe' OR Name='python3.exe' OR Name='node.exe'" -ErrorAction Stop)
- if (@($hosts | Where-Object { $_.ProcessId -ne $RecoveryPid }).Count -ne 0) { throw 'host' }
+ $stage='RECOVERY_PROCESS'
  $self=@($hosts | Where-Object { $_.ProcessId -eq $RecoveryPid })
- if ($self.Count -ne 1 -or [int]$self[0].ProcessId -ne $RecoveryPid) { throw 'recovery process' }
+ if ($self.Count -ne 1 -or -not [StringComparer]::OrdinalIgnoreCase.Equals([string]$self[0].ExecutablePath,$RecoveryExecutable)) { throw 'recovery process' }
+ $allowed=@($RecoveryPid)
+ # Windows venv python.exe can remain as the direct parent redirector while
+ # the base interpreter runs this helper. Allow exactly that proven pair.
+ $parent=@($hosts | Where-Object { $_.ProcessId -eq $self[0].ParentProcessId })
+ if ($parent.Count -ne 0) {
+  if ($parent.Count -ne 1 -or $parent[0].Name -notin @('python.exe','pythonw.exe','python3.exe') -or
+      $parent[0].ProcessId -eq $RecoveryPid -or $parent[0].ParentProcessId -eq $RecoveryPid -or
+      [StringComparer]::OrdinalIgnoreCase.Equals($RecoveryLauncher,$RecoveryExecutable) -or
+      -not [StringComparer]::OrdinalIgnoreCase.Equals([string]$parent[0].ExecutablePath,$RecoveryLauncher)) { throw 'launcher process' }
+  $allowed+=@($parent[0].ProcessId)
+ }
+ $stage='OTHER_EXECUTORS'
+ if (@($hosts | Where-Object { $_.ProcessId -notin $allowed }).Count -ne 0) { throw 'host' }
+ $stage='GUARD_PARENT'
  $guardProcess=Get-CimInstance Win32_Process -Filter ("ProcessId="+$PID) -ErrorAction Stop
  if ([int]$guardProcess.ParentProcessId -ne $RecoveryPid) { throw 'parent' }
  $stage='ENROLLMENT'

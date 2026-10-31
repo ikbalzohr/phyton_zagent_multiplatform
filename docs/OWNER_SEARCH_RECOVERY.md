@@ -47,7 +47,10 @@ Use the existing owner console and owner's selected Python interpreter and
 PowerShell **7** `pwsh.exe`, not an MCP-launched terminal. Stop Core through its
 supported owner control and wait for Core, Router, Files, ArcMap and Web
 executors to exit. The guard rejects every Core/dotnet host and every other
-Python/Node host, even unrelated ones, rather than guessing command lines.
+Python/Node host, even unrelated ones. The sole exception is the helper's own
+Windows virtual-environment redirector: its direct-parent PID and exact launcher
+path must match the running base interpreter's PID and exact executable path.
+No generic parent/ancestor process or same-name Python process is exempted.
 It checks inherited owner-only ACLs back to the protected DataRoot, rejects
 reparse ancestors and verifies the enrolled install/DataRoot and placement.
 It does not create/repair ACLs or read/decrypt OAuth/internal credentials.

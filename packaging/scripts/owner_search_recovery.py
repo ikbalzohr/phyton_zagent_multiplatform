@@ -159,6 +159,7 @@ def recover(path, task_id, *, guard, apply=False, expected_plan=None):
 def windows_guard(install_root, data_root, principal, powershell):
     import os
     import subprocess
+    import sys
     if os.name != 'nt':
         raise RecoveryDenied('OWNER_CONSOLE')
     # Do not trust redirected/service callers or an attestation passed in argv.
@@ -177,12 +178,15 @@ def windows_guard(install_root, data_root, principal, powershell):
     try:
         proc = subprocess.run([str(host), '-NoLogo', '-NoProfile', '-File', str(script),
             '-InstallRoot', str(install_root), '-DataRoot', str(data_root),
-            '-OwnerPrincipal', principal, '-RecoveryPid', str(os.getpid())],
+            '-OwnerPrincipal', principal, '-RecoveryPid', str(os.getpid()),
+            '-RecoveryLauncher', sys.executable,
+            '-RecoveryExecutable', getattr(sys, '_base_executable', sys.executable)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30, check=False)
         answer = strict_json(proc.stdout.decode('utf-8-sig').strip())
     except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
         raise RecoveryDenied('WINDOWS_GUARD') from exc
-    stages = {'OWNER_CONSOLE','SOURCE_PATH','DATAROOT_ACL','STOPPED_PRODUCERS','ENROLLMENT','JOURNAL_ACL'}
+    stages = {'OWNER_CONSOLE','SOURCE_PATH','DATAROOT_ACL','STOPPED_PRODUCERS',
+              'RECOVERY_PROCESS','OTHER_EXECUTORS','GUARD_PARENT','ENROLLMENT','JOURNAL_ACL'}
     if proc.returncode:
         code = answer.get('denied') if isinstance(answer, dict) else None
         raise RecoveryDenied(code if code in stages else 'WINDOWS_GUARD')
