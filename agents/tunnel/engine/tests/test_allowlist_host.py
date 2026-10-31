@@ -16,7 +16,30 @@ def test_dedicated_router_module_exists():
     assert importlib.util.find_spec('router.allowlist_admin') is not None
 
 
-def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monkeypatch):
+@pytest.fixture
+def isolated_router_modules():
+    # Importing the production server creates disposable journals/config state.
+    # Restore both import caches; sys.modules alone leaves package attributes stale.
+    import router
+    names=('config','server','registry')
+    missing=object()
+    modules={name:sys.modules.get('router.'+name,missing) for name in names}
+    attributes={name:getattr(router,name,missing) for name in names}
+    try:
+        for name in names:
+            sys.modules.pop('router.'+name,None)
+            if hasattr(router,name):delattr(router,name)
+        yield
+    finally:
+        for name in names:
+            if modules[name] is missing:sys.modules.pop('router.'+name,None)
+            else:sys.modules['router.'+name]=modules[name]
+            if attributes[name] is missing:
+                if hasattr(router,name):delattr(router,name)
+            else:setattr(router,name,attributes[name])
+
+
+def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monkeypatch,isolated_router_modules):
     import json
     config=tmp_path/'config';config.mkdir()
     runtime=tmp_path/'runtime';runtime.mkdir()
@@ -24,7 +47,7 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
     monkeypatch.setenv('ZAGENT_TUNNEL_RUNTIME_DIR',str(runtime))
     monkeypatch.setenv('ZAGENT_DEVICE_ID','device')
     monkeypatch.setenv('ZAGENT_INSTALLATION_ID','install')
-    monkeypatch.setenv('ZAGENT_INTERNAL_TOKEN','fixture-internal')
+    monkeypatch.setenv('ZAGENT_INTERNAL_TOKEN','fixture-internal-token-32-bytes-minimum')
     monkeypatch.setenv('FIXTURE_INTROSPECT','fixture-credential')
     from router.access import principal_id
     principal=principal_id('https://issuer.invalid','owner')
@@ -33,7 +56,7 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
         files_resource=dict(kind='files',resource_id='r',profile_id='agentRoot',allowed_profile_ids=['agentRoot'],
                             device_id='device',installation_id='install',revoked=False),
         profile_management=dict(version=1,enabled=True,workspace_id='workspace',device_id='device',
-            installation_id='install',actions=['list','status','get']))
+            installation_id='install',actions=['list','get']))
     rs=dict(resource_uri='https://public.invalid/mcp',issuer='https://issuer.invalid',
         introspection_endpoint='https://issuer.invalid/introspect',workspace_id='workspace',policy_revision='grant-1',
         introspection_client_id='fixture',introspection_secret_env='FIXTURE_INTROSPECT',
@@ -44,9 +67,6 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
     service=dict(id='zagent_files',name='Files',namespace='files',url='http://127.0.0.1:18010/mcp',enabled=True)
     (config/'core_services.json').write_text(json.dumps({'services':[service]}),encoding='utf-8')
     (config/'additional_services.json').write_text('{"services":[]}',encoding='utf-8')
-    # Clear stale fixture config modules only, never use installed paths.
-    for name in list(sys.modules):
-        if name in ('router.config','router.server','router.registry'):monkeypatch.delitem(sys.modules,name,raising=False)
     server=importlib.import_module('router.server')
     from router.allowlist_admin import RouterAllowlist
     route=server.allowlist_routes
@@ -58,7 +78,7 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
     upstream=FastAPI()
     @upstream.post('/allowlist/capability')
     async def capability(request:Request):
-        assert request.headers['x-zagent-internal-token']=='fixture-internal'
+        assert request.headers['x-zagent-internal-token']=='fixture-internal-token-32-bytes-minimum'
         return dict(cap,revoked=not state['dedicated'])
     @upstream.post('/allowlist/dispatch')
     async def dispatch(request:Request):
@@ -88,8 +108,6 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
                 assert (await client.post('/broker/allowlist/catalog',json={})).status_code==401
                 headers={'Authorization':'Bearer fixture-bearer'}
                 result=await client.post('/broker/allowlist/catalog',json={},headers=headers)
-                if result.status_code!=200:
-                    import traceback;print('CATALOG DEBUG',traceback.format_exc())
                 assert result.status_code==200,result.text
                 view=result.json();assert view['profile_generation']=='generation-1' and view['mutations_ready'] is False
                 fields={**view['placement'], 'profile_generation':view['profile_generation'],
@@ -106,6 +124,12 @@ def test_actual_router_auth_catalog_forwarding_and_live_revocation(tmp_path,monk
                 forbidden=copy.deepcopy(original);forbidden['body']['method']='commit'
                 assert (await client.post('/broker/allowlist',json=forbidden,headers=headers)).status_code==403
                 assert len(forwarded)==1
+                for field,value in [('scopes',['files:read','files:write']),
+                                    ('tools',['files_profile_admin_list','files_profile_admin_get']),
+                                    ('profile_management',dict(grant['profile_management'],enabled=False))]:
+                    before=copy.deepcopy(grant[field]);grant[field]=value;publish()
+                    assert (await client.post('/broker/allowlist/catalog',json={},headers=headers)).status_code==403
+                    grant[field]=before;publish()
                 state['dedicated']=False
                 assert (await client.post('/broker/allowlist/catalog',json={},headers=headers)).status_code==403
                 state['dedicated']=True;state['revoke']=True

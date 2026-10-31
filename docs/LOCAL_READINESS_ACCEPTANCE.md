@@ -4,7 +4,7 @@
 
 ## 0 — Batas dan prasyarat
 
-- Repo lokal yang dilaporkan: `D:\3-Ikbalzohr\Agent\phyton_zagent_multiplatform`. SDK portable yang dilaporkan: `D:\3-Ikbalzohr\Agent\appBridge\toolchain\dotnet10\dotnet.exe`. Verifikasi, jangan fallback ke PATH: `global.json` mengunci SDK **10.0.401**, rollForward disabled.
+- Repo lokal yang dilaporkan: `D:\3-Ikbalzohr\Agent\phyton_zagent_multiplatform`. SDK portable yang dilaporkan: `D:\3-Ikbalzohr\Agent\appBridge\toolchain\dotnet10\dotnet.exe`. Verifikasi, jangan fallback ke PATH: `global.json` menetapkan SDK **10.0.401** dengan `rollForward: latestFeature` dan `allowPrerelease: false` (bukan pin exact). Gate penerimaan di bawah sengaja lebih ketat: SDK terpilih harus tepat **10.0.401**.
 - Pilih direktori disposable **di luar source dan instalasi aktif**. Jangan memakai data produksi, root drive, junction/symlink atau DataRoot user lain. Harness hanya menghapus subfolder fixture GUID yang dibuatnya sendiri. Setup fixture memakai executable palsu yang diberi label fixture, bukan produk/bearer/AS palsu.
 - Password dashboard hanya prompt no-echo owner; bearer AS lewat secure process environment, bukan chat/CLI/log/file plaintext. Jangan dump config, headers, cookies, DPAPI plaintext atau `.env`.
 - TLS CurrentUser My dengan private key, SAN localhost, serverAuth EKU; trust hanya keputusan owner. Protected owner-only ACL DataRoot/config/dashboard-keys/secret dan DPAPI CurrentUser wajib. Missing certificate/ACL/secret/account = BLOCKED, bukan insecure fallback.

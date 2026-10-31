@@ -18,6 +18,8 @@ def capability_for(cap,auth,placement,grant,method):
     if action is None:
         from .access import AuthorizationError as _AE
         raise _AE('ALLOWLIST_MUTATIONS_NOT_READY',403)
+    placement.validate()
+    auth.require('allowlist-admin','allowlist_admin_list')
     auth.require('files:read' if method in ('list','operation') else 'files:write')
     expected=dict(principal_id=auth.principal_id,workspace_id=auth.workspace_id,
         device_id=placement.device_id,installation_id=placement.installation_id,target_profile_id='agentRoot')
@@ -71,6 +73,8 @@ class RouterAllowlist:
     async def _authorize(self,auth,method):
         s=self.server
         current=s.authorizer();grant=current.current_grant(auth)
+        from .profile_admin import require_profile_management
+        require_profile_management(auth,s.placement,current,'files_profile_admin_list')
         cap=await self._files('/allowlist/capability',{})
         expected=capability_for(cap,auth,s.placement,grant,method)
         return cap,expected
@@ -78,8 +82,8 @@ class RouterAllowlist:
     async def catalog(self,auth):
         s=self.server;current=s.authorizer();grant=current.current_grant(auth)
         cap=await self._files('/allowlist/capability',{})
-        from .profile_admin import PROFILE_ADMIN_SCOPES, require_profile_management
-        require_profile_management(auth,s.placement,current,'allowlist_admin_list')
+        from .profile_admin import require_profile_management
+        require_profile_management(auth,s.placement,current,'files_profile_admin_list')
         expected=capability_for(cap,auth,s.placement,grant,'list')
         catalog=await s._files_catalog(auth,current)
         if 'agentRoot' not in catalog['allowed_profile_ids']:raise AuthorizationError('ALLOWLIST_REQUEST_DENIED',403)
