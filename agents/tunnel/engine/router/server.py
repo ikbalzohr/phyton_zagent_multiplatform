@@ -36,6 +36,7 @@ from .registry import MCPRegistry
 from .workflow_domain import WorkflowDomainJournal
 from .workflow_runtime import WorkflowRuntimeService
 from .workflow_security import execution_authority
+from . import task_recovery
 
 SERVER_INFO = {"name": "Zagent Tunnel", "version": "1.0.0"}
 PROTOCOL = "2025-11-25"  # candidate; client conformance NOT_RUN
@@ -65,6 +66,8 @@ def _policy(name: str) -> dict[str, Any]:
     # or disabled, must never fall back to an enabled policy.
     if name not in policies and name in _NATIVE_ALLOWLIST_TOOLS:
         return {"scope": scope_for_files_tool(name), "enabled": True}
+    if name == task_recovery.TOOL and name not in policies:
+        return {"scope": "files:write", "enabled": True}
     policy = policies.get(name)
     if not isinstance(policy, dict) or not policy.get("scope"):
         raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
@@ -299,7 +302,10 @@ def _tool(name: str, properties=None, required=()):
 
 def _management_tools():
     string = {"type":"string", "minLength":1,"maxLength":512}
-    return [_tool("zagent_access_status"), _tool("zagent_capabilities"),
+    return [{"name": task_recovery.TOOL,
+        "description": "Immediate owned orphaned read-only Files search recovery. Plan first; apply with expected_plan. Never replays the search or returns a durable receipt.",
+        "inputSchema": task_recovery.SCHEMA},
+        _tool("zagent_access_status"), _tool("zagent_capabilities"),
         _tool("zagent_task_submit", {"tool_name":string,"arguments":{"type":"object"},"idempotency_key":string}, ("tool_name",)),
         *[_tool("zagent_task_"+name, {"task_id":string}, ("task_id",)) for name in ("status","result","cancel")],
         _tool("zagent_task_list", {"limit":{"type":"integer","minimum":1,"maximum":200}}),
@@ -322,6 +328,9 @@ def _visible(auth: AuthContext):
         if name in _ALWAYS:
             tools.append(tool); continue
         try:
+            if name == task_recovery.TOOL:
+                task_recovery.require_available(auth, authorizer(), _policy)
+                tools.append(tool); continue
             policy = _policy(name)
             auth.require(policy["scope"], name)
             if name in PROFILE_ADMIN_SCOPES:
@@ -392,8 +401,13 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
     if name == "zagent_access_status":
         return _text({"ok":True, **auth.public()})
     if name == "zagent_capabilities":
+        from .allowlist_diagnostics import allowlist_diagnostics
         return _text({"ok":True,"version":"1.0.0","tools":[t["name"] for t in _visible(auth)],
+                      "allowlist_diagnostics": allowlist_diagnostics(auth, registry, _policy),
                       "workflow_execution_blocker": workflow_runtime.execution_unavailable()})
+    if name == task_recovery.TOOL:
+        return _text(await task_recovery.recover(orchestrator, arguments, auth, placement,
+                                                authorizer, _policy))
     # Read-only receipts are authorized against the task owner and ORIGINAL tool.
     # Do not demand extra grant tool names merely to retrieve an approved read.
     # Submission/cancellation retain the separate control-policy checks below.
@@ -523,6 +537,8 @@ async def mcp(request: Request):
             name, arguments = params.get("name"), params.get("arguments", {})
             if not isinstance(name, str) or not isinstance(arguments, dict):
                 raise ValueError("INVALID_TOOL_ARGUMENTS")
+            if name == task_recovery.TOOL and set(params) - {'name', 'arguments'}:
+                raise ValueError('CLIENT_AUTHORITY_NOT_ALLOWED')
             target = arguments.get('tool_name') if name == 'zagent_task_submit' else name
             if isinstance(target, str) and target in PROFILE_ADMIN_SCOPES and set(params) - {'name', 'arguments'}:
                 raise ValueError('PROFILE_ADMIN_PUBLIC_META_DENIED')
