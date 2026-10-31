@@ -51,8 +51,21 @@ def authorizer() -> ResourceAuthorizer:
     return ResourceAuthorizer(load_tunnel_config().get("resource_server") or {})
 
 
+_NATIVE_ALLOWLIST_TOOLS = frozenset({"files_allowlist_list", "files_allowlist_add",
+    "files_allowlist_remove", "files_allowlist_replace"})
+
+
 def _policy(name: str) -> dict[str, Any]:
-    policy = (load_tunnel_config().get("tool_policy") or {}).get(name)
+    policies = load_tunnel_config().get("tool_policy")
+    if policies is None:
+        policies = {}
+    if not isinstance(policies, dict):
+        raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
+    # Only the new native tools have defaults. An explicit entry, even malformed
+    # or disabled, must never fall back to an enabled policy.
+    if name not in policies and name in _NATIVE_ALLOWLIST_TOOLS:
+        return {"scope": scope_for_files_tool(name), "enabled": True}
+    policy = policies.get(name)
     if not isinstance(policy, dict) or not policy.get("scope"):
         raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
     if name.startswith("files_") and policy["scope"] != scope_for_files_tool(name):

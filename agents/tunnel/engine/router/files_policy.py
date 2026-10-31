@@ -13,6 +13,10 @@ from .profile_admin import PROFILE_ADMIN_SCOPES
 
 
 FILES_TOOL_SCOPES = {
+    'files_allowlist_list': 'files:read',
+    'files_allowlist_add': 'files:write',
+    'files_allowlist_remove': 'files:write',
+    'files_allowlist_replace': 'files:write',
     'files_ping': 'files:read',
     'files_runtime_info': 'files:read',
     'files_get_root': 'files:read',

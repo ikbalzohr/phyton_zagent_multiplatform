@@ -40,6 +40,37 @@ class TrustedFilesMCP(FastMCP):
             value = (await admin_call(name, arguments or {}, metadata) if name in PROFILE_ADMIN_TOOLS
                      else await catalog_snapshot(arguments or {}, metadata))
             return [TextContent(type='text', text=json.dumps(value, ensure_ascii=False, allow_nan=False))]
+        from app.mcp.allowlist_tools import TOOLS as ALLOWLIST_TOOLS, invoke as invoke_allowlist
+        if name in ALLOWLIST_TOOLS:
+            from mcp.types import TextContent
+            # Serialize profile administration against native policy operations,
+            # just like the existing data plane; no new approval authority.
+            async with read_lease():
+                authority = verify(metadata, name, arguments or {})
+                validate_profile(authority, engine.approved(authority['profile_id']))
+                token = CURRENT.set(authority)
+                try:
+                    try:
+                        value = invoke_allowlist(name, arguments or {})
+                    except ValueError as exc:
+                        # Expected user-correctable failures are protocol data,
+                        # not private exceptions. Unknown parser/path errors
+                        # still follow the existing diagnostics-only path.
+                        code = str(exc)
+                        if code not in {
+                            'INVALID_ARGUMENT', 'REVISION_CONFLICT', 'EXACT_LOCAL_EXECUTABLE_REQUIRED',
+                            'EXECUTABLE_IMAGE_REQUIRED', 'EXECUTABLE_NOT_ALLOWED',
+                            'NONEMPTY_ALLOWLIST_REQUIRED', 'EXECUTABLE_ALREADY_ALLOWED',
+                            'ALLOWLIST_CAPACITY', 'POLICY_TOO_LARGE', 'POLICY_INVALID',
+                        }:
+                            raise
+                        from mcp.types import CallToolResult
+                        return CallToolResult(isError=True,
+                            content=[TextContent(type='text', text=code)],
+                            structuredContent={'ok': False, 'error': {'code': code}})
+                    return [TextContent(type='text', text=json.dumps(value, ensure_ascii=False, allow_nan=False))]
+                finally:
+                    CURRENT.reset(token)
         controls = {'files_command_cancel','files_process_stop','files_process_list','files_operation_cancel','files_operation_status','files_operation_list'}
         async with read_lease(control=name in controls):
             return await self._call_data_tool(name, arguments, metadata)
@@ -116,6 +147,8 @@ def register_profile_administration():
 
 
 register_profile_administration()
+from app.mcp.allowlist_tools import register as register_allowlist
+register_allowlist(mcp)
 
 
 def metadata_from(ctx, metadata):

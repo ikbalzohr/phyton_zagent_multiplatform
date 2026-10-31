@@ -7,7 +7,8 @@ from .files_policy import FILES_TOOL_SCOPES
 from .profile_admin import PROFILE_ADMIN_SCOPES, tool_schema
 
 # These original domain APIs accept profile_id; other upstream APIs do not.
-DOMAIN_PROFILE_ID_TOOLS = frozenset({'files_workspace_status', 'files_workspace_switch'})
+DOMAIN_PROFILE_ID_TOOLS = frozenset({'files_workspace_status', 'files_workspace_switch',
+    'files_allowlist_list', 'files_allowlist_add', 'files_allowlist_remove', 'files_allowlist_replace'})
 COMMAND_TOOLS = frozenset({'files_command_capabilities', 'files_command_cancel',
     'files_exec_command', 'files_powershell_run', 'files_node', 'files_npm', 'files_npx',
     'files_git', 'files_build', 'files_test', 'files_process_list', 'files_process_start',
@@ -33,6 +34,12 @@ def files_tool_schema(tool):
     result = deepcopy(tool)
     schema = result['inputSchema']
     schema.setdefault('properties', {}).setdefault('profile_id', dict(PROFILE_SCHEMA))
+    if tool['name'] in {'files_allowlist_list', 'files_allowlist_add', 'files_allowlist_remove', 'files_allowlist_replace'}:
+        schema['additionalProperties'] = False
+        if 'expected_revision' in schema['properties']:
+            schema['properties']['expected_revision'] = {'type': 'string', 'pattern': '^[0-9a-f]{64}$'}
+        if 'profile_id' not in schema.get('required', []):
+            schema.setdefault('required', []).append('profile_id')
     return result
 
 

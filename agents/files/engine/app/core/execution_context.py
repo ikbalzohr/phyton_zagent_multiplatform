@@ -68,6 +68,8 @@ COMMAND_TOOLS = frozenset({'files_command_capabilities', 'files_command_cancel',
     'files_exec_command', 'files_powershell_run', 'files_node', 'files_npm', 'files_npx',
     'files_git', 'files_build', 'files_test', 'files_process_list', 'files_process_start',
     'files_process_stop'})
+ALLOWLIST_READ = frozenset({'allowlist_list'})
+ALLOWLIST_WRITE = frozenset({'allowlist_add', 'allowlist_remove', 'allowlist_replace'})
 AUTHORITY_ARGUMENTS = frozenset({'_meta', 'metadata', 'execution_context', 'principal_id',
     'owner_session_id', 'session_id', 'scopes', 'grant_id', 'policy_revision', 'device_id',
     'target_device_id', 'installation_id', 'request_id', 'trace_id', 'task_id',
@@ -90,7 +92,7 @@ def _operation(tool, arguments):
     if op.startswith('profile_') or op.startswith('update_'):
         raise PermissionError('MANAGEMENT_PLANE_ONLY')
     forbidden = set(AUTHORITY_ARGUMENTS)
-    if op in READ_CONTROLS | WRITE_CONTROLS or tool in COMMAND_TOOLS:
+    if op in READ_CONTROLS | WRITE_CONTROLS | ALLOWLIST_READ | ALLOWLIST_WRITE or tool in COMMAND_TOOLS:
         forbidden.discard('profile_id')  # selection only, checked against trusted resource
     if op in {'operation_cancel', 'command_cancel'}:
         forbidden.discard('task_id')  # target selector only; actual owner is trusted context
@@ -116,9 +118,9 @@ def _operation(tool, arguments):
         return inner_op, 'files:write', 'write'
     if tool in COMMAND_TOOLS:
         return op, 'files:execute', 'write'
-    if op in NATIVE_READ | READ_CONTROLS:
+    if op in NATIVE_READ | READ_CONTROLS | ALLOWLIST_READ:
         return op, 'files:read', 'read'
-    if op in NATIVE_WRITE | WRITE_CONTROLS:
+    if op in NATIVE_WRITE | WRITE_CONTROLS | ALLOWLIST_WRITE:
         return op, 'files:write', 'write'
     raise PermissionError('UNKNOWN_FILES_OPERATION')
 
