@@ -108,6 +108,14 @@ New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 Copy-Tree (Join-Path $publish "core") $OutputRoot
 Copy-Item -LiteralPath $setup -Destination (Join-Path $OutputRoot "Zagent.Setup.exe")
 Copy-Item -LiteralPath $launcher -Destination (Join-Path $OutputRoot "Zagent.Launcher.exe")
+# Passwordless local-owner first-run is separate from remote MCP OAuth.
+# HTTPS trust requires explicit CurrentUser consent on the first click.
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot "FirstRun-ZagentMultiPlatform.ps1") -Destination $OutputRoot
+$setupScripts = Join-Path $OutputRoot "setup"
+New-Item -ItemType Directory -Force -Path $setupScripts | Out-Null
+foreach ($helper in @("Provision-WindowsDashboard.ps1", "WindowsDashboard-Provisioning.ps1")) {
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot $helper) -Destination $setupScripts
+}
 Copy-Item -LiteralPath (Join-Path $Root "component-manifest.json") -Destination $OutputRoot
 
 $agentsOut = Join-Path $OutputRoot "agents"

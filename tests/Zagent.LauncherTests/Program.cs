@@ -113,9 +113,26 @@ try
 
     Check(LaunchPlan.DiscoverDataRoot(install) == data, "installation defaults to its own DataRoot");
     Check(LaunchPlan.DiscoverDataRoot(install, data) == data, "explicit matching DataRoot is accepted");
+    var configFolder = Path.Combine(data, "config");
+    File.WriteAllText(Path.Combine(configFolder, "zagent.machine.json"),
+        JsonSerializer.Serialize(new { install_root = install, data_root = data }));
+    File.WriteAllText(Path.Combine(configFolder, "installed-manifest.json"),
+        JsonSerializer.Serialize(new { install_root = install, data_root = data }));
+    Check(LaunchPlan.DiscoverDataRoot(install, data) == data,
+        "Core snake_case enrollment fields are accepted");
+    Check(LauncherApplication.FailureCode(new InvalidOperationException("ENROLLMENT_INSTALL_MISMATCH")) ==
+        "ENROLLMENT_INSTALL_MISMATCH", "known startup failure displays actionable code");
+    Check(LauncherApplication.FailureCode(new InvalidOperationException("token=private-value")) ==
+        "STARTUP_UNEXPECTED_ERROR", "unknown exception text never exposes secrets");
+    Enroll(install, data, installed: true);
     var nested = Directory.CreateDirectory(Path.Combine(install, "artifacts", "launcher-win-x64")).FullName;
     Check(LauncherApplication.FindInstallRoot(nested) == install, "published nested launcher detects install root");
     var start = LaunchPlan.Create(install, data);
+    var oneTimeScript = Path.Combine(install, "FirstRun-ZagentMultiPlatform.ps1");
+    File.WriteAllText(oneTimeScript, "# Fixture only, never executed.");
+    var firstRun = LauncherApplication.BuildFirstRunStartInfo(install);
+    Check(firstRun.ArgumentList.SequenceEqual(new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", oneTimeScript }) &&
+        firstRun.UseShellExecute, "first-click Windows owner consent is handled by a separate console");
     Check(start.FileName == Path.Combine(install, "Zagent.Core.exe"), "installed Core executable selected");
     Check(start.ArgumentList.SequenceEqual(new[] { "--dashboard", "--root", install,
         "--data-root", data, "--dashboard-config", Path.Combine(data, "config", "dashboard.json") }),

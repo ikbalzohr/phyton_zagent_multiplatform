@@ -94,11 +94,32 @@ public static class LaunchPlan
     private static string? ReadString(JsonElement root, string key)
     {
         if (root.ValueKind != JsonValueKind.Object) return null;
+        // Core's persistent JSON serializer emits snake_case fields.
+        // Also accept the historical Pascal/camel cases from older installs,
+        // but fail closed if two spellings disagree.
+        var snakeCase = key switch
+        {
+            "InstallRoot" => "install_root",
+            "DataRoot" => "data_root",
+            _ => throw new ArgumentException("Unrecognized installation field.", nameof(key))
+        };
+        string? selected = null;
+        var matched = false;
         foreach (var property in root.EnumerateObject())
-            if (string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase))
-                return property.Value.ValueKind == JsonValueKind.String
-                    ? property.Value.GetString() : null;
-        return null;
+        {
+            if (!string.Equals(property.Name, key, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(property.Name, snakeCase, StringComparison.Ordinal))
+                continue;
+            if (property.Value.ValueKind != JsonValueKind.String)
+                return null;
+            var current = property.Value.GetString();
+            if (string.IsNullOrWhiteSpace(current) ||
+                (matched && !string.Equals(selected, current, StringComparison.OrdinalIgnoreCase)))
+                return null;
+            selected = current;
+            matched = true;
+        }
+        return selected;
     }
 
     public static ProcessStartInfo Create(string installRoot, string dataRoot)

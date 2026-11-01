@@ -28,7 +28,7 @@ public sealed class TunnelConfigurationWriter
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(services);
 
-        Directory.CreateDirectory(options.ConfigRoot);
+        EnsureOwnerOnlyConfigDirectory(options.ConfigRoot);
         Directory.CreateDirectory(options.RuntimeRoot);
 
         ValidateServices(services);
@@ -124,6 +124,69 @@ public sealed class TunnelConfigurationWriter
                 },
                 cancellationToken);
         }
+    }
+
+    private static void EnsureOwnerOnlyConfigDirectory(string path)
+    {
+        var full = Path.GetFullPath(path);
+        ValidateAccessPath(full);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(full);
+            return;
+        }
+
+        var owner = WindowsIdentity.GetCurrent().User ??
+            throw new InvalidOperationException("Windows owner SID is unavailable.");
+
+        static DirectorySecurity OwnerAcl(SecurityIdentifier sid)
+        {
+            var acl = new DirectorySecurity();
+            acl.SetOwner(sid);
+            acl.SetAccessRuleProtection(true, false);
+            acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            return acl;
+        }
+
+        var directory = new DirectoryInfo(full);
+        if (!directory.Exists)
+        {
+            // Apply the owner ACL on creation, not after creating a broadly
+            // accessible directory. Existing folders are validated separately.
+            directory.Create(OwnerAcl(owner));
+        }
+
+        directory.Refresh();
+        ValidateAccessPath(full);
+        var existing = directory.GetAccessControl(
+            AccessControlSections.Owner | AccessControlSections.Access);
+
+        if (!owner.Equals(existing.GetOwner(typeof(SecurityIdentifier))))
+            throw new InvalidDataException("Tunnel config directory is owned by another Windows identity.");
+
+        var rules = existing.GetAccessRules(true, true, typeof(SecurityIdentifier))
+            .Cast<FileSystemAccessRule>().ToArray();
+        foreach (var rule in rules)
+            if (!owner.Equals(rule.IdentityReference))
+                throw new InvalidDataException("Tunnel config ACL contains another Windows identity.");
+
+        // A folder inheriting only the current owner's rights can be made
+        // private automatically. Never delete an unrelated owner's ACE.
+        var expectedInheritance = InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit;
+        var alreadyPrivate = existing.AreAccessRulesProtected &&
+            rules.Length == 1 &&
+            !rules[0].IsInherited &&
+            rules[0].AccessControlType == AccessControlType.Allow &&
+            rules[0].FileSystemRights == FileSystemRights.FullControl &&
+            rules[0].InheritanceFlags == expectedInheritance &&
+            rules[0].PropagationFlags == PropagationFlags.None;
+        if (!alreadyPrivate)
+            directory.SetAccessControl(OwnerAcl(owner));
+
+        InternalSecretStore.ValidatePrivatePath(full, directory: true);
     }
 
     // POSIX record locks are process-scoped; serialize Core instances too.

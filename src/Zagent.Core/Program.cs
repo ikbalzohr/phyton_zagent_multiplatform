@@ -191,12 +191,11 @@ if (args.Contains("--initialize-install", StringComparer.Ordinal))
 
 if (args.Contains("--provision-dashboard", StringComparer.Ordinal))
 {
-    Zagent.Core.Dashboard.DashboardOptions.ProvisionInteractive(
+    Zagent.Core.Dashboard.DashboardOptions.ProvisionLocalOwner(
         GetOptionValue(args, "--dashboard-config") ?? throw new ArgumentException("--dashboard-config required"),
         GetOptionValue(args, "--dashboard-url") ?? throw new ArgumentException("--dashboard-url required"),
         GetOptionValue(args, "--certificate-thumbprint") ?? throw new ArgumentException("--certificate-thumbprint required"),
-        GetOptionValue(args, "--workspace-id") ?? throw new ArgumentException("--workspace-id required"),
-        GetOptionValue(args, "--account") ?? throw new ArgumentException("--account required"));
+        GetOptionValue(args, "--workspace-id") ?? throw new ArgumentException("--workspace-id required"));
     return 0;
 }
 
@@ -233,7 +232,7 @@ if (args.Contains("--dashboard", StringComparer.Ordinal))
         var url = options.Origin.GetLeftPart(UriPartial.Authority);
         try
         {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            Zagent.Core.Dashboard.DashboardChromeBrowser.Open(options.Origin);
         }
         catch (Exception ex)
         {

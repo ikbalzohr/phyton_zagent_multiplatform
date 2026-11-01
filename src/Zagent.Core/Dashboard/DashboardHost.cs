@@ -68,8 +68,8 @@ public static class DashboardHost
         // Fresh startup opens once, only after Kestrel is listening. Existing-Core
         // activation is already handled by Program's --dashboard lease path.
         app.Lifetime.ApplicationStarted.Register(() => {
-            try { Process.Start(new ProcessStartInfo(options.Origin.AbsoluteUri) { UseShellExecute = true })?.Dispose(); }
-            catch (Exception) { app.Logger.LogWarning("Dashboard is listening; automatic browser launch failed."); }
+            try { DashboardChromeBrowser.Open(options.Origin); }
+            catch (Exception ex) { app.Logger.LogWarning(ex, "Dashboard is listening; automatic Chrome tab launch failed."); }
         });
         app.Use(async (ctx, next) => {
             ctx.Response.Headers.CacheControl = "no-store";

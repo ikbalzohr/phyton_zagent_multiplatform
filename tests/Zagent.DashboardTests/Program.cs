@@ -9,6 +9,28 @@ using Zagent.Shared.Installation;
 static void Check(bool ok, string name) { if (!ok) throw new Exception(name); }
 var options = new DashboardOptions("https://localhost:19443", "certificate", "workspace-1", "admin", "hash", "revision");
 options.Validate();
+// The authenticated Windows owner sees the Dashboard without a browser login.
+// No PasswordHash is necessary; enrollment stamp and HTTPS boundary still are.
+(options with { PasswordHash = "" }).Validate();
+try { (options with { SecurityStamp = "" }).Validate(); throw new Exception("Accepted missing local owner enrollment stamp"); }
+catch (ArgumentException) { }
+var chromeFixtureRoot = Path.Combine(Path.GetTempPath(), "Zagent-ChromeFixture-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(chromeFixtureRoot);
+try
+{
+    var chrome = Path.Combine(chromeFixtureRoot, "chrome.exe");
+    File.WriteAllBytes(chrome, []);
+    var chromeStart = DashboardChromeBrowser.BuildStartInfo(chrome, new Uri("https://localhost:19444/"));
+    Check(chromeStart.FileName == chrome && !chromeStart.UseShellExecute,
+        "local dashboard opens explicit Chrome executable");
+    Check(chromeStart.ArgumentList.SequenceEqual(new[] { "--new-tab", "https://localhost:19444/" }),
+        "Chrome receives exact localhost tab URL without login data");
+    try { DashboardChromeBrowser.BuildStartInfo(chrome, new Uri("https://example.com/")); throw new Exception("Accepted remote Dashboard"); }
+    catch (ArgumentException) { }
+    try { DashboardChromeBrowser.BuildStartInfo(chrome, new Uri("http://localhost:19444/")); throw new Exception("Accepted plaintext Dashboard"); }
+    catch (ArgumentException) { }
+}
+finally { Directory.Delete(chromeFixtureRoot, true); }
 foreach (var url in new[] { "http://localhost:19443", "https://0.0.0.0:19443", "https://example.org:19443", "https://localhost:19443/path" })
 {
     try { (options with { Url = url }).Validate(); throw new Exception("Accepted unsafe listener"); }

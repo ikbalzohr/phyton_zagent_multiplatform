@@ -87,7 +87,8 @@ try {
     var options = new DashboardOptions("https://localhost:19443/", "0000000000000000000000000000000000000000", "acceptance-workspace", "fixture-admin", "fixture-not-a-login-hash", "fixture-stamp");
     options.Validate();
     Reject<ArgumentException>(() => (options with { RemoteEnabled = true }).Validate(), "remote dashboard disabled");
-    Reject<ArgumentException>(() => (options with { PasswordHash = "" }).Validate(), "missing dashboard enrollment rejected");
+    (options with { PasswordHash = "" }).Validate(); // Windows owner scheme does not require a browser password.
+    Reject<ArgumentException>(() => (options with { SecurityStamp = "" }).Validate(), "missing enrollment stamp rejected");
     Reject<FileNotFoundException>(() => DashboardOptions.Load(Path.Combine(root, "missing-dashboard.json")), "missing dashboard config rejected");
     Reject<InvalidOperationException>(() => { using var cert = options.LoadCertificate(); }, "absent CurrentUser TLS certificate rejected");
     Check(!DashboardSecurity.IsSameOrigin(null, options.Origin), "missing mutating origin rejected");

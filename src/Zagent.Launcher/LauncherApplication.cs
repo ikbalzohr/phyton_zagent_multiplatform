@@ -29,6 +29,22 @@ public static class LauncherApplication
         if (identity.IsSystem || identity.IsAnonymous) throw new InvalidOperationException("INTERACTIVE_OWNER_REQUIRED");
         ValidatePlainPath(install);
 
+        // First click may require ONE local TLS trust approval; never a login.
+        // Only a fresh, default-data installation with our packaged helper is
+        // eligible. Do not guess or alter another installation's DataRoot.
+        if (string.IsNullOrWhiteSpace(explicitDataRoot) &&
+            LaunchPlan.IsInstalledProduct(install) &&
+            File.Exists(Path.Combine(install, "data", "config", "installed-manifest.json")) &&
+            !File.Exists(Path.Combine(install, "data", "config", "dashboard.json")) &&
+            File.Exists(Path.Combine(install, "FirstRun-ZagentMultiPlatform.ps1")))
+        {
+            using var firstRun = Process.Start(BuildFirstRunStartInfo(install))
+                ?? throw new InvalidOperationException("FIRST_RUN_START_FAILED");
+            firstRun.WaitForExit();
+            if (firstRun.ExitCode != 0)
+                throw new InvalidOperationException("OWNER_PROVISIONING_INCOMPLETE");
+        }
+
         var data = LaunchPlan.DiscoverDataRoot(install, explicitDataRoot);
         var start = LaunchPlan.Create(install, data);
 
@@ -64,6 +80,47 @@ public static class LauncherApplication
         var result = (activate ?? Activate)(start);
         if (result is not null and not 0) throw new InvalidOperationException("CORE_START_FAILED");
         return 0;
+    }
+
+    public static ProcessStartInfo BuildFirstRunStartInfo(string installRoot)
+    {
+        var script = Path.Combine(Path.GetFullPath(installRoot), "FirstRun-ZagentMultiPlatform.ps1");
+        if (!LaunchPlan.IsInstalledProduct(installRoot) || !File.Exists(script))
+            throw new InvalidOperationException("FIRST_RUN_HELPER_MISSING");
+        ValidatePlainPath(script);
+        var ps = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+            "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+        if (!File.Exists(ps))
+            throw new FileNotFoundException("Windows PowerShell is required for first-time HTTPS setup.", ps);
+        var start = new ProcessStartInfo(ps)
+        {
+            WorkingDirectory = Path.GetFullPath(installRoot),
+            UseShellExecute = true,
+            WindowStyle = ProcessWindowStyle.Normal
+        };
+        foreach (var argument in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script })
+            start.ArgumentList.Add(argument);
+        return start;
+    }
+
+    // Display a stable diagnostic code without exposing local paths, process
+    // arguments, internal credentials, stack traces or exception messages.
+    public static string FailureCode(Exception exception)
+    {
+        if (exception is InvalidOperationException failure &&
+            failure.Message is ("INSTALL_ROOT_NOT_FOUND" or "ENROLLMENT_SELECTION_REQUIRED" or
+                "ENROLLMENT_INSTALL_MISMATCH" or "REQUIRED_RUNTIME_MISSING" or
+                "OWNER_ACL_REQUIRED" or "INTERACTIVE_OWNER_REQUIRED" or
+                "REPARSE_PATH_REJECTED" or "CORE_START_FAILED" or
+                "FIRST_RUN_START_FAILED" or "FIRST_RUN_HELPER_MISSING" or
+                "OWNER_PROVISIONING_INCOMPLETE"))
+            return failure.Message;
+        return exception switch
+        {
+            FileNotFoundException => "REQUIRED_FILE_NOT_FOUND",
+            UnauthorizedAccessException => "ACCESS_DENIED",
+            _ => "STARTUP_UNEXPECTED_ERROR"
+        };
     }
 
     public static int? Activate(ProcessStartInfo start)
@@ -112,11 +169,15 @@ internal static class Program
                 LauncherApplication.FindInstallRoot(AppContext.BaseDirectory),
                 Environment.GetEnvironmentVariable("ZAGENT_LAUNCHER_DATA_ROOT"));
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            var code = LauncherApplication.FailureCode(error);
             MessageBoxTimeout(IntPtr.Zero,
-                "Zagent could not open its own enrolled dashboard. Check the installation-bound configuration, owner-only ACL and packaged runtimes. No settings were changed. Never delete or import credentials from another Zagent installation.",
-                "Zagent launcher", 0x10, 0, 15000);
+                "Zagent Multi Platform could not open the local Dashboard.\n" +
+                "Error code: " + code + "\n" +
+                "Only this installation may be configured. No other Zagent installation was modified.\n" +
+                "Report this error code for troubleshooting.",
+                "Zagent Multi Platform Launcher", 0x10, 0, 15000);
             return 1;
         }
     }

@@ -157,6 +157,95 @@ try
         });
 
     await RunAsync(
+        "fresh Tunnel config gets owner-only ACL automatically",
+        async () =>
+        {
+            var scenario = Path.Combine(root, "fresh-tunnel-owner-acl");
+            var config = Path.Combine(scenario, "tunnel", "config");
+            var runtime = Path.Combine(scenario, "tunnel", "runtime");
+            False(Directory.Exists(config), "Fresh config root unexpectedly exists.");
+            var options = new TunnelIntegrationOptions("python.exe", root, config, runtime,
+                Path.Combine(runtime, "chat.jsonl"), "127.0.0.3", 18810);
+            var writer = new TunnelConfigurationWriter();
+            await writer.WriteAsync(options, Array.Empty<TunnelServiceDefinition>());
+
+            InternalSecretStore.ValidatePrivatePath(config, directory: true);
+            True(File.Exists(Path.Combine(config, "tunnel.json")),
+                "Fresh Tunnel config was not published.");
+            True(File.Exists(Path.Combine(config, "tunnel.json.access.lock")),
+                "Tunnel grant lock was not created.");
+            await writer.WriteAsync(options, Array.Empty<TunnelServiceDefinition>());
+            InternalSecretStore.ValidatePrivatePath(config, directory: true);
+        });
+
+    await RunAsync(
+        "Tunnel writer repairs inherited owner-only ACL without touching other SIDs",
+        async () =>
+        {
+            var scenario = Path.Combine(root, "inherited-owner-acl");
+            Directory.CreateDirectory(scenario);
+            var sid = WindowsIdentity.GetCurrent().User!;
+            var privateParent = new DirectorySecurity();
+            privateParent.SetOwner(sid);
+            privateParent.SetAccessRuleProtection(true, false);
+            privateParent.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            new DirectoryInfo(scenario).SetAccessControl(privateParent);
+            var config = Path.Combine(scenario, "config");
+            Directory.CreateDirectory(config);
+            var before = new DirectoryInfo(config).GetAccessControl(
+                AccessControlSections.Owner | AccessControlSections.Access);
+            False(before.AreAccessRulesProtected, "Fixture must inherit permissions.");
+
+            var options = new TunnelIntegrationOptions("python.exe", root, config,
+                Path.Combine(scenario, "runtime"),
+                Path.Combine(scenario, "runtime", "chat.jsonl"), "127.0.0.3", 18810);
+            await new TunnelConfigurationWriter().WriteAsync(options, Array.Empty<TunnelServiceDefinition>());
+            InternalSecretStore.ValidatePrivatePath(config, directory: true);
+        });
+
+    await RunAsync(
+        "Tunnel writer rejects existing ACL belonging to another Windows principal",
+        async () =>
+        {
+            var scenario = Path.Combine(root, "foreign-sid-tunnel-acl");
+            var config = Path.Combine(scenario, "config");
+            Directory.CreateDirectory(config);
+            var owner = WindowsIdentity.GetCurrent().User!;
+            var foreignSid = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
+            var unsafeAcl = new DirectorySecurity();
+            unsafeAcl.SetOwner(owner);
+            unsafeAcl.SetAccessRuleProtection(true, false);
+            unsafeAcl.AddAccessRule(new FileSystemAccessRule(owner, FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            unsafeAcl.AddAccessRule(new FileSystemAccessRule(foreignSid, FileSystemRights.Read,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            var info = new DirectoryInfo(config);
+            info.SetAccessControl(unsafeAcl);
+            var before = info.GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access)
+                .GetSecurityDescriptorSddlForm(AccessControlSections.Owner | AccessControlSections.Access);
+
+            var options = new TunnelIntegrationOptions("python.exe", root, config,
+                Path.Combine(scenario, "runtime"),
+                Path.Combine(scenario, "runtime", "chat.jsonl"), "127.0.0.3", 18810);
+            var rejected = false;
+            try
+            {
+                await new TunnelConfigurationWriter().WriteAsync(options, Array.Empty<TunnelServiceDefinition>());
+            }
+            catch (InvalidDataException) { rejected = true; }
+            True(rejected, "Existing ACL granting other Windows principals was accepted.");
+            var after = info.GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access)
+                .GetSecurityDescriptorSddlForm(AccessControlSections.Owner | AccessControlSections.Access);
+            Equal(before, after);
+            False(File.Exists(Path.Combine(config, "tunnel.json")),
+                "Rejected Tunnel ACL must not publish config.");
+        });
+
+    await RunAsync(
         "Manager protocol add/remove Development Agent restarts Tunnel",
         async () =>
         {

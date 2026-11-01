@@ -7,7 +7,6 @@ param(
     [switch]$CreateCertificate,
     [switch]$TrustCertificate,
     [Parameter(Mandatory=$true)][string]$WorkspaceId,
-    [Parameter(Mandatory=$true)][string]$Account,
     [string]$DashboardUrl = 'https://localhost:19443/',
     [switch]$Development,
     [switch]$RegisterStartup
@@ -22,7 +21,7 @@ $DataRoot = [IO.Path]::GetFullPath($DataRoot)
 Assert-ZagentPlainPath $DataRoot
 if ($DataRoot.TrimEnd('\') -eq $InstallRoot.TrimEnd('\') -or $DataRoot -eq [IO.Path]::GetPathRoot($DataRoot)) { throw 'Choose a dedicated DataRoot, not the install root or drive root.' }
 Assert-ZagentDashboardOrigin $DashboardUrl
-if ($WorkspaceId -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$' -or [string]::IsNullOrWhiteSpace($Account)) { throw 'Valid workspace identifier and account required.' }
+if ($WorkspaceId -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$') { throw 'Valid workspace identifier required.' }
 if ($CreateCertificate -eq [bool]$CertificateThumbprint) { throw 'Choose exactly one: -CreateCertificate or -CertificateThumbprint.' }
 if ($TrustCertificate -and -not $CreateCertificate) { throw 'Automatic trust is restricted to the new localhost self-signed certificate; manage existing CA trust separately.' }
 if (-not $CoreExecutable) {
@@ -73,12 +72,13 @@ if ($TrustCertificate) {
     } finally { $store.Dispose() }
 }
 New-ZagentInternalSecrets $secretPath
-# Core performs the no-echo password+confirmation prompt; no password/token parameter exists here.
-& $CoreExecutable --provision-dashboard --root $InstallRoot --data-root $DataRoot --dashboard-config $config --dashboard-url $DashboardUrl --certificate-thumbprint $CertificateThumbprint --workspace-id $WorkspaceId --account $Account
+# Core binds Dashboard access to the interactive Windows owner. No username,
+# password, bearer token or browser credential is created for the local UI.
+& $CoreExecutable --provision-dashboard --root $InstallRoot --data-root $DataRoot --dashboard-config $config --dashboard-url $DashboardUrl --certificate-thumbprint $CertificateThumbprint --workspace-id $WorkspaceId
 if ($LASTEXITCODE -ne 0) { throw 'Core dashboard provisioning failed; partial state retained for explicit offline recovery, no startup registered.' }
 Set-ZagentOwnerAcl $config
 $stored = Get-Content -LiteralPath $config -Raw | ConvertFrom-Json
-if ($stored.Url -cne $DashboardUrl -or $stored.CertificateThumbprint -ine $CertificateThumbprint -or $stored.WorkspaceId -cne $WorkspaceId -or $stored.Administrator -cne $Account -or -not $stored.PasswordHash -or -not $stored.SecurityStamp -or $stored.RemoteEnabled -ne $false) { throw 'Provisioned config read-back mismatch.' }
+if ($stored.Url -cne $DashboardUrl -or $stored.CertificateThumbprint -ine $CertificateThumbprint -or $stored.WorkspaceId -cne $WorkspaceId -or -not $stored.Administrator -or $stored.PasswordHash -ne '' -or -not $stored.SecurityStamp -or $stored.RemoteEnabled -ne $false) { throw 'Provisioned config read-back mismatch.' }
 Assert-ZagentOwnerAcl $secretPath
 if ($RegisterStartup) {
     $shell = New-Object -ComObject WScript.Shell
@@ -92,4 +92,4 @@ if ($RegisterStartup) {
     if ($check.TargetPath -ne $CoreExecutable -or $check.Arguments -cne $link.Arguments) { throw 'Startup shortcut read-back failed.' }
 }
 Write-Output ('Local provisioning saved. Origin: '+$DashboardUrl+' Certificate: '+$CertificateThumbprint)
-Write-Output 'NOT runtime acceptance. Core DPAPI loader, certificate trust, login and CSRF checks must pass on Windows. MCP auth/remote remains BLOCKED until real external AS/transport evidence exists.'
+Write-Output 'Local-owner Dashboard uses no browser login. HTTPS certificate, Windows owner, Origin and CSRF checks remain mandatory. MCP OAuth/remote stays independently gated.'
