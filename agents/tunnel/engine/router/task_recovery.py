@@ -34,6 +34,54 @@ def require_available(auth, authorizer, policy_lookup):
             raise AuthorizationError('TOOL_NOT_AUTHORIZED', 403)
 
 
+
+async def reconciliation_status(orch, auth, limit=50):
+    """List only authenticated owner's quarantine blockers without Files access.
+
+    No private file paths, arguments, task contexts, external grants or other
+    principals' task IDs. This is diagnostic only; no repair/replay/unlock.
+    """
+    auth.require('files:read')
+    limit = max(1, min(int(limit), 100))
+    async with orch.journal._lock:
+        rows = orch.journal.conn.execute(
+            """SELECT task_id, service_id, tool_name, execution_context_json
+                 FROM tasks
+                 WHERE session_id=? AND state='orphaned'
+                   AND started_at IS NOT NULL
+                 ORDER BY created_at DESC, task_id DESC LIMIT ?""",
+            (auth.owner, limit + 1)).fetchall()
+    blockers = []
+    for row in rows[:limit]:
+        try:
+            context = json.loads(row['execution_context_json'] or '{}')
+        except (ValueError, TypeError):
+            context = {}
+        is_search = (
+            row['service_id'] in {'zagent_files', 'zagent_files_v3'}
+            and row['tool_name'] == ORIGINAL
+            and context.get('public_tool') == ORIGINAL
+            and context.get('required_scope') == 'files:read'
+            and context.get('effective_access') == 'read'
+        )
+        blockers.append({
+            'task_id': row['task_id'],
+            'tool': row['tool_name'],
+            'recovery': 'review_read_only_recovery_plan' if is_search
+                        else 'manual_owner_reconciliation_required'
+        })
+    return {
+        'ok': True,
+        'diagnostic_only': True,
+        'owner_task_count': len(blockers),
+        'truncated': len(rows) > limit,
+        'tasks': blockers,
+        'guidance': ('For read-only search candidates, request a zagent_task_recover '
+                     'plan and inspect it before apply. For other orphaned tasks '
+                     'verify external side effects manually; never blindly replay, '
+                     'delete the task journal, or disable resource quarantine.')
+    }
+
 def _conflict():
     raise AuthorizationError('RESOURCE_RECONCILIATION_REQUIRED', 409)
 

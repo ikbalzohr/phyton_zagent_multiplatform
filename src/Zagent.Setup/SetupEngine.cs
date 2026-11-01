@@ -375,7 +375,8 @@ public sealed class SetupEngine
             _windowsIntegration.Register(
                 target,
                 request.ProductVersion ??
-                manifest.CoreVersion);
+                manifest.CoreVersion,
+                dataRoot);
 
             RemoveEmptyProgramDirectories(
                 target,

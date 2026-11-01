@@ -84,7 +84,8 @@ public interface IWindowsInstallationIntegration
 {
     void Register(
         string targetRoot,
-        string productVersion);
+        string productVersion,
+        string dataRoot);
 
     void Unregister(
         string targetRoot);

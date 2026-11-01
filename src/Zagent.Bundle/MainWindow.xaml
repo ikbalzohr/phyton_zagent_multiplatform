@@ -52,29 +52,9 @@
                     Click="BrowseButton_Click"/>
         </Grid>
 
-        <Grid Grid.Row="3"
-              Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="180"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="Jenis instalasi"
-                       VerticalAlignment="Center"
-                       Foreground="#CBD5E1"/>
-            <ComboBox Grid.Column="1"
-                      x:Name="PluginRoleBox"
-                      Height="34"
-                      SelectedIndex="0"
-                      Padding="8,4"
-                      Background="#111A2D"
-                      Foreground="White"
-                      BorderBrush="#334155">
-                <ComboBoxItem Content="Zagent Master"
-                              Tag="Master"/>
-                <ComboBoxItem Content="Zagent User"
-                              Tag="User"/>
-            </ComboBox>
-        </Grid>
+        <TextBlock Grid.Row="3" Margin="0,16,0,0"
+                   Text="Instalasi tunggal Zagent: tanpa pilihan identitas/role instalasi."
+                   Foreground="#CBD5E1"/>
 
         <StackPanel Grid.Row="4"
                     Margin="0,20,0,0">
@@ -98,7 +78,7 @@
                 CornerRadius="6">
             <TextBlock TextWrapping="Wrap"
                        Foreground="#A9B7CC">
-                Pilih profil instalasi lokal. Role instalasi bukan identitas atau izin client MCP. Instalasi baru memiliki folder dan data terpisah. Update in-place hanya untuk lini MCP v1. Versi lama wajib backup offline dan cutover ke target baru; izin lama tidak diimpor otomatis. Google Chrome tetap eksternal.
+                Pilih direktori Zagent. Tidak ada role instalasi. Beberapa instalasi tetap memiliki data serta namespace proses terpisah berdasarkan path. Update in-place hanya untuk lini MCP v1. Versi lama wajib backup offline dan cutover ke target baru; izin lama tidak diimpor otomatis. Google Chrome tetap eksternal.
             </TextBlock>
         </Border>
 

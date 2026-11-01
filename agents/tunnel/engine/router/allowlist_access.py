@@ -93,6 +93,27 @@ def writer(path):
         local.release()
 
 
+def _replace_file(path, temporary):
+    """One guarded publication seam on POSIX and Windows for fault injection.
+
+    Windows ReplaceFileW preserves destination security metadata; POSIX sets the
+    destination file mode on the staged file before rename. No non-atomic
+    remove+rename fallback is allowed.
+    """
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        replace = ctypes.WinDLL('kernel32', use_last_error=True).ReplaceFileW
+        replace.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR,
+                            wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p]
+        replace.restype = wintypes.BOOL
+        if not replace(str(path), str(temporary), None, 0, None, None):
+            raise OSError('PUBLICATION_FAILED')
+    else:
+        os.chmod(temporary, path.stat().st_mode & 0o777)
+        os.replace(temporary, path)
+
+
 def publish(path, raw, expected, revalidate):
     path = _physical(path)
     fd, temporary = tempfile.mkstemp(prefix=path.name+'.access-',dir=path.parent)
@@ -106,17 +127,8 @@ def publish(path, raw, expected, revalidate):
         if expected is None:
             # Bootstrap creation without overwriting a concurrently-created file.
             os.link(temporary,path)
-        elif os.name == 'nt':
-            import ctypes
-            from ctypes import wintypes
-            replace=ctypes.WinDLL('kernel32',use_last_error=True).ReplaceFileW
-            replace.argtypes=[wintypes.LPCWSTR,wintypes.LPCWSTR,wintypes.LPCWSTR,wintypes.DWORD,ctypes.c_void_p,ctypes.c_void_p]
-            replace.restype=wintypes.BOOL
-            if not replace(str(path),temporary,None,0,None,None):
-                raise OSError('PUBLICATION_FAILED')
         else:
-            os.chmod(temporary,path.stat().st_mode & 0o777)
-            os.replace(temporary,path)
+            _replace_file(path, temporary)
         if path.read_bytes() != raw:
             raise AuthorizationError('PUBLICATION_UNCERTAIN',409)
     finally:

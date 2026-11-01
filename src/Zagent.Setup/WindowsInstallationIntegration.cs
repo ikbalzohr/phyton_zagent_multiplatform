@@ -6,24 +6,26 @@ namespace Zagent.Setup;
 
 public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegration
 {
-    private static string UninstallKeyFor(string role) =>
+    private static string UninstallKeyFor(string root) =>
         @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Zagent-" +
-        ZagentInstallationProfile.Normalize(role);
+        ZagentInstanceScope.Key(root);
 
     public void Register(
         string targetRoot,
-        string productVersion)
+        string productVersion,
+        string dataRoot)
     {
         var root = Path.GetFullPath(targetRoot);
-        var role = ZagentInstallationProfile.InferRole(root);
-        var displayName = ZagentInstallationProfile.DisplayName(role);
-        var manager = Path.Combine(root, "Zagent.Core.exe");
+        var key = ZagentInstanceScope.Key(root);
+        const string displayName = "Zagent";
+        var core = Path.Combine(root, "Zagent.Core.exe");
+        var launcher = Path.Combine(root, "Zagent.Launcher.exe");
         var setup = Path.Combine(root, "Zagent.Setup.exe");
 
-        if (!File.Exists(manager) || !File.Exists(setup))
+        if (!File.Exists(core) || !File.Exists(launcher) || !File.Exists(setup))
         {
             throw new InvalidOperationException(
-                "Installed Core/Setup executable is missing.");
+                "Installed Core/Launcher/Setup executable is missing.");
         }
 
         var uninstallCache = Path.Combine(
@@ -31,7 +33,7 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
                 Environment.SpecialFolder.LocalApplicationData),
             "Zagent",
             "Uninstall",
-            role);
+            key);
 
         Directory.CreateDirectory(uninstallCache);
 
@@ -50,36 +52,37 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
             Quote(root) +
             " --keep-data true";
 
-        using var key = Registry.CurrentUser.CreateSubKey(
-            UninstallKeyFor(role),
+        using var registration = Registry.CurrentUser.CreateSubKey(
+            UninstallKeyFor(root),
             writable: true) ??
             throw new InvalidOperationException(
                 "Could not create Zagent Installed Apps registry entry.");
 
-        key.SetValue("DisplayName", displayName, RegistryValueKind.String);
-        key.SetValue("DisplayVersion", productVersion, RegistryValueKind.String);
-        key.SetValue("Publisher", "Zagent", RegistryValueKind.String);
-        key.SetValue("InstallLocation", root, RegistryValueKind.String);
-        key.SetValue("DisplayIcon", manager, RegistryValueKind.String);
-        key.SetValue("UninstallString", uninstallCommand, RegistryValueKind.String);
-        key.SetValue("QuietUninstallString", uninstallCommand, RegistryValueKind.String);
-        key.SetValue("NoModify", 1, RegistryValueKind.DWord);
-        key.SetValue("NoRepair", 0, RegistryValueKind.DWord);
+        registration.SetValue("DisplayName", displayName, RegistryValueKind.String);
+        registration.SetValue("DisplayVersion", productVersion, RegistryValueKind.String);
+        registration.SetValue("Publisher", "Zagent", RegistryValueKind.String);
+        registration.SetValue("InstallLocation", root, RegistryValueKind.String);
+        registration.SetValue("DataRoot", Path.GetFullPath(dataRoot), RegistryValueKind.String);
+        registration.SetValue("DisplayIcon", launcher, RegistryValueKind.String);
+        registration.SetValue("UninstallString", uninstallCommand, RegistryValueKind.String);
+        registration.SetValue("QuietUninstallString", uninstallCommand, RegistryValueKind.String);
+        registration.SetValue("NoModify", 1, RegistryValueKind.DWord);
+        registration.SetValue("NoRepair", 0, RegistryValueKind.DWord);
 
         RemoveMatchingLegacyRegistration(root);
-        CreateShortcuts(root, manager, role);
+        CreateShortcuts(root, launcher, key);
     }
 
     public void Unregister(
         string targetRoot)
     {
         var root = Path.GetFullPath(targetRoot);
-        var role = ZagentInstallationProfile.InferRole(root);
+        var key = ZagentInstanceScope.Key(root);
 
         try
         {
             Registry.CurrentUser.DeleteSubKeyTree(
-                UninstallKeyFor(role),
+                UninstallKeyFor(root),
                 throwOnMissingSubKey: false);
         }
         catch
@@ -87,7 +90,7 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
         }
 
         RemoveMatchingLegacyRegistration(root);
-        foreach (var shortcut in ShortcutPaths(role))
+        foreach (var shortcut in ShortcutPaths(key))
         {
             try
             {
@@ -106,7 +109,7 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
             var startMenuFolder = Path.Combine(
                 Environment.GetFolderPath(
                     Environment.SpecialFolder.Programs),
-                ZagentInstallationProfile.DisplayName(role));
+                "Zagent", key);
 
             if (Directory.Exists(startMenuFolder) &&
                 !Directory.EnumerateFileSystemEntries(startMenuFolder).Any())
@@ -124,48 +127,52 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
 
     private static void RemoveMatchingLegacyRegistration(string root)
     {
-        const string legacyKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Zagent";
-        using var existing = Registry.CurrentUser.OpenSubKey(legacyKey);
-        var legacyRoot = existing?.GetValue("InstallLocation") as string;
-        if (string.IsNullOrWhiteSpace(legacyRoot) ||
-            !string.Equals(Path.GetFullPath(legacyRoot), Path.GetFullPath(root),
-                StringComparison.OrdinalIgnoreCase))
-            return;
-        existing?.Close();
-        Registry.CurrentUser.DeleteSubKeyTree(legacyKey, throwOnMissingSubKey: false);
+        const string parentPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+        using var parent = Registry.CurrentUser.OpenSubKey(parentPath);
+        if (parent is null) return;
+        var current = UninstallKeyFor(root);
+        foreach (var name in parent.GetSubKeyNames())
+        {
+            if (!name.StartsWith("Zagent", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(parentPath + @"\" + name, current, StringComparison.OrdinalIgnoreCase))
+                continue;
+            string? previousLocation;
+            using (var existing = parent.OpenSubKey(name))
+                previousLocation = existing?.GetValue("InstallLocation") as string;
+            if (string.IsNullOrWhiteSpace(previousLocation)) continue;
+            try
+            {
+                if (!string.Equals(Path.GetFullPath(previousLocation), Path.GetFullPath(root),
+                    StringComparison.OrdinalIgnoreCase)) continue;
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException) { continue; }
+            Registry.CurrentUser.DeleteSubKeyTree(parentPath + @"\" + name,
+                throwOnMissingSubKey: false);
+        }
     }
 
-    private static void CreateShortcuts(
-        string root,
-        string manager,
-        string role)
+    private static void CreateShortcuts(string root, string manager, string key)
     {
-        var displayName = ZagentInstallationProfile.DisplayName(role);
         var startMenuFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.Programs),
-            displayName);
+            "Zagent", key);
         Directory.CreateDirectory(startMenuFolder);
-        var linkName = displayName + " Manager.lnk";
-        CreateShortcut(Path.Combine(startMenuFolder, linkName), manager, root,
-            displayName + " Manager");
-        var desktop = Environment.GetFolderPath(
-            Environment.SpecialFolder.DesktopDirectory);
+        CreateShortcut(Path.Combine(startMenuFolder, "Zagent Manager.lnk"),
+            manager, root, "Zagent Manager");
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         if (!string.IsNullOrWhiteSpace(desktop))
-            CreateShortcut(Path.Combine(desktop, linkName), manager, root,
-                displayName + " Manager");
+            CreateShortcut(Path.Combine(desktop, "Zagent Manager (" + key + ").lnk"),
+                manager, root, "Zagent Manager");
     }
 
-    private static IEnumerable<string> ShortcutPaths(string role)
+    private static IEnumerable<string> ShortcutPaths(string key)
     {
-        var name = ZagentInstallationProfile.DisplayName(role);
-        var linkName = name + " Manager.lnk";
         yield return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.Programs),
-            name, linkName);
-        var desktop = Environment.GetFolderPath(
-            Environment.SpecialFolder.DesktopDirectory);
+            "Zagent", key, "Zagent Manager.lnk");
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
         if (!string.IsNullOrWhiteSpace(desktop))
-            yield return Path.Combine(desktop, linkName);
+            yield return Path.Combine(desktop, "Zagent Manager (" + key + ").lnk");
     }
 
     private static void CreateShortcut(
@@ -210,7 +217,7 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
                 BindingFlags.SetProperty,
                 null,
                 shortcut,
-                ["--dashboard --root " + Quote(workingDirectory)]);
+                [""]);
 
             type.InvokeMember(
                 "WorkingDirectory",
@@ -270,7 +277,7 @@ public sealed class WindowsInstallationIntegration : IWindowsInstallationIntegra
                 Environment.SpecialFolder.LocalApplicationData),
             "Zagent",
             "Uninstall",
-            ZagentInstallationProfile.InferRole(targetRoot));
+            ZagentInstanceScope.Key(targetRoot));
 
         if (!Path.GetFullPath(processPath).StartsWith(
                 Path.GetFullPath(cacheRoot) +

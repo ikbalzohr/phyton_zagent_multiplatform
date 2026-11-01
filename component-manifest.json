@@ -26,7 +26,7 @@
       "product_line": "zagent-ui-v1",
       "canonical_version": "1.0.0",
       "source": "src/Zagent.Core",
-      "baseline_product_version": "WPF Manager reference only"
+      "baseline_product_version": "legacy desktop UI retired"
     },
     "tunnel": {
       "product_line": "zagent-tunnel-v1",

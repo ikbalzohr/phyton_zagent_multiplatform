@@ -20,7 +20,7 @@ public sealed class ZagentPortAllocator
         ArgumentNullException.ThrowIfNull(preferred);
 
         var used = new HashSet<int>();
-        var range = ZagentNetworkPolicy.For(preferred.InstallationRole);
+        var range = ZagentNetworkPolicy.For();
 
         var core = AllocateOne(
             preferred.BindHost,
@@ -88,13 +88,12 @@ public sealed class ZagentPortAllocator
 
         throw new InvalidOperationException(
             $"No free Zagent production port is available in " +
-            $"{range.ProductionStart}-{range.ProductionEnd} ({range.InstallationRole}).");
+            $"{range.ProductionStart}-{range.ProductionEnd}.");
     }
 
     private static IEnumerable<int> Candidates(int preferred, ZagentPortProfile range)
     {
-        // Retain the legacy forward-first allocation order, but never cross
-        // the installation role's reserved production port range.
+        // Keep forward-first allocation inside the neutral production port range.
         if (preferred >= range.ProductionStart && preferred <= range.ProductionEnd)
         {
             yield return preferred;

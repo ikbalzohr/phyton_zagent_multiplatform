@@ -2,6 +2,7 @@ using System.Text.Json;
 using Zagent.Core.Diagnostics;
 using Zagent.Core.Dashboard;
 using Zagent.Core.Agents.ArcMap;
+using Zagent.Core.Agents.Qgis;
 using Zagent.Core.Agents.Files;
 using Zagent.Core.Agents.Tunnel;
 using Zagent.Core.Agents.Web;
@@ -33,7 +34,12 @@ public sealed record ManagerCoreHostOptions(
     int ArcMapPort = 18840,
     string? SupervisorLeaseName = null,
     AgentEnvironment Environment = AgentEnvironment.Production,
-    string? WorkspaceId = null);
+    string? WorkspaceId = null,
+    string? QgisPython = null,
+    string? QgisRoot = null,
+    int QgisPort = 18850,
+    int DevelopmentGatewayStart = 18900,
+    int DevelopmentGatewayEnd = 18999);
 
 public sealed class ManagerCoreHost : IAsyncDisposable
 {
@@ -179,8 +185,7 @@ public sealed class ManagerCoreHost : IAsyncDisposable
         var supervisor = new NativeAgentSupervisor(
             acquireInstanceLease: acquireSupervisorLease,
             instanceLeaseName: options.SupervisorLeaseName ??
-                ZagentInstallationProfile.SupervisorLeaseName(
-                    ZagentInstallationProfile.InferRole(root)),
+                ZagentInstanceScope.SupervisorLeaseName(root),
             diagnostics: new DiagnosticEventStore(data));
 
         try
@@ -298,32 +303,6 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                     "zagent-router-local",
                     cancellationToken);
 
-            var pluginAccessConfigStore =
-                new PluginAccessConfigurationStore();
-
-            var pluginAccessConfig =
-                await pluginAccessConfigStore.EnsureAsync(
-                    Path.Combine(
-                        data,
-                        "config"),
-                    options.Environment,
-                    cancellationToken);
-
-            var pluginAccessRoot =
-                Environment.GetEnvironmentVariable(
-                    "ZAGENT_PLUGIN_ACCESS_ROOT");
-
-            if (string.IsNullOrWhiteSpace(
-                    pluginAccessRoot))
-            {
-                pluginAccessRoot = Path.Combine(
-                    Environment.GetFolderPath(
-                        Environment.SpecialFolder.LocalApplicationData),
-                    "Zagent",
-                    ZagentInstallationProfile.InferRole(root),
-                    "PluginAccess");
-            }
-
             var tunnelOptions = new TunnelIntegrationOptions(
                 PythonExecutable: tunnelPython,
                 EngineRoot: Path.Combine(
@@ -356,21 +335,6 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                     Environment.GetEnvironmentVariable(
                         "ZAGENT_IDENTITY_ENFORCEMENT")
                     ?? "mandatory",
-                PluginAudience:
-                    pluginAccessConfig.Audience,
-                PluginDisplayName:
-                    pluginAccessConfig.DisplayName,
-                PluginAccessMode:
-                    pluginAccessConfig.Mode,
-                PluginAccessRoot:
-                    Path.GetFullPath(
-                        pluginAccessRoot),
-                PluginAccessEnforcement:
-                    pluginAccessConfig.Enforcement,
-                PluginFallback:
-                    pluginAccessConfig.FallbackPlugin,
-                PluginParentAudience:
-                    pluginAccessConfig.ParentAudience,
                 ArcMapMcpUrl: $"http://{options.BindHost}:{options.ArcMapPort}/mcp",
                 OAuthCredentialDataRoot: data,
                 CoreDataRoot: data);
@@ -381,7 +345,7 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                 System.Environment.GetFolderPath(
                     System.Environment.SpecialFolder.LocalApplicationData),
                 "Zagent",
-                ZagentInstallationProfile.InferRole(root),
+                ZagentInstanceScope.Key(root),
                 "Credentials",
                 credentialScope);
             var persistentCredentialPath = Path.Combine(
@@ -459,10 +423,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
             var developmentAgentStore =
                 new DevelopmentAgentStore(
                     Path.Combine(tunnelData, "config", "additional_services.json"),
-                    ZagentNetworkPolicy.For(ZagentInstallationProfile.InferRole(root))
-                        .DevelopmentGatewayStart,
-                    ZagentNetworkPolicy.For(ZagentInstallationProfile.InferRole(root))
-                        .DevelopmentGatewayEnd);
+                    options.DevelopmentGatewayStart,
+                    options.DevelopmentGatewayEnd);
 
             var files = new FilesAgentCoordinator(
                 registry,
@@ -530,7 +492,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                 cancellationToken: cancellationToken,
                 environment: options.Environment);
 
-            var services = new[]
+            var qgisOptions = QgisIntegration.Resolve(options);
+            var services = new List<TunnelServiceDefinition>
             {
                 new TunnelServiceDefinition(
                     "zagent_files",
@@ -548,6 +511,8 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                     "arcmap",
                     $"http://{options.BindHost}:{options.ArcMapPort}/mcp")
             };
+
+            if (qgisOptions is not null) services.Add(QgisIntegration.CreateService(qgisOptions));
 
             await tunnel.PrepareAsync(
                 tunnelOptions,
@@ -745,6 +710,9 @@ public sealed class ManagerCoreHost : IAsyncDisposable
                                 : health.Error ??
                                     "Tunnel offline.");
                     }));
+
+            if (qgisOptions is not null)
+                QgisIntegration.Register(qgisOptions, registry, supervisor, controllers, productionApproved, options.Environment);
 
             var logs = new ManagerTechnicalLogStore();
             logs.Write(

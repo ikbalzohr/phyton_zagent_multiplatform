@@ -8,8 +8,8 @@ public static class ManagerProtocol
 {
     public const string Version = "1.0";
     public const string DefaultPipeName = "Zagent.Manager.v1";
-    public static string ForInstallationRole(string? role) =>
-        ZagentInstallationProfile.PipeName(role);
+    public static string ForRoot(string installRoot) =>
+        ZagentInstanceScope.PipeName(installRoot);
 }
 
 public sealed record ManagerRequestEnvelope(

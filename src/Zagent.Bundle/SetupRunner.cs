@@ -51,13 +51,6 @@ public static class SetupRunner
 
         info.ArgumentList.Add("--product-version");
         info.ArgumentList.Add("1.0.0");
-        var installationRole = Environment.GetEnvironmentVariable("ZAGENT_INSTALLATION_ROLE");
-        if (!string.IsNullOrWhiteSpace(installationRole))
-        {
-            info.ArgumentList.Add("--installation-role");
-            info.ArgumentList.Add(installationRole);
-        }
-
         if (mode == "uninstall")
         {
             info.ArgumentList.Add("--keep-data");

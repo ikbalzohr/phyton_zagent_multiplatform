@@ -113,7 +113,7 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((await self.call()).status_code,409)
         from router import allowlist_access
         plan=self.value(await self.call());before=self.path.read_bytes()
-        with patch.object(allowlist_access.os,'replace',side_effect=OSError('fixture-private-error')):
+        with patch.object(allowlist_access,'_replace_file',side_effect=OSError('fixture-private-error')):
             response=await self.call(plan_only=False,expected_revision=plan['revision'],expected_plan=plan['expected_plan'])
             self.assertTrue(response.status_code != 200 or 'error' in response.json())
             self.assertNotIn('fixture-private-error',response.text)
@@ -177,8 +177,13 @@ class AccessTests(unittest.IsolatedAsyncioTestCase):
 
     def test_shared_config_writer_preserves_mode_and_cleans_failed_stage(self):
         self.path.chmod(0o600)
-        with patch('os.replace',side_effect=OSError('fixture')):
+        # Windows st_mode synthesizes rw bits from file attributes (typically
+        # 0o666), not the POSIX 0o600 ACL. Preserve its original observation.
+        expected_mode = self.path.stat().st_mode & 0o777
+        original = self.path.read_bytes()
+        with patch('router.allowlist_access._replace_file',side_effect=OSError('fixture')):
             with self.assertRaises(OSError):config.atomic_write_json(self.path,{'new':True})
-        self.assertEqual(list(self.path.parent.glob('*.tmp')),[])
+        self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(list(self.path.parent.glob(self.path.name+'.access-*')),[])
         config.atomic_write_json(self.path,{'new':True})
-        self.assertEqual(self.path.stat().st_mode & 0o777,0o600)
+        self.assertEqual(self.path.stat().st_mode & 0o777, expected_mode)

@@ -1,6 +1,5 @@
 using Zagent.Core.Network;
 using Zagent.Shared.Configuration;
-using Zagent.Shared.Installation;
 
 namespace Zagent.Core.Configuration;
 
@@ -27,59 +26,28 @@ public sealed class ZagentConfigurationBootstrapper
         string installRoot,
         string? filesDefaultProfile = null,
         string? dataRoot = null,
-        CancellationToken cancellationToken = default,
-        string? installationRole = null,
-        bool allowRoleMigration = false)
+        CancellationToken cancellationToken = default)
     {
-        var layout = _engine.ResolveLayout(
-            installRoot,
-            filesDefaultProfile,
-            dataRoot);
-
+        var layout = _engine.ResolveLayout(installRoot, filesDefaultProfile, dataRoot);
         _engine.EnsurePersistentDirectories(layout);
-
         var configPath = _engine.GetMachineConfigurationPath(layout);
-
-        var requestedRole = installationRole is null
-            ? null : ZagentInstallationProfile.Normalize(installationRole);
         ZagentMachineConfiguration configuration;
         if (_store.Exists(configPath))
         {
+            // Keep existing ports and data paths. Old JSON installation_role is
+            // ignored by the current schema; never silently migrate live ports.
             configuration = await _engine.LoadMachineConfigurationAsync(
-                layout,
-                cancellationToken);
-            if (requestedRole is not null &&
-                !string.Equals(configuration.InstallationRole, requestedRole,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                if (!allowRoleMigration)
-                    throw new InvalidOperationException(
-                        "Installation role migration requires an explicit install initializer.");
-                // Never copy the previous role's ports into the new profile.
-                var preferredMigration = _engine.CreateDefaultMachineConfiguration(
-                    layout, requestedRole);
-                configuration = _portAllocator.Allocate(preferredMigration);
-                await _engine.SaveMachineConfigurationAsync(
-                    layout, configuration, cancellationToken);
-            }
+                layout, cancellationToken);
         }
         else
         {
-            var preferred =
-                _engine.CreateDefaultMachineConfiguration(
-                    layout, requestedRole ?? ZagentInstallationProfile.InferRole(installRoot));
-
-            configuration =
-                _portAllocator.Allocate(preferred);
-
+            var preferred = _engine.CreateDefaultMachineConfiguration(layout);
+            configuration = _portAllocator.Allocate(preferred);
             await _engine.SaveMachineConfigurationAsync(
-                layout,
-                configuration,
-                cancellationToken);
+                layout, configuration, cancellationToken);
         }
 
         var manifestPath = _engine.GetInstalledManifestPath(layout);
-
         return new ZagentConfigurationSnapshot(
             Paths: layout,
             Machine: configuration,

@@ -16,7 +16,7 @@ from .workflow_security import current_context, authorize_step
 class MCPHttpClient:
     def __init__(self, url: str | None = None, timeout_seconds: float = 90.0):
         self.url=(url or os.environ.get(
-            "ZAGENT_PRODUCTION_ARCMAP_MCP_URL",
+            "ZAGENT_ARCMAP_MCP_URL",
             "")).strip()
         self.timeout_seconds=max(1.0,float(timeout_seconds))
 

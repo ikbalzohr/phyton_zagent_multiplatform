@@ -10,6 +10,7 @@ _PUBLIC_HINTS = {
     'PROFILE_MANAGEMENT_NOT_AUTHORIZED': 'Profile management requires explicit owner capability, matching placement and scope/tool authorization. Ordinary Files write access is not sufficient; ask the owner to verify deployment configuration.',
     'PROFILE_CATALOG_NOT_CONFIGURED': 'Ask the owner to verify that exactly one supported Files backend is enabled in the Router configuration. Do not assume a profile operation succeeded.',
     'PROFILE_CATALOG_UNAVAILABLE': 'The private profile catalog could not be obtained. Ask the owner to inspect authenticated local diagnostics for private-channel, transport or response failures. Do not assume Files is stopped or retry a mutation without checking its receipt.',
+    'RESOURCE_RECONCILIATION_REQUIRED': 'A previously started task has an uncertain outcome. Use the authenticated zagent_reconciliation_status read-only tool to find your own blocking task IDs without requiring the Files catalog. For a read-only Files search, inspect a zagent_task_recover plan; writes require owner verification of side effects. Do not retry unknown writes, clear journals, or bypass quarantine.',
 }
 
 

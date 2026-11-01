@@ -2,16 +2,26 @@
 
 Satu produk MCP netral: HTTPS MCP → Tunnel/router/workflow → **Files1, Web1, ArcMap1**. Core1 adalah satu pemilik lifecycle Windows per-user; UI1 adalah dashboard web same-origin yang dilayani Core. Tidak ada WPF Manager produk, mode provider, approval/binding per chat, atau otoritas berdasarkan nama client. Installer native Setup/Bundle tetap khusus install/repair/uninstall.
 
-**Status: source integration, bukan rilis accepted.** Semua produk termasuk Files memakai versi `1.0.0`. Build/test/install/live acceptance belum dijalankan pada pekerjaan ini; semuanya hanya pada Windows lokal yang diizinkan. Angka versi target bukan bukti release-ready. Provenance baseline `222341c3840b4048b8f19c534e8619fbc6a711f0`; inventaris historis disimpan di `docs/history/`, tidak dikirim sebagai konfigurasi payload baru.
+**Status: source integration, bukan rilis accepted.** Semua produk termasuk Files memakai versi `1.0.0`. Targeted build/unit/harness Windows lokal telah dijalankan untuk perubahan netralisasi instalasi; full client/live/installer acceptance masih memerlukan evidence terpisah. Angka versi target bukan bukti release-ready. Provenance baseline `222341c3840b4048b8f19c534e8619fbc6a711f0`; inventaris historis disimpan di `docs/history/`, tidak dikirim sebagai konfigurasi payload baru.
+
+## Arsitektur produk independen
+
+Zagent Multi Platform adalah produk **MCP-first** tersendiri, bukan varian, dependensi runtime, atau deployment Zagent Dev/Production. Klien MCP yang kompatibel terhubung melalui HTTPS MCP + OAuth; tidak ada fallback otorisasi dari plugin produk lain. Kontrak arsitektur dan aturan pemulihan task: [MCP_FIRST_ARCHITECTURE.md](docs/MCP_FIRST_ARCHITECTURE.md).
 
 ## Struktur
 
 - `src/Zagent.Core`: lifecycle + ASP.NET Core/Razor dashboard, `src/Zagent.Shared`: kontrak.
 - `src/Zagent.Setup`, `src/Zagent.Bundle`: installer native, bukan UI manajemen kedua.
-- `src/Zagent.Manager`: source referensi lama milik stream C; tidak dipublish/dipaketkan sebagai produk.
+- `src/Zagent.Launcher`: peluncur mandiri per-installasi. Tidak memindai `*Zagent*` atau mengambil runtime dari instalasi lain; lihat `docs/WINDOWS-OWNER-LAUNCHER.md`.
 - `agents/{tunnel,files,web,arcmap}`: engine dan manifest agent; versi dependency/protokol/vendor tidak di-reset.
 - `component-manifest.json`: versi suite/product-line, status bukti; `capability-inventory.json`: policy rekonsiliasi katalog, bukan tool-count/runtime PASS historis.
 - `packaging/scripts`: workflow Windows dan gates; `dev`: launcher terisolasi.
+
+## Instalasi netral (tanpa role)
+
+Produk menggunakan satu nama instalasi **Zagent** tanpa pilihan slot Primary/Secondary atau Master/User. Nama folder baru `Zagent`; nilai `installation_role` / `InstallationRole` dari konfigurasi lama tidak lagi menjadi otoritas atau penentu routing. Port yang tersimpan dibaca tanpa migrasi otomatis, termasuk blok lama; instalasi baru menggunakan kebijakan port netral dan allocator mengecek ketersediaan. Named pipe, supervisor lease, cache uninstaller, registrasi uninstall, serta folder konfigurasi privat baru dipisahkan memakai fingerprint deterministik dari **path root instalasi**, bukan nama operator, audience MCP, atau label instalasi.
+
+**Batas migrasi:** runtime lama tidak di-restart/diubah oleh pekerjaan source ini. Akses plugin/credential yang sebelumnya tersimpan di direktori berdasarkan slot lama **tidak** dipindahkan secara otomatis ke direktori path-scoped. Sebelum cutover diperlukan migrasi offline yang diverifikasi atau enrolment ulang oleh owner, disertai pemeriksaan ACL, kredensial, endpoint, dan cleanup shortcut/registration lama. Identitas perangkat dan installation UUID yang dipakai otorisasi MCP tetap dipertahankan; penghapusan role instalasi bukan penghapusan security binding.
 
 ## Windows lokal: prasyarat
 
@@ -28,10 +38,11 @@ Dari source root di Windows, pilih evidence directory **baru di luar source**:
   -Dotnet 'dotnet' -EvidenceRoot $EvidenceRoot -RunHarnesses
 ```
 
-Script menginventarisasi semua `.csproj`, build TestChild dahulu, build project satu per satu, dan menjalankan console harness memakai `dotnet run --no-build`, bukan menganggap `dotnet test` menjalankan proyek Exe. Default harness subset: Setup/Architecture/Supervisor/ArcMapWorkflowUnit. `-HarnessTests` memilih daftar eksplisit. Hasil subset tidak berarti full acceptance; unexpected SKIP/BLOCKED adalah error. Environment/interpreter/fixture live harus dipenuhi terpisah sebelum memilih harness integration. Jangan arahkan fixture ke data pengguna/source.
+Script menginventarisasi semua `.csproj`, build TestChild dahulu, build project satu per satu, dan menjalankan console harness termasuk 33 assertions Launcher memakai `dotnet run --no-build`, bukan menganggap `dotnet test` menjalankan proyek Exe. Default harness subset: Setup/Architecture/Supervisor/ArcMapWorkflowUnit. `-HarnessTests` memilih daftar eksplisit. Hasil subset tidak berarti full acceptance; unexpected SKIP/BLOCKED adalah error. Environment/interpreter/fixture live harus dipenuhi terpisah sebelum memilih harness integration. Jangan arahkan fixture ke data pengguna/source.
 
 ```powershell
 & .\packaging\scripts\Publish-Core.ps1 -Dotnet 'dotnet'
+& .\packaging\scripts\Publish-Launcher.ps1 -Dotnet 'dotnet'
 & .\packaging\scripts\Publish-Setup.ps1 -Dotnet 'dotnet'
 & .\packaging\scripts\Publish-Bundle.ps1 -Dotnet 'dotnet'
 # Setelah seluruh runtime, snapshots, AddIn implementation dan input eksternal tervalidasi:
@@ -39,7 +50,7 @@ Script menginventarisasi semua `.csproj`, build TestChild dahulu, build project 
 & .\packaging\scripts\Build-SingleExeBundle.ps1 -PayloadRoot $FreshStaging -OutputFile $FreshBundle
 ```
 
-`Publish-Manager.ps1` hanya alias publish Core untuk nama script historis, tidak membangun WPF Manager. Payload menyalin **seluruh** publish Core termasuk assets dashboard. Staging/publish/bundle menolak output existing. Browser binaries Chromium/Firefox/WebKit dilarang; hanya FFmpeg helper, Chrome eksternal. Hash manifest bukan publisher signature; signing/trust bundle masih release blocker.
+Hanya `Publish-Core.ps1` yang mem-publish Core dan Web Dashboard; tidak ada lagi proyek atau alias publish WPF Manager. Payload menyalin **seluruh** publish Core termasuk assets dashboard. Staging/publish/bundle menolak output existing. Browser binaries Chromium/Firefox/WebKit dilarang; hanya FFmpeg helper, Chrome eksternal. Hash manifest bukan publisher signature; signing/trust bundle masih release blocker.
 
 ## Instalasi dan keamanan
 

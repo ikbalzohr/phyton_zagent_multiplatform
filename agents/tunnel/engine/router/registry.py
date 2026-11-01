@@ -86,6 +86,7 @@ class UpstreamState:
     service: dict[str, Any]
     session_id: str | None = None
     initialized: bool = False
+    protocol_version: str = MCP_PROTOCOL_VERSION
     tools: list[dict[str, Any]] = field(default_factory=list)
     last_error: str = ""
     # Code-only catalog attempt outcome, exposed only on authenticated /router/status.
@@ -153,8 +154,10 @@ class MCPRegistry:
             "Accept": "application/json, text/event-stream",
             "Content-Type": "application/json",
             "User-Agent": "Zagent-Tunnel-Router/1.0.0",
-            "X-Zagent-Internal-Token": internal_token(),
+            "MCP-Protocol-Version": state.protocol_version,
         }
+        if state.service.get("internal_auth", True):
+            headers["X-Zagent-Internal-Token"] = internal_token()
         if state.session_id:
             headers["Mcp-Session-Id"] = state.session_id
         client = self._client(state)
@@ -203,6 +206,7 @@ class MCPRegistry:
                 result = await self._post(state, payload)
                 if "error" in result:
                     raise RuntimeError(result["error"])
+                state.protocol_version = result.get("result", {}).get("protocolVersion", MCP_PROTOCOL_VERSION)
                 await self._post(
                     state,
                     {"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}},
@@ -223,13 +227,24 @@ class MCPRegistry:
             return {"ok": False, "disabled": True, "tools": 0}
         try:
             await self.ensure_initialized(state)
-            response = await self._post(
-                state,
-                {"jsonrpc": "2.0", "id": uuid.uuid4().hex, "method": "tools/list", "params": {}},
-            )
-            if "error" in response:
-                raise RuntimeError(response["error"])
-            state.tools = list(response.get("result", {}).get("tools", []))
+            tools = []
+            cursors = set()
+            params = {}
+            while True:
+                response = await self._post(state, {"jsonrpc": "2.0", "id": uuid.uuid4().hex,
+                    "method": "tools/list", "params": params})
+                if "error" in response:
+                    raise RuntimeError(response["error"])
+                page = response.get("result", {})
+                tools.extend(page.get("tools", []))
+                cursor = page.get("nextCursor")
+                if not cursor:
+                    break
+                if not isinstance(cursor, str) or cursor in cursors or len(cursors) >= 1000:
+                    raise ValueError("Invalid tools/list pagination")
+                cursors.add(cursor)
+                params = {"cursor": cursor}
+            state.tools = tools
             state.last_ok = time.time()
             state.last_error = ""
             self.rebuild_index()
@@ -415,7 +430,7 @@ class MCPRegistry:
         capability = tool.get("_meta", {}).get("zagent.capability")
         # Files authority travels only in authenticated params._meta. Legacy
         # argument enrichment changes the payload bound by the consumer verifier.
-        if "metadata" in properties and capability and service_id not in {"zagent_files", "zagent_files_v3"}:
+        if state.service.get("internal_auth", True) and "metadata" in properties and capability and service_id not in {"zagent_files", "zagent_files_v3"}:
             forwarded = {}
             forwarded.update({
                 "session_id": ctx.session_id,
@@ -443,18 +458,22 @@ class MCPRegistry:
             call_arguments["metadata"] = forwarded
 
         call_timeout = _tool_call_timeout_seconds(state, tool, call_arguments)
+        # Third-party upstreams receive tool data, never Core credentials or
+        # principal/resource metadata. Public identity remains in Router/journal.
+        params = {"name": upstream_name, "arguments": call_arguments}
+        if state.service.get("internal_auth", True):
+            params['_meta'] = ({'zagent.profile_admin_context': dict(envelope)} if admin else {
+                "zagent.session_id": ctx.session_id, "zagent.request_id": ctx.request_id,
+                "zagent.trace_id": ctx.trace_id, "zagent.task_id": ctx.task_id,
+                "zagent.device_id": _DEVICE_ID or None,
+                "zagent.execution_context": dict(ctx.execution_context)})
         response = await self._post(
             state,
             {
                 "jsonrpc": "2.0",
                 "id": ctx.request_id or uuid.uuid4().hex,
                 "method": "tools/call",
-                "params": {"name": upstream_name, "arguments": call_arguments, "_meta":
-                    {'zagent.profile_admin_context': dict(envelope)} if admin else {
-                    "zagent.session_id": ctx.session_id, "zagent.request_id": ctx.request_id,
-                    "zagent.trace_id": ctx.trace_id, "zagent.task_id": ctx.task_id,
-                    "zagent.device_id": _DEVICE_ID or None,
-                    "zagent.execution_context": dict(ctx.execution_context)}},
+                "params": params,
             },
             timeout_seconds=call_timeout,
         )

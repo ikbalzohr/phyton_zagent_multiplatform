@@ -48,11 +48,10 @@ public sealed class ZagentConfigurationEngine
     }
 
     public ZagentMachineConfiguration CreateDefaultMachineConfiguration(
-        ZagentPathLayout layout,
-        string installationRole = "Primary")
+        ZagentPathLayout layout)
     {
         BasePathResolver.Validate(layout);
-        var ports = ZagentNetworkPolicy.For(installationRole);
+        var ports = ZagentNetworkPolicy.For();
 
         return new ZagentMachineConfiguration(
             SchemaVersion: ZagentMachineConfiguration.CurrentSchemaVersion,
@@ -67,8 +66,7 @@ public sealed class ZagentConfigurationEngine
             WebPort: ports.Web,
             ArcMapPort: ports.ArcMap,
             DevelopmentPortStart: ports.DevelopmentGatewayStart,
-            DevelopmentPortEnd: ports.DevelopmentGatewayEnd,
-            InstallationRole: ports.InstallationRole);
+            DevelopmentPortEnd: ports.DevelopmentGatewayEnd);
     }
 
     public ZagentInstalledManifest CreateInstalledManifest(
@@ -193,16 +191,12 @@ public sealed class ZagentConfigurationEngine
                 "Configuration contains duplicate fixed ports.");
         }
 
-        var role = ZagentInstallationProfile.Normalize(configuration.InstallationRole);
-        var range = ZagentNetworkPolicy.For(role);
-        if (fixedPorts.Any(port => port < range.ProductionStart || port > range.ProductionEnd))
+        if (!ZagentNetworkPolicy.IsSupportedPortBlock(
+                fixedPorts, configuration.DevelopmentPortStart,
+                configuration.DevelopmentPortEnd))
         {
-            throw new InvalidDataException($"Installation {role} ports must stay in {range.ProductionStart}-{range.ProductionEnd}.");
-        }
-        if (configuration.DevelopmentPortStart != range.DevelopmentGatewayStart ||
-            configuration.DevelopmentPortEnd != range.DevelopmentGatewayEnd)
-        {
-            throw new InvalidDataException($"Installation {role} has an incorrect Development Gateway range.");
+            throw new InvalidDataException(
+                "Production ports and Development Gateway range must belong to a supported, non-overlapping block.");
         }
 
         if (configuration.DevelopmentPortStart < 1 ||

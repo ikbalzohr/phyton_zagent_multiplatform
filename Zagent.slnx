@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Zagent.Core/Zagent.Core.csproj" />
+    <Project Path="src/Zagent.Launcher/Zagent.Launcher.csproj" />
     <Project Path="src/Zagent.Bundle/Zagent.Bundle.csproj" />
     <Project Path="src/Zagent.Setup/Zagent.Setup.csproj" />
     <Project Path="src/Zagent.Shared/Zagent.Shared.csproj" />
@@ -14,6 +15,7 @@
     <Project Path="tests/Zagent.ArcMapTests/Zagent.ArcMapTests.csproj" />
     <Project Path="tests/Zagent.FilesTests/Zagent.FilesTests.csproj" />
     <Project Path="tests/Zagent.ManagerTests/Zagent.ManagerTests.csproj" />
+    <Project Path="tests/Zagent.LauncherTests/Zagent.LauncherTests.csproj" />
     <Project Path="tests/Zagent.SetupTests/Zagent.SetupTests.csproj" />
     <Project Path="tests/Zagent.SupervisorTests/Zagent.SupervisorTests.csproj" />
     <Project Path="tests/Zagent.TestChild/Zagent.TestChild.csproj" />

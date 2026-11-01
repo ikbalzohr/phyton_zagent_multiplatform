@@ -2,7 +2,7 @@ from pathlib import Path
 import shutil
 root=Path(r"D:\3-Ikbalzohr\Agent")
 dev=root/"appBridge/production/Zagent/v3/agents/web/engine"
-prod=root/"ZohrSystem/Zagent Master/agents/web/engine"
+prod=Path(__import__("os").environ["ZAGENT_SOURCE_WEB_ENGINE"])  # explicit path required; historical migration only
 files=["background.js","popup.html","popup.js","popup.css"]
 for f in files:
  shutil.copy2(prod/"extension"/f,dev/"extension"/f)

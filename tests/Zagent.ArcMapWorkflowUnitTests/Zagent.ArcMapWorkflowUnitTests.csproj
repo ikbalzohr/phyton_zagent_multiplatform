@@ -2,7 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Zagent.Core\Zagent.Core.csproj" />
     <ProjectReference Include="..\..\src\Zagent.Shared\Zagent.Shared.csproj" />
-    <ProjectReference Include="..\..\src\Zagent.Manager\Zagent.Manager.csproj" />
   </ItemGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>

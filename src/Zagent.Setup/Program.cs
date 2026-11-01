@@ -8,7 +8,7 @@ if (args.Length == 0 ||
         "Zagent.Setup <install|repair|verify|uninstall> " +
         "--target <InstallRoot> [--source <PayloadRoot>] " +
         "[--data-root <Path>] [--files-profile <Path>] " +
-        "[--product-version <Version>] [--installation-role Master|User] [--keep-data true|false]");
+        "[--product-version <Version>] [--keep-data true|false]");
     return 0;
 }
 
@@ -41,13 +41,6 @@ if (!bool.TryParse(
     Console.Error.WriteLine(
         "--keep-data must be true or false.");
     return 2;
-}
-
-var selectedRole = Option("--installation-role");
-if (!string.IsNullOrWhiteSpace(selectedRole))
-{
-    Environment.SetEnvironmentVariable("ZAGENT_INSTALLATION_ROLE",
-        Zagent.Shared.Installation.ZagentInstallationProfile.Normalize(selectedRole));
 }
 
 var request = new SetupRequest(

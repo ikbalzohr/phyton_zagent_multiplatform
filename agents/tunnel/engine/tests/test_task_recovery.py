@@ -66,6 +66,48 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result['isError'])
         return json.loads(result['content'][0]['text'])
 
+
+    async def test_owner_only_reconciliation_diagnostics_without_files_backend(self):
+        before = await self.orch.journal.get(self.task_id)
+        foreign = dict(before, task_id='tsk_'+'d'*32, session_id='owner_v1_foreign')
+        await self.orch.journal.create(foreign)
+        broken = AsyncMock(side_effect=AssertionError('Files must not be called'))
+        with patch.object(server, '_files_catalog', broken):
+            response = await self.rpc('tools/call', {
+                'name': 'zagent_reconciliation_status', 'arguments': {'limit': 50}})
+        self.assertEqual(response.status_code, 200)
+        value = self.value(response)
+        self.assertTrue(value['diagnostic_only'])
+        self.assertEqual(value['owner_task_count'], 1)
+        self.assertEqual(value['tasks'], [{
+            'task_id': self.task_id, 'tool': 'files_search',
+            'recovery': 'review_read_only_recovery_plan'}])
+        self.assertNotIn('arguments_json', json.dumps(value))
+        self.assertNotIn('installation:install', json.dumps(value))
+        self.assertEqual(before, await self.orch.journal.get(self.task_id))
+        broken.assert_not_awaited()
+        with patch.object(ResourceAuthorizer, 'authenticate',
+                          AsyncMock(return_value=AuthContext(
+                              'p', 'ws', frozenset({'files:write'}),
+                              frozenset({'files_search'}), '1', time.time()+300))):
+            denied = await self.rpc('tools/call', {
+                'name': 'zagent_reconciliation_status', 'arguments': {}})
+            self.assertEqual(denied.status_code, 403)
+
+    async def test_write_orphan_is_diagnostic_only_never_automatically_recovered(self):
+        row = await self.orch.journal.get(self.task_id)
+        write_id = 'tsk_'+'e'*32
+        other = dict(row, task_id=write_id, tool_name='files_exec_command',
+                     service_id='zagent_files', arguments_json='{}')
+        await self.orch.journal.create(other)
+        response = await self.rpc('tools/call', {
+            'name': 'zagent_reconciliation_status', 'arguments': {}})
+        value = self.value(response)
+        statuses = {t['task_id']: t['recovery'] for t in value['tasks']}
+        self.assertEqual(statuses[write_id], 'manual_owner_reconciliation_required')
+        self.assertEqual((await self.orch.journal.get(write_id))['state'], 'orphaned')
+        self.assertEqual((await self.orch.journal.get(self.task_id))['state'], 'orphaned')
+
     async def test_http_plan_apply_wal_persistence_and_replay_denial(self):
         before = await self.orch.journal.get(self.task_id)
         reader = sqlite3.connect(self.orch.journal.path)

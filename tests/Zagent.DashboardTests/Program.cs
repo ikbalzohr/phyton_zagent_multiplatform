@@ -57,8 +57,8 @@ Check(DashboardSecurity.IsExpectedHost("localhost:19443", options.Origin), "conf
 Check(DashboardSecurity.Redact("Authorization: Bearer token12345 token=secret api_key=hidden").Contains("secret") == false, "redaction");
 Check(!ZagentProductInfo.CoreVersion.StartsWith("0.", StringComparison.Ordinal), "Core1 product version");
 Check(ZagentProductInfo.UiVersion == "1.0.0", "UI1 product version");
-Check(ZagentInstallationProfile.Normalize("primary") == ZagentInstallationProfile.Primary, "neutral primary slot");
-Check(ZagentInstallationProfile.Normalize("secondary") == ZagentInstallationProfile.Secondary, "neutral secondary slot");
+Check(ZagentInstanceScope.Key(@"C:\Zagent") == ZagentInstanceScope.Key(@"c:\zagent"), "instance scope path canonicalization");
+Check(ZagentInstanceScope.PipeName(@"C:\Zagent") != ZagentInstanceScope.PipeName(@"C:\OtherZagent"), "distinct instance pipe");
 var shutdown = new CoreShutdownCoordinator();
 var called = 0;
 shutdown.ShutdownRequested += (_, _) => Interlocked.Increment(ref called);

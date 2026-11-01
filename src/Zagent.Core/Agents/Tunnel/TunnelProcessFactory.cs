@@ -50,19 +50,15 @@ public static class TunnelProcessFactory
                 ["ZAGENT_IDENTITY_ENFORCEMENT"] = options.IdentityEnforcement,
                 ["CONTROL_PLANE_TUNNEL_ID"] = options.ControlPlaneTunnelId,
                 ["CONTROL_PLANE_API_KEY"] = options.ControlPlaneApiKey,
-                ["ZAGENT_PLUGIN_AUDIENCE"] = options.PluginAudience,
-                ["ZAGENT_PLUGIN_DISPLAY_NAME"] = options.PluginDisplayName,
-                ["ZAGENT_PRODUCTION_ARCMAP_MCP_URL"] = options.ArcMapMcpUrl,
-                ["ZAGENT_PLUGIN_ACCESS_MODE"] = options.PluginAccessMode,
-                ["ZAGENT_PLUGIN_ACCESS_ROOT"] =
-                    string.IsNullOrWhiteSpace(options.PluginAccessRoot)
-                        ? Path.Combine(
-                            Path.GetFullPath(options.RuntimeRoot),
-                            "plugin-access")
-                        : Path.GetFullPath(options.PluginAccessRoot),
-                ["ZAGENT_PLUGIN_ACCESS_ENFORCEMENT"] = options.PluginAccessEnforcement,
-                ["ZAGENT_PLUGIN_FALLBACK"] = options.PluginFallback,
-                ["ZAGENT_PLUGIN_PARENT_AUDIENCE"] = options.PluginParentAudience,
+                ["ZAGENT_ARCMAP_MCP_URL"] = options.ArcMapMcpUrl,
+                // Do not inherit any legacy sibling-plugin authority from the
+                // Windows owner environment. MCP authorization comes from OAuth.
+                ["ZAGENT_PLUGIN_AUDIENCE"] = "",
+                ["ZAGENT_PLUGIN_ACCESS_MODE"] = "",
+                ["ZAGENT_PLUGIN_ACCESS_ROOT"] = "",
+                ["ZAGENT_PLUGIN_FALLBACK"] = "",
+                ["ZAGENT_PLUGIN_PARENT_AUDIENCE"] = "",
+                ["ZAGENT_PLUGIN_ACCESS_ENFORCEMENT"] = "",
                 ["PYTHONUNBUFFERED"] = "1"
             },
             GracefulShutdownSeconds: 3,

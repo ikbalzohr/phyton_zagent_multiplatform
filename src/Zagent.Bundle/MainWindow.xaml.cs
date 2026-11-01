@@ -19,12 +19,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         InstallPathBox.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
         InstallPathBox.TextChanged += (_, _) => RefreshMode();
-        PluginRoleBox.SelectionChanged += (_, _) => RefreshMode();
         RefreshMode();
     }
-
-    private string SelectedRole() => PluginRoleBox.SelectedItem is ComboBoxItem { Tag: string role }
-        ? ZagentInstallationProfile.Normalize(role) : "Master";
 
     private string TargetRoot()
     {
@@ -32,7 +28,7 @@ public partial class MainWindow : Window
         var selected = Path.GetFullPath(InstallPathBox.Text.Trim());
         if (File.Exists(Path.Combine(selected, "payload-manifest.json")) ||
             File.Exists(Path.Combine(selected, "Zagent.Core.exe"))) return selected;
-        return InstallTargetResolver.ResolveFromBaseFolder(selected, SelectedRole());
+        return InstallTargetResolver.ResolveFromBaseFolder(selected);
     }
 
     private void RefreshMode()
@@ -61,7 +57,6 @@ public partial class MainWindow : Window
     {
         if (_busy) return;
         string? payloadRoot = null;
-        var previousRole = Environment.GetEnvironmentVariable("ZAGENT_INSTALLATION_ROLE");
         try
         {
             var target = TargetRoot();
@@ -69,7 +64,6 @@ public partial class MainWindow : Window
             _busy = true;
             _cts = new CancellationTokenSource();
             ToggleUi(true);
-            Environment.SetEnvironmentVariable("ZAGENT_INSTALLATION_ROLE", SelectedRole());
             var progress = new Progress<(int Percent, string Message)>(value => {
                 Progress.Value = value.Percent; StatusText.Text = value.Message;
             });
@@ -85,14 +79,10 @@ public partial class MainWindow : Window
                 StatusText.Text = "Program terpasang. Dashboard NOT_CONFIGURED: lakukan provisioning sertifikat dan akun lokal sesuai panduan v1, lalu buka shortcut Manager.";
                 return;
             }
-            var core = Path.Combine(target, "Zagent.Core.exe");
-            var launch = new ProcessStartInfo { FileName = core, WorkingDirectory = target, UseShellExecute = true };
-            launch.ArgumentList.Add("--dashboard");
-            launch.ArgumentList.Add("--root");
-            launch.ArgumentList.Add(target);
-            launch.ArgumentList.Add("--dashboard-config");
-            launch.ArgumentList.Add(config);
-            using var process = Process.Start(launch) ?? throw new InvalidOperationException("Core dashboard launcher gagal dimulai.");
+            var launcher = Path.Combine(target, "Zagent.Launcher.exe");
+            if (!File.Exists(launcher)) throw new InvalidOperationException("Zagent Launcher tidak ditemukan dalam instalasi.");
+            var launch = new ProcessStartInfo { FileName = launcher, WorkingDirectory = target, UseShellExecute = true };
+            using var process = Process.Start(launch) ?? throw new InvalidOperationException("Zagent Launcher gagal dimulai.");
             _allowClose = true;
         }
         catch (OperationCanceledException) { StatusText.Text = "Operasi dibatalkan."; }
@@ -104,7 +94,6 @@ public partial class MainWindow : Window
         finally
         {
             BundlePayloadReader.Cleanup(payloadRoot);
-            Environment.SetEnvironmentVariable("ZAGENT_INSTALLATION_ROLE", previousRole);
             _cts?.Dispose(); _cts = null; _busy = false; ToggleUi(false);
         }
         if (_allowClose) Close();
@@ -112,7 +101,7 @@ public partial class MainWindow : Window
 
     private void ToggleUi(bool running)
     {
-        InstallPathBox.IsEnabled = BrowseButton.IsEnabled = PluginRoleBox.IsEnabled = InstallButton.IsEnabled = !running;
+        InstallPathBox.IsEnabled = BrowseButton.IsEnabled = InstallButton.IsEnabled = !running;
         InstallButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
         CancelButton.IsEnabled = true;
     }

@@ -56,6 +56,33 @@ _NATIVE_ALLOWLIST_TOOLS = frozenset({"files_allowlist_list", "files_allowlist_ad
     "files_allowlist_remove", "files_allowlist_replace"})
 
 
+def _qgis_tool(name: str) -> bool:
+    mapping = registry.tool_index.get(name)
+    state = registry.states.get(mapping[0]) if mapping else None
+    return bool(name.startswith('qgis_') and state
+        and state.service.get('id') == 'zagent_qgis'
+        and state.service.get('namespace') == 'qgis'
+        and state.service.get('enabled', True)
+        and state.service.get('internal_auth') is False)
+
+
+def _require_tool(auth: AuthContext, scope: str, name: str) -> None:
+    if not _qgis_tool(name):
+        auth.require(scope, name)
+        return
+    # Explicit Core-configured QGIS is owner-code execution, not a new grant.
+    # Reuse ONLY the existing command authority; never mutate token/grant tools.
+    if scope != 'files:execute':
+        raise AuthorizationError('TOOL_NOT_AUTHORIZED', 403)
+    anchor = _policy('files_powershell_run')
+    if anchor.get('enabled', True) is not True:
+        raise AuthorizationError('TOOL_NOT_AUTHORIZED', 403)
+    auth.require('files:read')
+    auth.require('files:write')
+    auth.require('files:execute', 'files_powershell_run')
+    policy_resources(auth, placement, 'files:write', authorizer())
+
+
 def _policy(name: str) -> dict[str, Any]:
     policies = load_tunnel_config().get("tool_policy")
     if policies is None:
@@ -68,6 +95,8 @@ def _policy(name: str) -> dict[str, Any]:
         return {"scope": scope_for_files_tool(name), "enabled": True}
     if name == task_recovery.TOOL and name not in policies:
         return {"scope": "files:write", "enabled": True}
+    if name not in policies and _qgis_tool(name):
+        return {'scope': 'files:execute', 'enabled': True}
     policy = policies.get(name)
     if not isinstance(policy, dict) or not policy.get("scope"):
         raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
@@ -109,7 +138,7 @@ async def _revalidate(context: dict[str, Any]) -> AuthContext:
     if (auth.principal_id != context["principal_id"] or auth.workspace_id != context["workspace_id"]
             or auth.policy_revision != context["policy_revision"]):
         raise AuthorizationError("AUTHORIZATION_CHANGED", 403)
-    auth.require(context["required_scope"], context["public_tool"])
+    _require_tool(auth, context["required_scope"], context["public_tool"])
     if is_admin:
         revalidate_admin(context, auth, placement, current_authorizer)
     if context["public_tool"].startswith("files_"):
@@ -140,6 +169,12 @@ async def _request_context(auth, policy, name, arguments):
     current_authorizer = authorizer()
     if name in PROFILE_ADMIN_SCOPES:
         return new_admin_context(auth, placement, current_authorizer, name, arguments)
+    if _qgis_tool(name):
+        _require_tool(auth, policy['scope'], name)
+        context = new_context(auth, placement, 'files:execute', 'files_powershell_run',
+                              resource_authorizer=current_authorizer)
+        context['public_tool'] = name
+        return context
     catalog = await _files_catalog(auth, current_authorizer) if name in FILES_TOOL_SCOPES else None
     return new_context(auth, placement, policy['scope'], name,
                        resource_authorizer=current_authorizer,
@@ -308,6 +343,7 @@ def _management_tools():
         "description": "Immediate owned orphaned read-only Files search recovery. Plan first; apply with expected_plan. Never replays the search or returns a durable receipt.",
         "inputSchema": task_recovery.SCHEMA},
         _tool("zagent_access_status"), _tool("zagent_capabilities"),
+        _tool("zagent_reconciliation_status", {"limit":{"type":"integer","minimum":1,"maximum":100}}),
         _tool("zagent_task_submit", {"tool_name":string,"arguments":{"type":"object"},"idempotency_key":string}, ("tool_name",)),
         *[_tool("zagent_task_"+name, {"task_id":string}, ("task_id",)) for name in ("status","result","cancel")],
         _tool("zagent_task_list", {"limit":{"type":"integer","minimum":1,"maximum":200}}),
@@ -329,6 +365,13 @@ def _visible(auth: AuthContext):
             tools.append(tool); continue
         if name in _ALWAYS:
             tools.append(tool); continue
+        if name == "zagent_reconciliation_status":
+            try:
+                auth.require("files:read")
+                tools.append(tool)
+            except AuthorizationError:
+                pass
+            continue
         try:
             if name == allowlist_access.TOOL:
                 allowlist_access.require_available(auth, placement, authorizer(), _policy)
@@ -337,7 +380,7 @@ def _visible(auth: AuthContext):
                 task_recovery.require_available(auth, authorizer(), _policy)
                 tools.append(tool); continue
             policy = _policy(name)
-            auth.require(policy["scope"], name)
+            _require_tool(auth, policy["scope"], name)
             if name in PROFILE_ADMIN_SCOPES:
                 require_profile_management(auth, placement, authorizer(), name)
             if name.startswith("files_"):
@@ -381,21 +424,22 @@ async def _owned_task(task_id: str, auth: AuthContext):
     if policy.get('enabled', True) is not True:
         raise AuthorizationError('TOOL_NOT_AUTHORIZED', 403)
     scope = policy['scope']
-    auth.require(scope, public_tool)
+    _require_tool(auth, scope, public_tool)
     if public_tool in PROFILE_ADMIN_SCOPES:
         # Actor-bound receipts survive target deletion; no profile lookup.
         require_profile_management(auth, placement, authorizer(), public_tool)
         if (context.get('device_id') != placement.device_id
                 or context.get('installation_id') != placement.installation_id):
             raise AuthorizationError('AUTHORIZATION_CHANGED', 403)
-    elif public_tool.startswith("files_"):
-        validate_files_tool_scope(public_tool, scope, auth.scopes)
+    elif public_tool.startswith("files_") or _qgis_tool(public_tool):
+        validate_files_tool_scope(
+            "files_powershell_run" if _qgis_tool(public_tool) else public_tool, scope, auth.scopes)
         # Receipt/result ownership remains principal/workspace, but removed or
         # revoked profile authorization must not expose old paths/results.
         if context.get('effective_resources') != policy_resources(
                 auth, placement, scope, authorizer(),
                 selected_profile_id=context['effective_resources'][0]['profile_id'],
-                catalog=await _files_catalog(auth, authorizer())):
+                catalog=await _files_catalog(auth, authorizer()) if public_tool.startswith('files_') else None):
             raise AuthorizationError('AUTHORIZATION_CHANGED', 403)
     return row
 
@@ -416,6 +460,12 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
     if name == task_recovery.TOOL:
         return _text(await task_recovery.recover(orchestrator, arguments, auth, placement,
                                                 authorizer, _policy))
+    if name == "zagent_reconciliation_status":
+        # Authenticated owner-only diagnosis. No Files backend/catalog dependency,
+        # no executor or resource-lock mutation, no visibility into other owners.
+        auth.require("files:read")
+        return _text(await task_recovery.reconciliation_status(
+            orchestrator, auth, arguments.get("limit", 50)))
     # Read-only receipts are authorized against the task owner and ORIGINAL tool.
     # Do not demand extra grant tool names merely to retrieve an approved read.
     # Submission/cancellation retain the separate control-policy checks below.
@@ -435,7 +485,7 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
         action = name.removeprefix("zagent_task_")
         return _text(await getattr(orchestrator, action)(task_id))
     policy = _policy(name)
-    auth.require(policy["scope"], name)
+    _require_tool(auth, policy["scope"], name)
     if name == "zagent_task_submit":
         target = arguments["tool_name"]
         if target.startswith("zagent_"):

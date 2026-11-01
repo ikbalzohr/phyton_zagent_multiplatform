@@ -93,6 +93,8 @@ def validate_service(service: dict[str, Any]) -> None:
     if parsed.hostname not in {"127.0.0.1", "127.0.0.3", "::1", "localhost"} or parsed.username or parsed.password or parsed.query or parsed.fragment:
         raise ValueError("Internal channel requires an exact loopback URL without credentials/query")
 
+    if type(service.get("internal_auth", True)) is not bool:
+        raise ValueError("internal_auth must be a boolean")
     service["enabled"] = bool(service.get("enabled", True))
     service["permanent"] = bool(service.get("permanent", False))
     service["timeout_seconds"] = max(3, min(int(service.get("timeout_seconds", 25)), 120))

@@ -76,7 +76,8 @@ public sealed class TunnelConfigurationWriter
                     url = service.Url,
                     permanent = service.Permanent,
                     enabled = service.Enabled,
-                    timeout_seconds = service.TimeoutSeconds
+                    timeout_seconds = service.TimeoutSeconds,
+                    internal_auth = service.InternalAuth
                 })
             .ToArray();
 

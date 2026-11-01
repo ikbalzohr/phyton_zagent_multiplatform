@@ -165,7 +165,8 @@ def validate_context(value: Any, placement: Placement) -> dict[str, Any]:
             or value["public_tool"].startswith("files_")
             or any(r["kind"] == "files" for r in resources)):
         effective_access = validate_files_tool_scope(
-            value["public_tool"], value["required_scope"], value["scopes"])
+            'files_powershell_run' if value['public_tool'].startswith('qgis_') else value["public_tool"],
+            value["required_scope"], value["scopes"])
         if not all(r["kind"] == "files" for r in resources):
             raise AuthorizationError("CONTEXT_INVALID", 403)
     if value.get("effective_access") != effective_access:

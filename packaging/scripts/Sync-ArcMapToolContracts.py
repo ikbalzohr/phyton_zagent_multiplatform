@@ -92,7 +92,7 @@ old_count = int(top["runtime_snapshot"]["arcmap_tools"])
 top["runtime_snapshot"]["arcmap_tools"] = len(tools)
 # Preserve historical routed-tool contract and add only the exact ArcMap delta.
 top["runtime_snapshot"]["connected_total_tools"] += len(tools) - old_count
-top["path_contract"]["production_install"] = "<user-selected base folder>\\Zagent Master or Zagent User"
+top["path_contract"]["production_install"] = "<user-selected base folder>\\Zagent"
 TOP_COMPONENT.write_text(json.dumps(top, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 factory = FACTORY.read_text(encoding="utf-8")

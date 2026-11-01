@@ -7,7 +7,8 @@ public sealed record TunnelServiceDefinition(
     string Url,
     bool Enabled = true,
     bool Permanent = true,
-    int TimeoutSeconds = 30);
+    int TimeoutSeconds = 30,
+    bool InternalAuth = true);
 
 public sealed record TunnelIntegrationOptions(
     string PythonExecutable,
@@ -28,13 +29,6 @@ public sealed record TunnelIntegrationOptions(
     string IdentityEnforcement = "mandatory",
     string ControlPlaneTunnelId = "",
     string ControlPlaneApiKey = "",
-    string PluginAudience = "zagent-production",
-    string PluginDisplayName = "Zagent",
-    string PluginAccessMode = "manager-approval",
-    string PluginAccessRoot = "",
-    string PluginAccessEnforcement = "mandatory",
-    string PluginFallback = "",
-    string PluginParentAudience = "zagent-production",
     string ArcMapMcpUrl = "",
     string? OAuthCredentialDataRoot = null,
     string? CoreDataRoot = null);

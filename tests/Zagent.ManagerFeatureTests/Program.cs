@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using Zagent.Core.Agents.Tunnel;
 using Zagent.Core.Identity;
 using Zagent.Core.Manager;
@@ -117,23 +119,37 @@ try
                     "devmcp",
                     "http://127.0.0.3:18960/mcp"));
 
+            // The production writer requires an owner-only, inheritance-protected
+            // config root. Test that unsafe temporary fixtures are rejected,
+            // then provision the disposable fixture correctly.
             var writer = new TunnelConfigurationWriter();
-            await writer.WriteAsync(
-                new TunnelIntegrationOptions(
-                    PythonExecutable: "python.exe",
-                    EngineRoot: root,
-                    ConfigRoot: config,
-                    RuntimeRoot: runtime,
-                    ChatLogPath: Path.Combine(runtime, "chat.jsonl"),
-                    BindHost: "127.0.0.3",
-                    RouterPort: 18810),
-                [
-                    new TunnelServiceDefinition(
-                        "zagent_files",
-                        "Zagent Files",
-                        "files",
-                        "http://127.0.0.3:18820/mcp")
-                ]);
+            var opts = new TunnelIntegrationOptions(
+                PythonExecutable: "python.exe",
+                EngineRoot: root,
+                ConfigRoot: config,
+                RuntimeRoot: runtime,
+                ChatLogPath: Path.Combine(runtime, "chat.jsonl"),
+                BindHost: "127.0.0.3",
+                RouterPort: 18810);
+            var upstream = new[]
+            {
+                new TunnelServiceDefinition(
+                    "zagent_files", "Zagent Files", "files",
+                    "http://127.0.0.3:18820/mcp")
+            };
+            var rejectedUnsafeAcl = false;
+            try { await writer.WriteAsync(opts, upstream); }
+            catch (InvalidDataException) { rejectedUnsafeAcl = true; }
+            True(rejectedUnsafeAcl, "Tunnel writer accepted an unprotected config directory.");
+            var sid = WindowsIdentity.GetCurrent().User!;
+            var acl = new DirectorySecurity();
+            acl.SetOwner(sid);
+            acl.SetAccessRuleProtection(true, false);
+            acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None, AccessControlType.Allow));
+            new DirectoryInfo(config).SetAccessControl(acl);
+            await writer.WriteAsync(opts, upstream);
 
             var rows = await store.SnapshotAsync();
             Equal(1, rows.Count);
@@ -519,7 +535,7 @@ try
         });
 
     await RunAsync(
-        "Manager identity.snapshot exposes verified local device",
+        "Manager identity.snapshot reports local proof without claiming external trust",
         async () =>
         {
             var registry = new CapabilityRegistry();
@@ -558,10 +574,10 @@ try
                 "verified",
                 snapshot.BindingState);
             Equal(
-                "mandatory",
+                "configured-installation",
                 snapshot.TargetValidationMode);
             Equal(
-                "verified-local",
+                "local-proof-only",
                 snapshot.TrustState);
             True(
                 !string.IsNullOrWhiteSpace(
@@ -574,7 +590,7 @@ try
         });
 
     await RunAsync(
-        "Installer base folder resolves to one role-specific subfolder",
+        "Installer base folder resolves to neutral product subfolder",
         () =>
         {
             var basePath = Path.Combine(
@@ -588,7 +604,7 @@ try
             Equal(
                 Path.Combine(
                     Path.GetFullPath(basePath),
-                    "Zagent Master"),
+                    "Zagent"),
                 target);
 
             Equal(

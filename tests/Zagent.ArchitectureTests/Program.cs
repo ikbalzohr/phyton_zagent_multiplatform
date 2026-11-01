@@ -1,4 +1,5 @@
 using Zagent.Core;
+using Zagent.Core.Agents.Tunnel;
 using Zagent.Core.Configuration;
 using Zagent.Core.Network;
 using Zagent.Core.Paths;
@@ -6,9 +7,22 @@ using Zagent.Core.Registry;
 using Zagent.Shared;
 using Zagent.Shared.Contracts;
 using Zagent.Shared.Installation;
+using Zagent.Shared.Manager;
 
 var passed = 0;
 var failed = 0;
+
+Run("MCP-first runtime has no sibling-plugin audience or fallback contract", () =>
+{
+    var names = typeof(TunnelIntegrationOptions).GetProperties()
+        .Select(property => property.Name)
+        .ToHashSet(StringComparer.Ordinal);
+    False(names.Any(name => name.StartsWith("Plugin", StringComparison.Ordinal)),
+        "Legacy plugin audience/approval/fallback was reintroduced to the Router.");
+    True(names.Contains("OAuthCredentialDataRoot"), "Owner OAuth resource configuration missing.");
+    True(names.Contains("DeviceId") && names.Contains("InstallationId"),
+        "Trusted device placement context missing.");
+});
 
 Run("product identity", () =>
 {
@@ -133,69 +147,91 @@ Run("development port policy boundaries", () =>
         "Port above development range was accepted.");
 });
 
-Run("Master and User install identities, ports and IPC are independent", () =>
+Run("neutral install policy and path-scoped IPC do not depend on client audience", () =>
 {
-    var master = ZagentNetworkPolicy.For("Master");
-    var user = ZagentNetworkPolicy.For("User");
-    Equal("Master", ZagentInstallationProfile.FromAudience("zagent-production"));
-    Equal("User", ZagentInstallationProfile.FromAudience("tryplugin"));
-    Equal("Zagent Master", ZagentInstallationProfile.DisplayName("Ikbal"));
-    Equal("Zagent User", ZagentInstallationProfile.DisplayName("Harry"));
-    Equal("Zagent.Manager.Master.v1", ZagentInstallationProfile.PipeName("Primary"));
-    Equal("Zagent.Manager.User.v1", ZagentInstallationProfile.PipeName("Secondary"));
-    False(ZagentInstallationProfile.SupervisorLeaseName("Master") ==
-          ZagentInstallationProfile.SupervisorLeaseName("User"),
-          "Supervisor leases must not overlap.");
-    Equal(18800, master.Core);
-    Equal(19100, user.Core);
-    Equal(18900, master.DevelopmentGatewayStart);
-    Equal(19200, user.DevelopmentGatewayStart);
-    Equal(19000, master.DevRuntimeStart);
-    Equal(19300, user.DevRuntimeStart);
-    True(master.ProductionEnd < user.ProductionStart,
-         "Master/User production ranges overlap.");
-    False(ZagentNetworkPolicy.IsDevelopmentPort(user.DevelopmentGatewayStart, "Master"),
-          "User development port was accepted in Master profile.");
-    True(ZagentNetworkPolicy.IsDevelopmentPort(user.DevelopmentGatewayStart, "User"),
-         "User development gateway start rejected.");
-    var parent = ValidationPath("role-install-roots", "base");
-    Equal(Path.Combine(parent, "Zagent Master"),
-          InstallTargetResolver.ResolveFromBaseFolder(parent, "Master"));
-    Equal(Path.Combine(parent, "Zagent User"),
-          InstallTargetResolver.ResolveFromBaseFolder(parent, "User"));
+    var ports = ZagentNetworkPolicy.For();
+    Equal(18800, ports.Core);
+    Equal(18900, ports.DevelopmentGatewayStart);
+    Equal(19000, ports.DevRuntimeStart);
+    True(ZagentNetworkPolicy.IsSupportedPortBlock(
+        new[] { 18800, 18810, 18811, 18820, 18830, 18840 }, 18900, 18999),
+        "Neutral production ports rejected.");
+    True(ZagentNetworkPolicy.IsSupportedPortBlock(
+        new[] { 19100, 19110, 19111, 19120, 19130, 19140 }, 19200, 19299),
+        "Existing persisted ports must be readable without a role.");
+    var rootA = Path.Combine(ValidationPath("instance-roots", "a"), "Zagent");
+    var rootB = Path.Combine(ValidationPath("instance-roots", "b"), "Zagent");
+    Equal(ZagentInstanceScope.Key(rootA.ToLowerInvariant()),
+          ZagentInstanceScope.Key(rootA.ToUpperInvariant()));
+    False(ZagentInstanceScope.Key(rootA) == ZagentInstanceScope.Key(rootB),
+        "Separate roots must never share instance key.");
+    Equal(ManagerProtocol.ForRoot(rootA), ZagentInstanceScope.PipeName(rootA));
+    False(ManagerProtocol.ForRoot(rootA) == ManagerProtocol.ForRoot(rootB),
+        "Named pipes must be isolated between install roots.");
+    False(ZagentInstanceScope.SupervisorLeaseName(rootA) ==
+          ZagentInstanceScope.SupervisorLeaseName(rootB),
+        "Supervisor lease must be scoped by path, not client.");
+    var parent = ValidationPath("neutral-install-root", "base");
+    Equal(Path.Combine(parent, "Zagent"),
+          InstallTargetResolver.ResolveFromBaseFolder(parent));
+    Equal(Path.Combine(parent, "Zagent"),
+          InstallTargetResolver.ResolveFromBaseFolder(Path.Combine(parent, "Zagent")));
 });
 
-Run("User configuration allocator and bootstrap reject Master ports", () =>
+Run("neutral allocator and bootstrap reject mixed port blocks", () =>
 {
-    var root = ValidationPath("role-user-bootstrap", "Zagent User");
+    var root = ValidationPath("neutral-bootstrap", "Zagent");
     var layout = new BasePathResolver().Resolve(root);
     var engine = new ZagentConfigurationEngine();
-    var user = engine.CreateDefaultMachineConfiguration(layout, "User");
-    Equal("User", user.InstallationRole);
-    Equal(19130, user.WebPort);
-    var allocator = new ZagentPortAllocator((_, port) => port != 19130);
-    var allocated = allocator.Allocate(user);
-    Equal(19131, allocated.WebPort);
+    var preferred = engine.CreateDefaultMachineConfiguration(layout);
+    Equal(18830, preferred.WebPort);
+    var allocator = new ZagentPortAllocator((_, port) => port != 18830);
+    var allocated = allocator.Allocate(preferred);
+    Equal(18831, allocated.WebPort);
     True(new[] { allocated.CorePort, allocated.TunnelPort, allocated.TunnelHealthPort,
                  allocated.FilesPort, allocated.WebPort, allocated.ArcMapPort }
-         .All(port => port >= 19100 && port <= 19199),
-         "One of the User ports escaped the reserved range.");
+         .All(port => port >= 18800 && port <= 18899),
+         "Neutral allocator escaped reserved production range.");
     var rejected = false;
     try
     {
-        engine.SaveMachineConfigurationAsync(layout, allocated with { ArcMapPort = 18840 })
+        engine.SaveMachineConfigurationAsync(layout, allocated with { ArcMapPort = 19140 })
               .GetAwaiter().GetResult();
     }
-    catch (InvalidDataException)
-    {
-        rejected = true;
-    }
-    True(rejected, "User profile accepted a Master ArcMap port.");
+    catch (InvalidDataException) { rejected = true; }
+    True(rejected, "Mixed legacy and neutral port blocks accepted.");
     var snapshot = new ZagentConfigurationBootstrapper(portAllocator: allocator)
-        .BootstrapAsync(root, installationRole: "User")
-        .GetAwaiter().GetResult();
-    Equal("User", snapshot.Machine.InstallationRole);
-    Equal(19131, snapshot.Machine.WebPort);
+        .BootstrapAsync(root).GetAwaiter().GetResult();
+    Equal(18831, snapshot.Machine.WebPort);
+});
+
+Run("existing machine configuration ignores obsolete installation-role metadata", () =>
+{
+    var root = ValidationPath("obsolete-role-config", "Zagent");
+    var layout = new BasePathResolver().Resolve(root);
+    var engine = new ZagentConfigurationEngine();
+    engine.EnsurePersistentDirectories(layout);
+    var existing = engine.CreateDefaultMachineConfiguration(layout) with
+    {
+        CorePort = 19100,
+        TunnelPort = 19110,
+        TunnelHealthPort = 19111,
+        FilesPort = 19120,
+        WebPort = 19130,
+        ArcMapPort = 19140,
+        DevelopmentPortStart = 19200,
+        DevelopmentPortEnd = 19299
+    };
+    engine.SaveMachineConfigurationAsync(layout, existing).GetAwaiter().GetResult();
+    var configPath = engine.GetMachineConfigurationPath(layout);
+    var raw = File.ReadAllText(configPath).TrimEnd();
+    raw = raw[..^1] + ", \"InstallationRole\": \"User\"}";
+    File.WriteAllText(configPath, raw);
+    var snapshot = new ZagentConfigurationBootstrapper()
+        .BootstrapAsync(root).GetAwaiter().GetResult();
+    Equal(19130, snapshot.Machine.WebPort);
+    Equal(19200, snapshot.Machine.DevelopmentPortStart);
+    Equal(raw, File.ReadAllText(configPath));
 });
 
 Run("user selected install root is preserved exactly", () =>

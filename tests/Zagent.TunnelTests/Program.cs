@@ -250,8 +250,7 @@ try
             DeviceFingerprint: new string('b', 64),
             InstallationId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
             DeviceBinding: testDeviceBinding,
-            IdentityEnforcement: "mandatory",
-            PluginAccessEnforcement: "disabled");
+            IdentityEnforcement: "mandatory");
 
         await using var supervisor = new NativeAgentSupervisor(
             acquireInstanceLease: false);

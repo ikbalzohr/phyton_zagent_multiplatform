@@ -1,5 +1,15 @@
 # Immediate MCP task recovery
 
+## First: find the blocking task from any authorized MCP client
+
+When a Router call returns `RESOURCE_RECONCILIATION_REQUIRED`, call `zagent_reconciliation_status` over the same authenticated HTTPS MCP connection:
+
+```json
+{"limit":50}
+```
+
+The tool requires the current caller's `files:read` scope. It is **read-only**, lists only orphaned/started tasks belonging to the authenticated principal/workspace, and does not depend on the Files backend or profile catalog. Each entry contains a `task_id`, the original tool and a classification: `review_read_only_recovery_plan` or `manual_owner_reconciliation_required`. No file arguments, private profiles, other owners' task IDs or credentials are returned. The result is diagnostic, not authorization to force-clear an orphaned task. Use the first tool only when its own policy and current grants permit it.
+
 `zagent_task_recover` is a native authenticated Router control, not a submitted job. It works while an installation resource is quarantined by an orphaned task. Core/Router must be running and reachable; there is no owner-terminal, clean-stop, empty-WAL, enrollment or grant-edit prerequisite.
 
 ## Two-phase usage
@@ -7,13 +17,13 @@
 Call `tools/call` with name `zagent_task_recover` and arguments:
 
 ```json
-{"task_id":"tsk_0bd717b5538149d78797d45e29abc4ec"}
+{"task_id":"tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 ```
 
 `plan_only` defaults to true. Inspect the result's classification and retain its `expected_plan` digest. This call changes no task or audit data. Apply using the exact returned digest:
 
 ```json
-{"task_id":"tsk_0bd717b5538149d78797d45e29abc4ec","plan_only":false,"expected_plan":"<64-character digest returned by plan>"}
+{"task_id":"tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","plan_only":false,"expected_plan":"<64-character digest returned by plan>"}
 ```
 
 The response is an immediate MCP control result, **not** an accepted durable task receipt. Inspect HTTP/JSON-RPC errors and MCP `isError`. A successful apply reports `audit_recorded` and `remaining_resource_orphans`. A nonzero remaining count means other tasks still quarantine that resource; this control does not clear those tasks. For independent post-apply readback, call this same tool again with only `task_id`: it checks the exact persisted row against the audit and reports `audit_verified: true` with the same plan digest. Ordinary `zagent_task_status`/`zagent_task_result` still perform their existing Files catalog checks and can remain unavailable while that backend is broken.

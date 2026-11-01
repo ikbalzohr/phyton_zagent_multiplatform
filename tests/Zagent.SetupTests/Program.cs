@@ -75,6 +75,10 @@ try
                         target,
                         "payload-manifest.json")),
                 "Installed payload manifest missing.");
+            False(File.Exists(Path.Combine(target, "Zagent.Manager.exe")),
+                "Retired WPF Manager must not ship in a fresh MCP-first installation.");
+            True(File.Exists(Path.Combine(target, "Zagent.Launcher.exe")),
+                "Fresh MCP-first install must include the Launcher.");
         });
 
     await RunAsync(
@@ -484,11 +488,11 @@ try
                     "In-place update did not stop the running target-root process.");
 
                 Equal(
-                    "fake-manager-proc-two",
+                    "fake-core-proc-two",
                     await File.ReadAllTextAsync(
                         Path.Combine(
                             target,
-                            "Zagent.Manager.exe")));
+                            "Zagent.Core.exe")));
             }
             finally
             {
@@ -717,8 +721,8 @@ string CreatePayload(
     {
         ["Zagent.Core.exe"] =
             "fake-core-" + value,
-        ["Zagent.Manager.exe"] =
-            "fake-manager-" + value,
+        ["Zagent.Launcher.exe"] =
+            "fake-launcher-" + value,
         ["agents/files/engine/sample.txt"] =
             "payload-" + value
     };
@@ -883,7 +887,8 @@ sealed class NoOpWindowsInstallationIntegration : IWindowsInstallationIntegratio
 {
     public void Register(
         string targetRoot,
-        string productVersion)
+        string productVersion,
+        string dataRoot)
     {
     }
 

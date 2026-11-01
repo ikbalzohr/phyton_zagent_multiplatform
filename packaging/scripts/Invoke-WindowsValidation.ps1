@@ -2,7 +2,7 @@ param(
     [string]$Dotnet = 'dotnet',
     [ValidateSet('Debug','Release')][string]$Configuration = 'Release',
     [Parameter(Mandatory=$true)][string]$EvidenceRoot,
-    [string[]]$HarnessTests = @('Zagent.SetupTests','Zagent.ArchitectureTests','Zagent.SupervisorTests','Zagent.ArcMapWorkflowUnitTests','Zagent.DashboardTests'),
+    [string[]]$HarnessTests = @('Zagent.SetupTests','Zagent.ArchitectureTests','Zagent.SupervisorTests','Zagent.ArcMapWorkflowUnitTests','Zagent.DashboardTests','Zagent.LauncherTests'),
     [switch]$RunHarnesses
 )
 $ErrorActionPreference = 'Stop'
@@ -29,7 +29,7 @@ function Invoke-Recorded([string]$Name,[string[]]$CommandArgs) {
 Push-Location $root
 try {
     & (Join-Path $PSScriptRoot 'Test-ReleaseSource.ps1') -Root $root *> (Join-Path $evidence 'release-source.log')
-    $projects = @(Get-ChildItem (Join-Path $root 'src'),(Join-Path $root 'tests') -Filter *.csproj -Recurse | Where-Object { $_.FullName -ne (Join-Path $root 'src\Zagent.Manager\Zagent.Manager.csproj') } | Sort-Object FullName)
+    $projects = @(Get-ChildItem (Join-Path $root 'src'),(Join-Path $root 'tests') -Filter *.csproj -Recurse | Sort-Object FullName)
     $projects.FullName | ConvertTo-Json | Set-Content (Join-Path $evidence 'project-inventory.json')
     # Build TestChild before any console harness. dotnet test does NOT run these Exe projects.
     Invoke-Recorded 'build-TestChild' @('build',(Join-Path $root 'tests\Zagent.TestChild\Zagent.TestChild.csproj'),'-c',$Configuration,'--nologo')
@@ -41,7 +41,9 @@ try {
             if ($test -notmatch '^Zagent\.[A-Za-z]+Tests$') { throw "Invalid harness name: $test" }
             $project = Join-Path $root "tests\$test\$test.csproj"
             if (-not (Test-Path $project)) { throw "Missing harness: $test" }
-            Invoke-Recorded ('run-'+$test) @('run','--project',$project,'-c',$Configuration,'--no-build')
+            $args = @('run','--project',$project,'-c',$Configuration,'--no-build')
+            if ($test -eq 'Zagent.LauncherTests') { $args += @('--',$sdk) }
+            Invoke-Recorded ('run-'+$test) $args
             $log = Get-Content (Join-Path $evidence ('run-'+$test+'.log')) -Raw
             if ($log -match '(?im)\b(SKIP|SKIPPED|BLOCKED)\b') { throw "Unexpected skipped/blocked coverage: $test" }
         }

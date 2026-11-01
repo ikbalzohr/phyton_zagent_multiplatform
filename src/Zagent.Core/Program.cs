@@ -59,10 +59,7 @@ if (args.Contains("--initialize-install", StringComparer.Ordinal))
         await bootstrapper.BootstrapAsync(
             installRoot,
             filesProfile,
-            dataRoot,
-            installationRole: GetOptionValue(args, "--installation-role") ??
-                Environment.GetEnvironmentVariable("ZAGENT_INSTALLATION_ROLE"),
-            allowRoleMigration: true);
+            dataRoot);
 
     var identityStore =
         new MachineIdentityStore(
@@ -73,20 +70,6 @@ if (args.Contains("--initialize-install", StringComparer.Ordinal))
     var machineIdentity = await identityStore.EnsureAsync();
     var displayName = GetOptionValue(args, "--device-display-name");
     if (!string.IsNullOrWhiteSpace(displayName)) machineIdentity = await identityStore.RenameAliasAsync(displayName);
-
-    // Persist plugin audience during install: Manager may be launched later
-    // without inheriting installer environment variables.
-    var pluginStore = new PluginAccessConfigurationStore();
-    var pluginPath = pluginStore.GetPath(snapshot.Paths.ConfigRoot);
-    if (!File.Exists(pluginPath))
-    {
-        Environment.SetEnvironmentVariable("ZAGENT_PLUGIN_AUDIENCE",
-            "zagent-production");
-        Environment.SetEnvironmentVariable("ZAGENT_PLUGIN_DISPLAY_NAME",
-            ZagentInstallationProfile.DisplayName(snapshot.Machine.InstallationRole));
-        await pluginStore.SaveFromEnvironmentAsync(
-            snapshot.Paths.ConfigRoot, AgentEnvironment.Production);
-    }
 
     var bridgeSync =
         await new ChromeBridgeConfigurationSynchronizer()
@@ -173,8 +156,7 @@ if (args.Contains("--initialize-install", StringComparer.Ordinal))
                     snapshot.InstalledManifestPath,
                 installRoot =
                     snapshot.Paths.InstallRoot,
-                installationRole = snapshot.Machine.InstallationRole,
-                dataRoot =
+                 dataRoot =
                     snapshot.Paths.DataRoot,
                 filesDefaultProfile =
                     snapshot.Paths.FilesDefaultProfile,
@@ -244,8 +226,7 @@ if (args.Contains("--dashboard", StringComparer.Ordinal))
 
     // Reuse existing Core lease: if another Core owns the supervisor lease,
     // open the dashboard origin in the browser and exit without launching.
-    var role = ZagentInstallationProfile.InferRole(fullRoot);
-    var leaseName = ZagentInstallationProfile.SupervisorLeaseName(role);
+    var leaseName = ZagentInstanceScope.SupervisorLeaseName(fullRoot);
     if (!SupervisorInstanceLease.TryAcquire(leaseName, out var probeLease))
     {
         var options = Zagent.Core.Dashboard.DashboardOptions.Load(dashboardConfig);
@@ -326,10 +307,10 @@ if (args.Contains("--serve-dashboard", StringComparer.Ordinal))
 
     var development =
         managerEnvironment == AgentEnvironment.Development;
-    var rolePorts = ZagentNetworkPolicy.For(machine.InstallationRole);
+    var devRuntimeStart = machine.DevelopmentPortStart + 100;
     var pipeName = requestedPipe ??
         (development ? "Zagent.Manager.Development" :
-            ManagerProtocol.ForInstallationRole(machine.InstallationRole));
+            ManagerProtocol.ForRoot(Path.GetFullPath(root)));
 
     var bindHost =
         development
@@ -342,35 +323,35 @@ if (args.Contains("--serve-dashboard", StringComparer.Ordinal))
         development
             ? ReadPortEnvironment(
                 "ZAGENT_TUNNEL_PORT",
-                rolePorts.DevRuntimeStart + 10)
+                devRuntimeStart + 10)
             : machine.TunnelPort;
 
     var tunnelHealthPort =
         development
             ? ReadPortEnvironment(
                 "ZAGENT_TUNNEL_HEALTH_PORT",
-                rolePorts.DevRuntimeStart + 11)
+                devRuntimeStart + 11)
             : machine.TunnelHealthPort;
 
     var filesPort =
         development
             ? ReadPortEnvironment(
                 "ZAGENT_FILES_PORT",
-                rolePorts.DevRuntimeStart + 20)
+                devRuntimeStart + 20)
             : machine.FilesPort;
 
     var webPort =
         development
             ? ReadPortEnvironment(
                 "ZAGENT_WEB_PORT",
-                rolePorts.DevRuntimeStart + 30)
+                devRuntimeStart + 30)
             : machine.WebPort;
 
     var arcMapPort =
         development
             ? ReadPortEnvironment(
                 "ZAGENT_ARCMAP_PORT",
-                rolePorts.DevRuntimeStart + 40)
+                devRuntimeStart + 40)
             : machine.ArcMapPort;
 
     await new ChromeBridgeConfigurationSynchronizer()
@@ -409,9 +390,11 @@ if (args.Contains("--serve-dashboard", StringComparer.Ordinal))
             Environment.GetEnvironmentVariable(
                 "ZAGENT_SUPERVISOR_LEASE_NAME") ??
                 (development ? @"Local\Zagent.Dev.Supervisor" :
-                    ZagentInstallationProfile.SupervisorLeaseName(machine.InstallationRole)),
+                    ZagentInstanceScope.SupervisorLeaseName(Path.GetFullPath(root))),
         Environment: managerEnvironment,
-        WorkspaceId: dashboardOptions.WorkspaceId);
+        WorkspaceId: dashboardOptions.WorkspaceId,
+        DevelopmentGatewayStart: machine.DevelopmentPortStart,
+        DevelopmentGatewayEnd: machine.DevelopmentPortEnd);
 
     await using var host =
         await ManagerCoreHost.CreateAsync(hostOptions);

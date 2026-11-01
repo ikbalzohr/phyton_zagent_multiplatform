@@ -89,8 +89,10 @@ function Set-EmbeddedPythonPath([string]$PythonRoot) {
 
 $core = Join-Path $publish "core\Zagent.Core.exe"
 $setup = Join-Path $publish "setup\Zagent.Setup.exe"
+$launcher = Join-Path $publish "launcher\Zagent.Launcher.exe"
 Require-File $core
 Require-File $setup
+Require-File $launcher
 
 foreach ($name in @(
   "files-python-3.11.9",
@@ -105,6 +107,7 @@ foreach ($name in @(
 New-Item -ItemType Directory -Force -Path $OutputRoot | Out-Null
 Copy-Tree (Join-Path $publish "core") $OutputRoot
 Copy-Item -LiteralPath $setup -Destination (Join-Path $OutputRoot "Zagent.Setup.exe")
+Copy-Item -LiteralPath $launcher -Destination (Join-Path $OutputRoot "Zagent.Launcher.exe")
 Copy-Item -LiteralPath (Join-Path $Root "component-manifest.json") -Destination $OutputRoot
 
 $agentsOut = Join-Path $OutputRoot "agents"
@@ -328,7 +331,7 @@ $payload = [pscustomobject]@{
   product_line = $release.product_line
   components = $release.components
   platform = "win-x64"
-  install_root_policy = "BASE_FOLDER_PLUS_ROLE_SUBFOLDER"
+  install_root_policy = "BASE_FOLDER_PLUS_ZAGENT"
   default_data_root = "<InstallRoot>\data"
   default_files_profile = "<InstallRoot>\workspace"
   file_count = $entries.Count

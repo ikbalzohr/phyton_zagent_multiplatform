@@ -60,11 +60,12 @@ await RunAsync(
                     artifactPath,
                     mimeType = "image/png",
                     bytes = 4L,
+                    sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(new byte[] { 1, 2, 3, 4 })),
                     provenance = new
                     {
                         deviceId = "device-test",
                         deviceName = "Viewer Test Device",
-                        sessionId = "session-test"
+                        workspaceId = "workspace-test"
                     }
                 });
 
@@ -88,8 +89,8 @@ await RunAsync(
                 "device-test",
                 valid.DeviceId);
             Equal(
-                "session-test",
-                valid.SessionId);
+                "workspace-test",
+                valid.WorkspaceId);
 
             var outsidePath =
                 Path.Combine(
@@ -115,14 +116,15 @@ await RunAsync(
                         mimeType =
                             "image/png",
                         bytes = 3L,
+                        sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(new byte[] { 9, 8, 7 })),
                         provenance = new
                         {
                             deviceId =
                                 "device-test",
                             deviceName =
                                 "Viewer Test Device",
-                            sessionId =
-                                "session-test"
+                            workspaceId =
+                                "workspace-test"
                         }
                     });
 
@@ -205,7 +207,7 @@ registry.TrySetHealth(
     "External ArcMap bridge offline.");
 
 await RunAsync(
-    "registry contains exactly 354 manager-visible capabilities",
+    "registry contains exactly 390 manager-visible capabilities",
     async () =>
     {
         await using var supervisor =
@@ -226,9 +228,9 @@ await RunAsync(
                 service,
                 "registry.capabilities");
 
-        Equal(354, rows.Count);
+        Equal(390, rows.Count);
         Equal(
-            354,
+            390,
             rows.Select(item => item.Capability)
                 .Distinct(StringComparer.Ordinal)
                 .Count());
@@ -255,7 +257,7 @@ await RunAsync(
                     WebAgentManifestFactory.AgentId));
 
         Equal(
-            124,
+            160,
             rows.Count(
                 item =>
                     item.AgentId ==
@@ -286,7 +288,7 @@ await RunAsync(
                 "manager.dashboard");
 
         Equal(4, dashboard.RegisteredAgents);
-        Equal(354, dashboard.CapabilityCount);
+        Equal(390, dashboard.CapabilityCount);
 
         var arc = dashboard.Agents.Single(
             item =>
@@ -423,7 +425,7 @@ await RunAsync(
     });
 
 await RunAsync(
-    "named pipe client roundtrip returns 354 capabilities",
+    "named pipe client roundtrip returns 390 capabilities",
     async () =>
     {
         await using var supervisor =
@@ -446,7 +448,7 @@ await RunAsync(
 
         server.Start();
 
-        var client = new ManagerPipeClient(
+        var client = new ManagerPipeTestClient(
             pipeName);
 
         var rows =
@@ -455,7 +457,7 @@ await RunAsync(
                 "registry.capabilities",
                 timeout: TimeSpan.FromSeconds(4));
 
-        Equal(354, rows.Count);
+        Equal(390, rows.Count);
 
         await server.StopAsync();
     });
@@ -491,7 +493,7 @@ await RunAsync(
 
         server.Start();
 
-        var client = new ManagerPipeClient(
+        var client = new ManagerPipeTestClient(
             pipeName);
 
         await client.RequestShutdownAsync();
@@ -508,131 +510,6 @@ await RunAsync(
             "Shutdown event was not raised.");
 
         await server.StopAsync();
-    });
-
-await RunAsync(
-    "chat presentation humanizes machine activity",
-    () =>
-    {
-        var row = new ManagerChatLogRow(
-            "chat_a",
-            "Chat 01",
-            "",
-            "Tunnel",
-            "files",
-            "files_powershell_run",
-            "",
-            1,
-            "Chat 01");
-
-        Equal(
-            "Menjalankan perintah PowerShell",
-            ChatPresentation.Humanize(row));
-
-        var chat = new ManagerChatRow(
-            "chat_a",
-            "Chat 01",
-            "",
-            "unavailable_from_host",
-            1,
-            2,
-            "files_powershell_run",
-            "Chat 01");
-
-        var title =
-            ChatPresentation.BuildDisplayTitle(
-                chat,
-                [
-                    row with
-                    {
-                        Message =
-                            "Zagent.Manager MainWindow development"
-                    }
-                ]);
-
-        Equal(
-            "Chat - Produksi Zagent",
-            title);
-
-        Equal(
-            "Chat",
-            ChatPresentation.BuildEntryDisplayTitle(row));
-
-        return Task.CompletedTask;
-    });
-
-
-await RunAsync(
-    "chat log reader accepts ISO timestamps",
-    async () =>
-    {
-        var root =
-            Path.Combine(
-                Path.GetTempPath(),
-                "zagent-manager-chatlog-" +
-                Guid.NewGuid().ToString("N"));
-
-        Directory.CreateDirectory(root);
-
-        try
-        {
-            var path =
-                Path.Combine(
-                    root,
-                    "chat_log.jsonl");
-
-            var line =
-                JsonSerializer.Serialize(
-                    new
-                    {
-                        time =
-                            "2026-09-28T11:01:59+08:00",
-                        role = "assistant",
-                        source = "ChatGPT",
-                        message =
-                            "Visible progress message",
-                        chat_id = "chat_iso",
-                        chat_alias = "Chat 02",
-                        chat_title =
-                            "Produksi Zagent"
-                    });
-
-            await File.WriteAllTextAsync(
-                path,
-                line + Environment.NewLine);
-
-            var reader =
-                new ManagerChatLogReader(path);
-
-            var rows =
-                await reader.ReadAsync(
-                    10,
-                    [
-                        new ManagerChatRow(
-                            "chat_iso",
-                            "Chat 02",
-                            "Produksi Zagent",
-                            "host",
-                            null,
-                            null,
-                            "",
-                            "")
-                    ]);
-
-            Equal(1, rows.Count);
-            True(
-                rows[0].Timestamp.GetValueOrDefault() > 0,
-                "ISO timestamp was not converted.");
-            Equal(
-                "Visible progress message",
-                rows[0].Message);
-        }
-        finally
-        {
-            Directory.Delete(
-                root,
-                recursive: true);
-        }
     });
 
 await RunAsync(
@@ -792,206 +669,6 @@ await RunAsync(
     });
 
 await RunAsync(
-    "plugin access configuration persists installer-selected audience",
-    async () =>
-    {
-        var root =
-            Path.Combine(
-                Path.GetTempPath(),
-                "zagent-plugin-access-config-" +
-                Guid.NewGuid().ToString("N"));
-
-        Directory.CreateDirectory(root);
-
-        var oldAudience =
-            Environment.GetEnvironmentVariable(
-                "ZAGENT_PLUGIN_AUDIENCE");
-        var oldDisplay =
-            Environment.GetEnvironmentVariable(
-                "ZAGENT_PLUGIN_DISPLAY_NAME");
-
-        try
-        {
-            Environment.SetEnvironmentVariable(
-                "ZAGENT_PLUGIN_AUDIENCE",
-                "tryplugin");
-            Environment.SetEnvironmentVariable(
-                "ZAGENT_PLUGIN_DISPLAY_NAME",
-                "TryPlugin");
-
-            var store =
-                new Zagent.Core.Configuration
-                    .PluginAccessConfigurationStore();
-
-            var created =
-                await store.EnsureAsync(
-                    root,
-                    Zagent.Shared.Contracts
-                        .AgentEnvironment.Production);
-
-            Equal(
-                "tryplugin",
-                created.Audience);
-            Equal(
-                "TryPlugin",
-                created.DisplayName);
-            Equal(
-                "zagent",
-                created.FallbackPlugin);
-
-            Environment.SetEnvironmentVariable(
-                "ZAGENT_PLUGIN_AUDIENCE",
-                "zagent-production");
-            Environment.SetEnvironmentVariable(
-                "ZAGENT_PLUGIN_DISPLAY_NAME",
-                "Zagent");
-
-            var reloaded =
-                await store.EnsureAsync(
-                    root,
-                    Zagent.Shared.Contracts
-                        .AgentEnvironment.Production);
-
-            Equal(
-                "tryplugin",
-                reloaded.Audience);
-            Equal(
-                "TryPlugin",
-                reloaded.DisplayName);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(
-                "ZAGENT_PLUGIN_AUDIENCE",
-                oldAudience);
-            Environment.SetEnvironmentVariable(
-                "ZAGENT_PLUGIN_DISPLAY_NAME",
-                oldDisplay);
-
-            Directory.Delete(
-                root,
-                recursive: true);
-        }
-    });
-
-await RunAsync(
-    "plugin access pending requests are locally resolvable through Router Manager",
-    async () =>
-    {
-        var handler =
-            new StubHttpHandler(
-                request =>
-                {
-                    var path =
-                        request.RequestUri?.AbsolutePath ??
-                        "";
-
-                    if (request.Method == HttpMethod.Get &&
-                        path == "/router/access/requests")
-                    {
-                        return JsonResponse(
-                            """
-                            {
-                              "ok": true,
-                              "audience": "zagent-production",
-                              "display_name": "Zagent",
-                              "count": 1,
-                              "requests": [
-                                {
-                                  "request_id": "PAC-TEST01",
-                                  "plugin_audience": "zagent-production",
-                                  "plugin_display_name": "Zagent",
-                                  "operator_alias": "Ikbal",
-                                  "session_id": "chat_test",
-                                  "device_alias": "Ikbal",
-                                  "state": "PENDING",
-                                  "created_at": 1790840000.0
-                                }
-                              ]
-                            }
-                            """);
-                    }
-
-                    if (request.Method == HttpMethod.Post &&
-                        path ==
-                            "/router/access/request/PAC-TEST01/resolve")
-                    {
-                        return JsonResponse(
-                            """
-                            {
-                              "ok": true,
-                              "request_id": "PAC-TEST01",
-                              "session_id": "chat_test",
-                              "state": "APPROVED",
-                              "allowed": true,
-                              "operator_alias": "Ikbal"
-                            }
-                            """);
-                    }
-
-                    return new HttpResponseMessage(
-                        HttpStatusCode.NotFound);
-                });
-
-        using var http =
-            new HttpClient(handler);
-
-        var configRoot =
-            Path.Combine(
-                Path.GetTempPath(),
-                "zagent-router-manager-access-" +
-                Guid.NewGuid().ToString("N"));
-
-        Directory.CreateDirectory(configRoot);
-
-        try
-        {
-            var router =
-                new RouterManagerService(
-                    new Uri(
-                        "http://127.0.0.3:18992/"),
-                    configRoot,
-                    http);
-
-            var pending =
-                await router
-                    .GetPluginAccessPendingAsync();
-
-            Equal(1, pending.Count);
-            Equal(
-                "Plugin Access",
-                pending[0].Source);
-            Equal(
-                "plugin_access",
-                pending[0].Kind);
-            Equal(
-                "Ikbal",
-                pending[0].RequestedBy);
-            True(
-                pending[0].CanResolveLocally,
-                "Plugin Access request must be resolvable locally.");
-
-            var resolved =
-                await router.ResolvePluginAccessAsync(
-                    new ManagerApprovalActionRequest(
-                        "PAC-TEST01",
-                        "approve",
-                        null,
-                        "Plugin Access"));
-
-            True(
-                resolved.Success,
-                resolved.Message);
-        }
-        finally
-        {
-            Directory.Delete(
-                configRoot,
-                recursive: true);
-        }
-    });
-
-await RunAsync(
     "web Pair and Approve requests are visible but not locally resolvable",
     async () =>
     {
@@ -1114,316 +791,6 @@ await RunAsync(
 
         return Task.CompletedTask;
     });
-
-var devRoot =
-    Environment.GetEnvironmentVariable(
-        "ZAGENT_DEV_ROOT");
-
-if (!string.IsNullOrWhiteSpace(devRoot))
-{
-    // UI1 replaces the WPF window-close smoke; browser lifetime must not own Core.
-
-    await RunAsync(
-        "real Manager Core host controls all four agents through Development Gateway",
-        async () =>
-        {
-            var filesPython =
-                Environment.GetEnvironmentVariable(
-                    "ZAGENT_FILES_TEST_PYTHON") ??
-                throw new InvalidOperationException(
-                    "ZAGENT_FILES_TEST_PYTHON is required.");
-            var tunnelPython =
-                Environment.GetEnvironmentVariable(
-                    "ZAGENT_TUNNEL_TEST_PYTHON") ??
-                throw new InvalidOperationException(
-                    "ZAGENT_TUNNEL_TEST_PYTHON is required.");
-            var webNode =
-                Environment.GetEnvironmentVariable(
-                    "ZAGENT_WEB_TEST_NODE") ??
-                throw new InvalidOperationException(
-                    "ZAGENT_WEB_TEST_NODE is required.");
-            var arcMapPython =
-                Environment.GetEnvironmentVariable(
-                    "ZAGENT_ARCMAP_TEST_PYTHON") ??
-                throw new InvalidOperationException(
-                    "ZAGENT_ARCMAP_TEST_PYTHON is required.");
-
-            var ports = FindFreePorts(4);
-            var validationRoot = Path.Combine(
-                Path.GetFullPath(devRoot),
-                "_validation",
-                "phase8-manager-e2e-" +
-                Guid.NewGuid().ToString("N"));
-
-            var workspace =
-                Path.Combine(
-                    validationRoot,
-                    "workspace");
-
-            Directory.CreateDirectory(workspace);
-
-            var pipeName =
-                "Zagent.Manager.E2E." +
-                Guid.NewGuid().ToString("N");
-
-            await using var host =
-                await ManagerCoreHost.CreateAsync(
-                    new ManagerCoreHostOptions(
-                        ZagentRoot:
-                            Path.GetFullPath(devRoot),
-                        DataRoot:
-                            Path.Combine(
-                                validationRoot,
-                                "data"),
-                        FilesDefaultProfile:
-                            workspace,
-                        PipeName:
-                            pipeName,
-                        FilesPython:
-                            filesPython,
-                        TunnelPython:
-                            tunnelPython,
-                        WebNode:
-                            webNode,
-                        ArcMapPython:
-                            arcMapPython,
-                        BindHost:
-                            "127.0.0.3",
-                        TunnelPort:
-                            ports[0],
-                        FilesPort:
-                            ports[1],
-                        WebPort:
-                            ports[2],
-                        ArcMapPort:
-                            ports[3],
-                        Environment:
-                            AgentEnvironment.Development),
-                    acquireSupervisorLease: false);
-
-            host.Start();
-
-            try
-            {
-                var client =
-                    new ManagerPipeClient(
-                        pipeName);
-
-                var capabilities =
-                    await client.SendAsync<
-                        IReadOnlyList<
-                            ManagerCapabilityRow>>(
-                        "registry.capabilities",
-                        timeout:
-                            TimeSpan.FromSeconds(8));
-
-                Equal(354, capabilities.Count);
-
-                var start =
-                    await client.SendAsync<
-                        ManagerOperationResult>(
-                        "lifecycle.all",
-                        new ManagerLifecycleRequest(
-                            "all",
-                            "start"),
-                        timeout:
-                            TimeSpan.FromSeconds(50));
-
-                True(
-                    start.Success,
-                    start.Message);
-
-                var dashboard =
-                    await client.SendAsync<
-                        ManagerDashboardSnapshot>(
-                        "manager.dashboard",
-                        timeout:
-                            TimeSpan.FromSeconds(15));
-
-                Equal(4, dashboard.RegisteredAgents);
-                Equal(354, dashboard.CapabilityCount);
-                Equal(4, dashboard.RunningProcesses);
-                True(
-                    dashboard.Agents.All(
-                        item => item.Environment ==
-                            AgentEnvironment.Development),
-                    "DEV Manager host exposed a non-development agent environment.");
-                True(
-                    dashboard.Agents.All(
-                        item => !item.ProductionApproved),
-                    "DEV Manager host exposed production-approved agents.");
-
-                var arc =
-                    dashboard.Agents.Single(
-                        item =>
-                            item.AgentId ==
-                            ArcMapAgentManifestFactory.AgentId);
-
-                Equal(
-                    AgentHealthState.Degraded,
-                    arc.Health);
-
-                var tunnel =
-                    dashboard.Agents.Single(
-                        item =>
-                            item.AgentId ==
-                            TunnelAgentManifestFactory.AgentId);
-                Equal(
-                    AgentHealthState.Ready,
-                    tunnel.Health);
-
-                var profiles =
-                    await client.SendAsync<
-                        ManagerProfilesSnapshot>(
-                        "profiles.snapshot",
-                        timeout:
-                            TimeSpan.FromSeconds(10));
-
-                if (profiles.Profiles.Count < 1)
-                {
-                    var logs =
-                        await client.SendAsync<
-                            ManagerLogsSnapshot>(
-                            "logs.snapshot",
-                            timeout:
-                                TimeSpan.FromSeconds(5));
-
-                    var rawFiles =
-                        await RawMcpToolAsync(
-                            new Uri(
-                                $"http://127.0.0.3:{ports[1]}/mcp"),
-                            "files_profile_list");
-
-                    throw new InvalidOperationException(
-                        "Files profile read-model returned no profiles. RAW=" +
-                        rawFiles +
-                        " LOGS=" +
-                        string.Join(
-                            " | ",
-                            logs.Technical
-                                .Take(10)
-                                .Select(
-                                    item =>
-                                        $"{item.Source}/{item.Event}: {item.Message}")));
-                }
-
-                var approvedRoot =
-                    Path.Combine(
-                        validationRoot,
-                        "approved-profile");
-                Directory.CreateDirectory(
-                    approvedRoot);
-
-                await RawMcpToolAsync(
-                    new Uri(
-                        $"http://127.0.0.3:{ports[1]}/mcp"),
-                    "files_profile_request_add",
-                    new
-                    {
-                        name = "manager_approved",
-                        root = approvedRoot,
-                        mode = "read-only",
-                        description =
-                            "Phase 8 local approval E2E"
-                    });
-
-                var pending =
-                    await client.SendAsync<
-                        ManagerProfilesSnapshot>(
-                        "profiles.snapshot",
-                        timeout:
-                            TimeSpan.FromSeconds(10));
-
-                var filesApproval =
-                    pending.PendingApprovals
-                        .Single(
-                            item =>
-                                item.Source == "Files" &&
-                                item.Kind == "add" &&
-                                item.CanResolveLocally);
-
-                var approvalResult =
-                    await client.SendAsync<
-                        ManagerOperationResult>(
-                        "approval.resolve",
-                        new ManagerApprovalActionRequest(
-                            filesApproval.RequestId,
-                            "approve"),
-                        timeout:
-                            TimeSpan.FromSeconds(10));
-
-                True(
-                    approvalResult.Success,
-                    approvalResult.Message);
-
-                var afterApproval =
-                    await client.SendAsync<
-                        ManagerProfilesSnapshot>(
-                        "profiles.snapshot",
-                        timeout:
-                            TimeSpan.FromSeconds(10));
-
-                True(
-                    afterApproval.Profiles.Any(
-                        item =>
-                            item.Name ==
-                            "manager_approved"),
-                    "Local Files approval did not materialize the approved profile.");
-
-                False(
-                    afterApproval.PendingApprovals.Any(
-                        item =>
-                            item.RequestId ==
-                            filesApproval.RequestId),
-                    "Resolved Files approval remained pending.");
-
-                var stop =
-                    await client.SendAsync<
-                        ManagerOperationResult>(
-                        "lifecycle.all",
-                        new ManagerLifecycleRequest(
-                            "all",
-                            "stop"),
-                        timeout:
-                            TimeSpan.FromSeconds(35));
-
-                True(
-                    stop.Success,
-                    stop.Message);
-
-                var stopped =
-                    await client.SendAsync<
-                        ManagerDashboardSnapshot>(
-                        "manager.dashboard",
-                        timeout:
-                            TimeSpan.FromSeconds(12));
-
-                Equal(
-                    0,
-                    stopped.RunningProcesses);
-            }
-            finally
-            {
-                try
-                {
-                    await host.StopAsync();
-                }
-                catch
-                {
-                }
-
-                try
-                {
-                    Directory.Delete(
-                        validationRoot,
-                        recursive: true);
-                }
-                catch
-                {
-                }
-            }
-        });
-}
 
 Console.WriteLine(
     failed == 0
@@ -1605,100 +972,6 @@ static void Equal<T>(
         throw new InvalidOperationException(
             $"Expected '{expected}', actual '{actual}'.");
     }
-}
-
-static int[] FindFreePorts(int count)
-{
-    var result = new List<int>();
-    var address = IPAddress.Parse("127.0.0.3");
-
-    for (var port = 18900;
-        port <= 18999 &&
-        result.Count < count;
-        port++)
-    {
-        TcpListener? listener = null;
-
-        try
-        {
-            listener = new TcpListener(
-                address,
-                port);
-            listener.Start();
-            result.Add(port);
-        }
-        catch (SocketException)
-        {
-        }
-        finally
-        {
-            listener?.Stop();
-        }
-    }
-
-    if (result.Count != count)
-    {
-        throw new InvalidOperationException(
-            "Not enough free Development Gateway ports.");
-    }
-
-    return result.ToArray();
-}
-
-static async Task<string> RawMcpToolAsync(
-    Uri uri,
-    string toolName,
-    object? arguments = null)
-{
-    using var http = new HttpClient(
-        new SocketsHttpHandler
-        {
-            UseProxy = false
-        })
-    {
-        Timeout = TimeSpan.FromSeconds(5)
-    };
-
-    var body = JsonSerializer.Serialize(
-        new
-        {
-            jsonrpc = "2.0",
-            id = "raw-manager-test",
-            method = "tools/call",
-            @params = new
-            {
-                name = toolName,
-                arguments =
-                    arguments ??
-                    new Dictionary<string, object?>()
-            }
-        });
-
-    using var request =
-        new HttpRequestMessage(
-            HttpMethod.Post,
-            uri);
-
-    request.Content =
-        new StringContent(
-            body,
-            Encoding.UTF8,
-            "application/json");
-
-    request.Headers.Accept.Add(
-        new MediaTypeWithQualityHeaderValue(
-            "application/json"));
-    request.Headers.Accept.Add(
-        new MediaTypeWithQualityHeaderValue(
-            "text/event-stream"));
-    request.Headers.TryAddWithoutValidation(
-        "MCP-Protocol-Version",
-        "2025-06-18");
-
-    using var response =
-        await http.SendAsync(request);
-
-    return await response.Content.ReadAsStringAsync();
 }
 
 static HttpResponseMessage JsonResponse(string json) =>

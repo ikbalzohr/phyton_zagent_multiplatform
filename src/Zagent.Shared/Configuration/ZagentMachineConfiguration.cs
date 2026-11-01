@@ -13,8 +13,7 @@ public sealed record ZagentMachineConfiguration(
     int WebPort,
     int ArcMapPort,
     int DevelopmentPortStart,
-    int DevelopmentPortEnd,
-    string InstallationRole = "Master")
+    int DevelopmentPortEnd)
 {
     public const string CurrentSchemaVersion = "1.0";
 }
