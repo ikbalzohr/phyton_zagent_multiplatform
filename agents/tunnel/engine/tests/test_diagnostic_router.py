@@ -168,6 +168,38 @@ class RouterDiagnosticTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Bearer resource_metadata=', response.headers['www-authenticate'])
         self.assertTrue(any(e['stage'] == 'auth.token_header' and e['code'] == 'AUTH_REQUIRED' for e in self.records()))
 
+    async def test_oauth_protected_resource_metadata_root_and_path_match(self):
+        cfg = dict(resource_uri='https://zmp-fixture.example/mcp',
+                   issuer='https://auth-fixture.example/realms/zmp',
+                   authorization_servers=['https://auth-fixture.example/realms/zmp'],
+                   introspection_endpoint='https://auth-fixture.example/token/introspect',
+                   introspection_client_id='test-rs', introspection_secret_env='NO_REAL_SECRET',
+                   workspace_id='w', policy_revision='1',
+                   scopes_supported=['files:read'], grants={})
+        with patch.object(self.server, 'load_tunnel_config', return_value={'resource_server':cfg}):
+            for path in ('/.well-known/oauth-protected-resource',
+                         '/.well-known/oauth-protected-resource/mcp'):
+                response = await self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()['resource'], cfg['resource_uri'])
+                self.assertEqual(response.json()['authorization_servers'], cfg['authorization_servers'])
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+
+            denied = await self.client.post('/mcp',
+                json={'jsonrpc':'2.0','id':1,'method':'initialize'})
+            self.assertEqual(denied.status_code, 401)
+            self.assertIn('resource_metadata="https://zmp-fixture.example/.well-known/oauth-protected-resource/mcp"',
+                          denied.headers['www-authenticate'])
+            self.assertIn('scope="files:read"', denied.headers['www-authenticate'])
+            self.assertNotIn('Bearer NO_REAL_SECRET', denied.text)
+
+            challenge = self.server._auth_error(self.server.AuthorizationError(
+                'insufficient_scope', status=403, scope='files:read'))
+            self.assertIn('scope="files:read"', challenge.headers['www-authenticate'])
+            invalid = self.server._auth_error(self.server.AuthorizationError(
+                'insufficient_scope', status=403, scope='not-listed\\r\\nmalicious'))
+            self.assertNotIn('not-listed', invalid.headers['www-authenticate'])
+
     async def test_unwritable_store_does_not_change_sanitized_rpc_response(self):
         from router.access import AuthContext
         auth = AuthContext('p','w',frozenset(),frozenset(),'1',time.time()+60)

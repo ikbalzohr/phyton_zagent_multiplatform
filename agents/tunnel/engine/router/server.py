@@ -251,12 +251,21 @@ def _auth_error(exc: AuthorizationError) -> JSONResponse:
     record('auth.rejection', failure_code(exc, 'AUTH_NOT_AUTHORIZED'), correlation)
     headers = {"Cache-Control": "no-store"}
     resource = authorizer().config.get("resource_uri", "")
-    if resource.startswith("https://"):
+    if authorizer().configured and resource.startswith("https://"):
         from urllib.parse import urlsplit
         p = urlsplit(resource)
-        metadata = p.scheme+"://"+p.netloc+"/.well-known/oauth-protected-resource"
+        # RFC9728: path-specific metadata is preferred for /mcp.
+        # Keep the root alias as well for older 2025 MCP clients.
+        metadata = p.scheme + "://" + p.netloc + "/.well-known/oauth-protected-resource" + p.path
         if exc.status in (401, 403):
-            headers["WWW-Authenticate"] = 'Bearer resource_metadata="'+metadata+'", error="'+("insufficient_scope" if exc.status == 403 else "invalid_token")+'"'
+            header = 'Bearer resource_metadata="' + metadata + '", error="' + (
+                "insufficient_scope" if exc.status == 403 else "invalid_token") + '"'
+            supported = set(authorizer().config.get("scopes_supported", []))
+            required_scope = exc.scope or (
+                "files:read" if exc.status == 401 and "files:read" in supported else "")
+            if required_scope and required_scope in supported:
+                header += ', scope="' + required_scope + '"'
+            headers["WWW-Authenticate"] = header
     return JSONResponse({"error": {**public_error(exc.code), 'data': {'requestId': correlation}}}, status_code=exc.status, headers=headers)
 
 
@@ -536,6 +545,7 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
 
 
 @app.get("/.well-known/oauth-protected-resource")
+@app.get("/.well-known/oauth-protected-resource/mcp")
 async def protected_metadata():
     try:
         return authorizer().metadata()

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
+from client_policy_review import build_review
 
 HERE = Path(__file__).resolve().parent
 SCOPES = ('zagent:read', 'files:read', 'files:write', 'files:execute', 'web:control',
@@ -46,6 +47,8 @@ def absolute_path(value):
 def render(config):
     issuer = https_url(config['issuer_origin'], origin=True)
     resource = https_url(config['resource_uri'])
+    if urlsplit(resource).path != '/mcp':
+        raise ValueError('The MCP resource URI must end in the exact /mcp endpoint')
     redirect = config['redirect_uri']
     u = urlsplit(redirect)
     if u.scheme == 'http' and u.hostname == '127.0.0.1':
@@ -62,6 +65,25 @@ def render(config):
     client['redirectUris'] = [redirect]
     client['defaultClientScopes'] = ['zagent-resource-audience']
     client['optionalClientScopes'] = ['files:read', 'offline_access']
+    # ChatGPT's CIMD metadata uses a plural token_endpoint_auth_methods_supported
+    # field that Keycloak 26.8.1 does not parse. Pre-register a public PKCE
+    # client with an exact, vetted callback instead of pretending CIMD works.
+    # No wildcard callbacks, implicit, password or client-credentials grants.
+    chatgpt_redirect = config.get('chatgpt_redirect_uri',
+                                  'https://chatgpt.com/connector_platform_oauth_redirect')
+    https_url(chatgpt_redirect)
+    if urlsplit(chatgpt_redirect).path not in (
+            '/connector_platform_oauth_redirect',) or urlsplit(chatgpt_redirect).hostname != 'chatgpt.com':
+        raise ValueError('Exact documented ChatGPT stable redirect required')
+    chatgpt = json.loads(json.dumps(client))
+    chatgpt.update(clientId='chatgpt-zagent-mp', name='ChatGPT interactive PKCE client',
+                   redirectUris=[chatgpt_redirect], consentRequired=True)
+    realm['clients'].insert(1, chatgpt)
+    # Keycloak 26.8's resource-indicators feature validates this resource_url
+    # when the client sends RFC8707 resource at both authorize and token endpoints.
+    resource_client = next(c for c in realm['clients']
+                           if c['clientId'] == 'zagent-resource-server')
+    resource_client['attributes']['resource_url'] = resource
     realm['clientScopes'] = [dict(name=s, protocol='openid-connect', attributes={
         'include.in.token.scope': 'true', 'display.on.consent.screen': 'true',
         'consent.screen.text': s}) for s in SCOPES]
@@ -131,6 +153,7 @@ def main():
         output.mkdir(mode=0o700, parents=True, exist_ok=True)
         files = {
             'zagent-realm.json': json.dumps(realm, indent=2) + '\n',
+            'cimd-policy-review.json': json.dumps(build_review(json.loads(args.config.read_text(encoding='utf-8'))['resource_uri']), indent=2) + '\n',
             'keycloak.nginx.conf': nginx,
             'zagent-keycloak-proxy.conf': proxy,
             'deployment.env': f'ISSUER_ORIGIN={issuer}\nSECRET_DIR={secret_dir}\nREALM_FILE={output}/zagent-realm.json\n'}

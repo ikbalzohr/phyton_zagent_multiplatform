@@ -1,12 +1,12 @@
 # Zagent Suite 1.0.0 — source integration
 
-Satu produk MCP netral: HTTPS MCP → Tunnel/router/workflow → **Files1, Web1, ArcMap1**. Core1 adalah satu pemilik lifecycle Windows per-user; UI1 adalah dashboard web same-origin yang dilayani Core. Tidak ada WPF Manager produk, mode provider, approval/binding per chat, atau otoritas berdasarkan nama client. Installer native Setup/Bundle tetap khusus install/repair/uninstall.
+**Arsitektur target yang ditetapkan pengguna:** klien ChatGPT / Claude / Hermes / klien MCP → **HTTPS MCP + OAuth** → **Zagent Core (.NET 10)** → **Tunnel, Files, Web, ArcMap**. Dalam implementasi saat ini, MCP Router Python yang berada di modul Tunnel menangani ingress dan dapat meneruskan panggilan langsung ke upstream, sementara Core memiliki lifecycle, supervisor dan registry. Core1 adalah satu pemilik lifecycle Windows per-user; UI1 adalah dashboard web same-origin yang dilayani Core. Tidak ada WPF Manager produk, mode provider, approval/binding per chat, atau otoritas berdasarkan nama client. Installer native Setup/Bundle tetap khusus install/repair/uninstall.
 
 **Status: source integration, bukan rilis accepted.** Semua produk termasuk Files memakai versi `1.0.0`. Targeted build/unit/harness Windows lokal telah dijalankan untuk perubahan netralisasi instalasi; full client/live/installer acceptance masih memerlukan evidence terpisah. Angka versi target bukan bukti release-ready. Provenance baseline `222341c3840b4048b8f19c534e8619fbc6a711f0`; inventaris historis disimpan di `docs/history/`, tidak dikirim sebagai konfigurasi payload baru.
 
 ## Arsitektur produk independen
 
-Zagent Multi Platform adalah produk **MCP-first** tersendiri, bukan varian, dependensi runtime, atau deployment Zagent Dev/Production. Klien MCP yang kompatibel terhubung melalui HTTPS MCP + OAuth; tidak ada fallback otorisasi dari plugin produk lain. Kontrak arsitektur dan aturan pemulihan task: [MCP_FIRST_ARCHITECTURE.md](docs/MCP_FIRST_ARCHITECTURE.md).
+Zagent Multi Platform adalah produk **MCP-first** tersendiri, bukan varian, dependensi runtime, atau deployment Zagent Dev/Production. Klien MCP yang kompatibel terhubung melalui HTTPS MCP + OAuth; tidak ada fallback otorisasi dari plugin produk lain. **Diagram target pengguna:** [ARCHITECTURE_TARGET.md](docs/ARCHITECTURE_TARGET.md). **Aturan kerja wajib (baca docs dahulu dan catat progres):** [WORKING_AGREEMENT.md](docs/WORKING_AGREEMENT.md). **Status koneksi ChatGPT:** [CHATGPT_OAUTH_CONNECTION.md](docs/CHATGPT_OAUTH_CONNECTION.md). Kontrak arsitektur dan aturan pemulihan task: [MCP_FIRST_ARCHITECTURE.md](docs/MCP_FIRST_ARCHITECTURE.md). Jalur identitas ChatGPT (pre-registered PKCE), Claude/Hermes (CIMD terikat domain), serta release gate OAuth: [MCP-OAUTH-MULTICLIENT.md](docs/MCP-OAUTH-MULTICLIENT.md).
 
 ## Struktur
 
@@ -56,6 +56,6 @@ Hanya `Publish-Core.ps1` yang mem-publish Core dan Web Dashboard; tidak ada lagi
 
 Installer memakai engine backup/stage/hash/reconcile yang ada. In-place update hanya dari lini `zagent-mcp-v1`; legacy/damaged manifests ditolak dan wajib cutover offline ke target baru. Data/izin lama tidak otomatis diimpor. Tidak menjalankan dua produk untuk rollback.
 
-Fresh install sengaja **NOT_CONFIGURED** sampai sertifikat TLS CurrentUser, direktori private owner dan akun dashboard diprovision out-of-band. `Provision-WindowsDashboard.ps1` memanggil prompt password lokal Core (tidak menerima password lewat argumen) dan dapat mendaftarkan startup per-user secara opt-in. Management remote default OFF. Lihat runbook sebelum menjalankan. Closing browser tidak menghentikan Core.
+Fresh install sengaja **NOT_CONFIGURED** sampai sertifikat TLS CurrentUser dan direktori private owner diprovision out-of-band. `Provision-WindowsDashboard.ps1` mengikat Dashboard ke identitas pengguna Windows interaktif tanpa membuat login/password browser, dan dapat mendaftarkan startup per-user secara opt-in. Management remote default OFF. Lihat runbook sebelum menjalankan. Closing browser tidak menghentikan Core.
 
 Jangan commit payload binary, runtime/cache, secret/DPAPI vault, certificate/private key, identitas aktual, logs atau cookies. Tidak ada commit/push/deploy otomatis dalam workflow ini. Bukti Windows/client/ArcMap nyata wajib sebelum promotion digest candidate yang sama.
