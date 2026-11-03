@@ -82,8 +82,8 @@
     "zagent_telemetry_status"
   ],
   "default_network": {
-    "production_router_port": 18810,
-    "development_range": "18900-18999",
+    "production_router_port": 19110,
+    "development_range": "19200-19299",
     "local_only": true
   },
   "validation_policy": {

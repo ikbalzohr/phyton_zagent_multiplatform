@@ -60,9 +60,9 @@
   },
   "transport": {
     "default_host": "127.0.0.3",
-    "default_port": 18840,
+    "default_port": 19140,
     "path": "/mcp",
-    "development_gateway": "18900-18999"
+    "development_gateway": "19200-19299"
   },
   "public_tools": {
     "count": 160,

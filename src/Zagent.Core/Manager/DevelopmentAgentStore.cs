@@ -9,7 +9,7 @@ public sealed class DevelopmentAgentStore
     private readonly int _portStart;
     private readonly int _portEnd;
 
-    public DevelopmentAgentStore(string path, int portStart = 18900, int portEnd = 18999)
+    public DevelopmentAgentStore(string path, int portStart = 19200, int portEnd = 19299)
     {
         _path = Path.GetFullPath(path ?? throw new ArgumentNullException(nameof(path)));
         if (portStart < 1 || portEnd > 65535 || portStart > portEnd)

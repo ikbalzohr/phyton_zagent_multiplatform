@@ -94,6 +94,7 @@ class UpstreamState:
     profile_catalog_diagnostic: str = 'NOT_CHECKED'
     last_ok: float = 0.0
     init_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    refresh_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class MCPRegistry:
@@ -220,7 +221,13 @@ class MCPRegistry:
                 raise
 
     async def refresh_service(self, service_id: str) -> dict[str, Any]:
+        # Serialize explicit management refresh and automatic recovery for this
+        # upstream. A failing peer cannot overwrite a newer successful catalog.
         state = self.states[service_id]
+        async with state.refresh_lock:
+            return await self._refresh_service_unlocked(state)
+
+    async def _refresh_service_unlocked(self, state: UpstreamState) -> dict[str, Any]:
         if not state.service.get("enabled", True):
             state.tools = []
             self.rebuild_index()
@@ -256,13 +263,29 @@ class MCPRegistry:
             self.rebuild_index()
             return {"ok": False, "tools": 0, "error": str(exc)}
 
+    async def retry_unavailable(self, interval_seconds: float = 10.0) -> None:
+        # Router is independent of its MCP peers: tools/list remains available
+        # for healthy agents while failed upstream catalogs are retried.
+        while True:
+            await asyncio.sleep(max(1.0, interval_seconds))
+            missing = [
+                state.service["id"] for state in self.enabled_states()
+                if not state.initialized or state.last_error
+            ]
+            if missing:
+                await asyncio.gather(
+                    *(self.refresh_service(service_id) for service_id in missing),
+                    return_exceptions=True,
+                )
+
     async def restart_service(self, service_id: str) -> dict[str, Any]:
         state = self.states[service_id]
-        state.session_id = None
-        state.initialized = False
-        state.tools = []
-        self.rebuild_index()
-        return await self.refresh_service(service_id)
+        async with state.refresh_lock:
+            state.session_id = None
+            state.initialized = False
+            state.tools = []
+            self.rebuild_index()
+            return await self._refresh_service_unlocked(state)
 
     async def refresh_all(self) -> dict[str, Any]:
         states = self.enabled_states()

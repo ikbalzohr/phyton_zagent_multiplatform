@@ -19,7 +19,9 @@ public sealed class ZagentPortAllocator
     {
         ArgumentNullException.ThrowIfNull(preferred);
 
-        var used = new HashSet<int>();
+        // QGIS may be registered later with its own dedicated MCP endpoint.
+        // Never assign that port to a built-in agent during fresh installation.
+        var used = new HashSet<int> { ZagentNetworkPolicy.QgisPort };
         var range = ZagentNetworkPolicy.For();
 
         var core = AllocateOne(

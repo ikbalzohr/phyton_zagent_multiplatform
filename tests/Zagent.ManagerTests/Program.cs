@@ -308,7 +308,7 @@ await RunAsync(
     });
 
 await RunAsync(
-    "start all follows dependency order",
+    "start all follows preferred order",
     async () =>
     {
         await using var supervisor =
@@ -337,7 +337,143 @@ await RunAsync(
     });
 
 await RunAsync(
-    "stop all follows reverse dependency order",
+    "start all attempts all agents and Router when Web fails",
+    async () =>
+    {
+        await using var supervisor =
+            new NativeAgentSupervisor(acquireInstanceLease: false);
+        var calls = new List<string>();
+        var service = new ManagerControlService(
+            registry, supervisor, CreateControllers(calls, "web.service"));
+
+        var result = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.all", new ManagerLifecycleRequest("all", "start"));
+
+        False(result.Success, "Start All must report the failed Web agent.");
+        True(result.Message.Contains("web.service", StringComparison.Ordinal),
+            "Missing failed agent diagnostic.");
+        Equal("start:files.service|start:web.service|start:arcmap.service|start:system.tunnel",
+            string.Join("|", calls));
+    });
+
+await RunAsync(
+    "direct Tunnel start only starts Tunnel",
+    async () =>
+    {
+        await using var supervisor =
+            new NativeAgentSupervisor(acquireInstanceLease: false);
+        var calls = new List<string>();
+        var service = new ManagerControlService(
+            registry, supervisor, CreateControllers(calls));
+
+        var result = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.agent",
+            new ManagerLifecycleRequest("system.tunnel", "start"));
+
+        True(result.Success, result.Message);
+        Equal("start:system.tunnel", string.Join("|", calls));
+    });
+
+await RunAsync(
+    "direct Tunnel start independent of failed Files",
+    async () =>
+    {
+        await using var supervisor =
+            new NativeAgentSupervisor(acquireInstanceLease: false);
+        var calls = new List<string>();
+        var service = new ManagerControlService(
+            registry, supervisor, CreateControllers(calls, "files.service"));
+
+        var files = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.agent",
+            new ManagerLifecycleRequest("files.service", "start"));
+        False(files.Success, "Fixture Files failure was not observed.");
+
+        var result = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.agent",
+            new ManagerLifecycleRequest("system.tunnel", "start"));
+        True(result.Success, "Tunnel must remain independent of Files.");
+        Equal("start:files.service|start:system.tunnel", string.Join("|", calls));
+    });
+
+await RunAsync(
+    "direct Tunnel restart only restarts Tunnel",
+    async () =>
+    {
+        await using var supervisor =
+            new NativeAgentSupervisor(acquireInstanceLease: false);
+        var calls = new List<string>();
+        var service = new ManagerControlService(
+            registry, supervisor, CreateControllers(calls, "files.service"));
+
+        var result = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.agent",
+            new ManagerLifecycleRequest("system.tunnel", "restart"));
+
+        True(result.Success, "Tunnel restart must not require Files.");
+        Equal("restart:system.tunnel", string.Join("|", calls));
+    });
+
+await RunAsync(
+    "start all continues after Files failure",
+    async () =>
+    {
+        await using var supervisor =
+            new NativeAgentSupervisor(acquireInstanceLease: false);
+        var calls = new List<string>();
+        var service = new ManagerControlService(
+            registry, supervisor, CreateControllers(calls, "files.service"));
+
+        var result = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.all", new ManagerLifecycleRequest("all", "start"));
+
+        False(result.Success, "Start All must report the failed Files agent.");
+        True(result.Message.Contains("files.service", StringComparison.Ordinal),
+            "Missing Files failure diagnostic.");
+        Equal("start:files.service|start:web.service|start:arcmap.service|start:system.tunnel",
+            string.Join("|", calls));
+    });
+
+await RunAsync(
+    "optional agent starts before Tunnel and remains independent",
+    async () =>
+    {
+        await using var supervisor =
+            new NativeAgentSupervisor(acquireInstanceLease: false);
+        var calls = new List<string>();
+        var controllers = CreateControllers(calls, "arcmap.service");
+        controllers.Register(new ManagerAgentController(
+            "qgis.service",
+            "qgis.service",
+            ct =>
+            {
+                calls.Add("start:qgis.service");
+                return Task.FromResult(new LifecycleOperationResult(
+                    true, "qgis.service", "start", "ok"));
+            },
+            ct =>
+            {
+                calls.Add("stop:qgis.service");
+                return Task.FromResult(new LifecycleOperationResult(
+                    true, "qgis.service", "stop", "ok"));
+            },
+            ct => Task.FromResult(new LifecycleOperationResult(
+                true, "qgis.service", "restart", "ok")),
+            ct => Task.FromResult(new ManagerOperationResult(
+                true, "refresh", "qgis.service", "ok"))));
+        var service = new ManagerControlService(registry, supervisor, controllers);
+
+        var result = await CallAsync<ManagerOperationResult>(
+            service, "lifecycle.all", new ManagerLifecycleRequest("all", "start"));
+        False(result.Success, "ArcMap failure must remain visible.");
+        Equal(
+            "start:files.service|start:web.service|start:arcmap.service|" +
+            "start:qgis.service|start:system.tunnel",
+            string.Join("|", calls));
+    });
+
+await RunAsync(
+    "stop all follows reverse startup order",
     async () =>
     {
         await using var supervisor =
@@ -800,7 +936,8 @@ Console.WriteLine(
 return failed == 0 ? 0 : 1;
 
 static ManagerAgentControllerRegistry CreateControllers(
-    List<string> calls)
+    List<string> calls,
+    string? failStartFor = null)
 {
     var registry =
         new ManagerAgentControllerRegistry();
@@ -838,10 +975,10 @@ static ManagerAgentControllerRegistry CreateControllers(
                     calls.Add("start:" + agentId);
                     return Task.FromResult(
                         new LifecycleOperationResult(
-                            true,
+                            agentId != failStartFor,
                             agentId,
                             "start",
-                            "ok"));
+                            agentId == failStartFor ? "simulated not ready" : "ok"));
                 },
                 ct =>
                 {

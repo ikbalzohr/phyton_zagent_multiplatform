@@ -15,7 +15,7 @@ public sealed record ArcMapIntegrationOptions(
     int CommandTimeoutSeconds = 15,
     string DeviceId = "",
     string DeviceName = "",
-    int TunnelPort = 18810);
+    int TunnelPort = 19110);
 
 public sealed record ArcMapHealthSnapshot(
     bool McpReady,

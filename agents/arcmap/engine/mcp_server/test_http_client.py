@@ -4,7 +4,7 @@ from mcp import Client
 
 URL = "http://{}:{}{}".format(
     os.environ.get("ZAGENT_ARCMAP_HOST", "127.0.0.3"),
-    os.environ.get("ZAGENT_ARCMAP_PORT", "18840"),
+    os.environ.get("ZAGENT_ARCMAP_PORT", "19140"),
     os.environ.get("ZAGENT_ARCMAP_MCP_PATH", "/mcp"),
 )
 

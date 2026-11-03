@@ -50,6 +50,52 @@ void Reject(Action action, string expected, string name)
     }
     throw new Exception("Expected " + expected + ": " + name);
 }
+// Inspect the actual Win32 apphost icon, not only an MSBuild property.
+var repoRoot = new DirectoryInfo(AppContext.BaseDirectory);
+while (repoRoot is not null && !File.Exists(Path.Combine(repoRoot.FullName, "image", "zohrsystem.ico")))
+    repoRoot = repoRoot.Parent;
+if (repoRoot is null) throw new Exception("Launcher icon source checkout not found");
+var iconFile = Path.Combine(repoRoot.FullName, "image", "zohrsystem.ico");
+var icoBytes = File.ReadAllBytes(iconFile);
+Check(BitConverter.ToUInt16(icoBytes, 0) == 0 &&
+      BitConverter.ToUInt16(icoBytes, 2) == 1 &&
+      BitConverter.ToUInt16(icoBytes, 4) == 7,
+    "launcher ICO contains all seven Windows resolutions");
+var expectedSizes = new[] { 16, 24, 32, 48, 64, 128, 256 };
+for (var i = 0; i < expectedSizes.Length; i++)
+{
+    var entry = 6 + i * 16;
+    var size = icoBytes[entry] == 0 ? 256 : icoBytes[entry];
+    var height = icoBytes[entry + 1] == 0 ? 256 : icoBytes[entry + 1];
+    var imageSize = BitConverter.ToInt32(icoBytes, entry + 8);
+    var offset = BitConverter.ToInt32(icoBytes, entry + 12);
+    Check(size == expectedSizes[i] && height == size &&
+          imageSize > 40 && offset >= 6 + expectedSizes.Length * 16 &&
+          offset <= icoBytes.Length - imageSize &&
+          (size == 256
+              ? icoBytes.AsSpan(offset, 4).SequenceEqual(new byte[] { 137, 80, 78, 71 })
+              : BitConverter.ToInt32(icoBytes, offset) == 40 &&
+                BitConverter.ToInt32(icoBytes, offset + 8) == size * 2),
+        $"ICO frame {size}px has a valid PNG/DIB resource");
+}
+var launcherExe = Path.ChangeExtension(typeof(LauncherApplication).Assembly.Location, ".exe");
+Check(File.Exists(launcherExe), "WinExe apphost exists for native icon verification");
+// The 32px image resource must be embedded verbatim in the actual EXE PE.
+// This avoids adding a System.Drawing package to the launcher test project.
+var icon32Offset = -1;
+var icon32Size = 0;
+for (var i = 0; i < BitConverter.ToUInt16(icoBytes, 4); i++)
+{
+    var entry = 6 + i * 16;
+    if (icoBytes[entry] != 32 || icoBytes[entry + 1] != 32) continue;
+    icon32Size = BitConverter.ToInt32(icoBytes, entry + 8);
+    icon32Offset = BitConverter.ToInt32(icoBytes, entry + 12);
+}
+Check(icon32Offset >= 0 && icon32Size > 40 &&
+      icon32Offset + icon32Size <= icoBytes.Length, "ICO 32px entry is complete");
+var launcherBytes = File.ReadAllBytes(launcherExe);
+Check(launcherBytes.AsSpan().IndexOf(icoBytes.AsSpan(icon32Offset, icon32Size)) >= 0,
+    "WinExe PE embeds the exact 32px launcher icon image");
 void Private(string path, bool directory)
 {
     var user = WindowsIdentity.GetCurrent().User!;

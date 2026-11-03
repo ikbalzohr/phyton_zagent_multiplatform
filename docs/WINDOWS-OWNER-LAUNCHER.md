@@ -31,6 +31,12 @@ A launcher in artifacts/launcher-win-x64 can locate its source checkout using co
 - ZAGENT_LAUNCHER_ARCMAP_PYTHON: absolute Python interpreter path
 - ZAGENT_LAUNCHER_DATA_ROOT: only when DataRoot is not checkout/data
 
+## Launcher icon (3 November 2026)
+
+Only `Zagent.Launcher.exe` is branded with `image/zohrsystem.png`. Run `packaging/scripts/New-LauncherIcon.ps1` to generate a 7-resolution `image/zohrsystem.ico` (16–256 px). `Zagent.Launcher.csproj` uses `ApplicationIcon` so the native WinExe apphost, Windows launcher dialog/taskbar context, and shortcut icon inherit the same artwork. Windows installation shortcuts already set `IconLocation=Zagent.Launcher.exe,0`; no icon asset is required in the installed root outside the self-contained EXE. `Zagent.Setup.exe` and Google Chrome keep their own icons.
+
+Verified in `docs/LAUNCHER_ICON_20261103.md`: Windows pixel comparison, published EXE resource check, 50/50 Launcher tests, 10/10 Setup tests, full 7,014-file installed hash verification, and both local shortcuts. Chrome's taskbar icon is not controlled by the Launcher.
+
 ## Build and test
 
 Run dotnet build Zagent.slnx -c Release. Run dotnet run --project tests/Zagent.LauncherTests -c Release -- <approved-dotnet-path>. Publish the launcher using packaging/scripts/Publish-Launcher.ps1 with -Dotnet and -OutputRoot specifying a fresh root. It produces launcher/Zagent.Launcher.exe as a self-contained single file.

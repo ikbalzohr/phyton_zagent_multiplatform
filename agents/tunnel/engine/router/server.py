@@ -222,19 +222,25 @@ workflow_runtime = WorkflowRuntimeService(workflow_journal, orchestrator, device
 async def lifespan(app: FastAPI):
     global _auth_client
     _auth_client = httpx.AsyncClient(trust_env=False, follow_redirects=False)
+    retry_task: asyncio.Task | None = None
     try:
         cfg = load_tunnel_config().get("orchestration", {})
         orchestrator.configure(cfg)
         workflow_journal.recover_incomplete_runs()
-        # Discovery is private and requires provisioned internal channel credentials.
+        # Discover the ready subset, then recover missing MCP peers without
+        # withholding Router startup or blocking public tools/list.
         try:
             internal_token()
             await registry.refresh_all()
+            retry_task = asyncio.create_task(registry.retry_unavailable())
         except AuthorizationError:
             pass
         await orchestrator.start()
         yield
     finally:
+        if retry_task is not None:
+            retry_task.cancel()
+            await asyncio.gather(retry_task, return_exceptions=True)
         await orchestrator.stop()
         await registry.close()
         await _auth_client.aclose()
@@ -725,7 +731,7 @@ def run():
     host = cfg.get("host", "127.0.0.1")
     if host not in {"127.0.0.1", "127.0.0.3", "::1"}:
         raise ValueError("Tunnel router must bind loopback; terminate public HTTPS at a provisioned ingress")
-    uvicorn.run("router.server:app", host=host, port=int(cfg.get("port",18810)),
+    uvicorn.run("router.server:app", host=host, port=int(cfg.get("port",19110)),
                 log_level=cfg.get("log_level","info"), reload=False, proxy_headers=False)
 
 

@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Zagent.Core.Manager;
 using Zagent.Shared;
 using Zagent.Shared.Installation;
+using Zagent.Shared.Manager;
 
 // Source authored first; execution is explicitly deferred to Windows.
 static void Check(bool ok, string name) { if (!ok) throw new Exception(name); }
@@ -97,4 +98,19 @@ Check(peak == 1, "cross-adapter commands serialized");
 await using (var lease = await gate.EnterAsync()) gate.BeginShutdown();
 try { await gate.EnterAsync(); throw new Exception("command after shutdown accepted"); }
 catch (InvalidOperationException) { }
-Console.WriteLine("Dashboard policy/coordinator/security source tests complete.");
+var offlineProfiles = new ManagerProfilesSnapshot(
+    [new ManagerProfileRow("appBridge", @"D:\Zagent Multi Platform\workspace",
+        "read-only", true, true, true, "zagent_install")],
+    [], [], "appBridge", DateTimeOffset.UtcNow);
+var offlineInventoryJson = JsonSerializer.SerializeToElement(
+    DashboardProfileAdministration.BuildLocalProfileInventory(offlineProfiles));
+var offlineInventory = offlineInventoryJson.GetProperty("data");
+Check(offlineInventory.GetProperty("source").GetString() == "local-config-read-only",
+    "Fallback must be explicitly labeled read-only local config.");
+Check(offlineInventory.GetProperty("administrativeAccess").GetBoolean() == false,
+    "Display-only profile inventory must never grant administration.");
+Check(offlineInventory.GetProperty("defaultProfile").GetString() == "appBridge",
+    "Default profile must come from installed local configuration.");
+Check(offlineInventory.GetProperty("profiles")[0].GetProperty("root").GetString() ==
+    @"D:\Zagent Multi Platform\workspace", "Offline profile root is preserved.");
+Console.WriteLine("Dashboard policy/coordinator/security/source and read-only profile inventory tests complete.");

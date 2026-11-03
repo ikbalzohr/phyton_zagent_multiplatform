@@ -335,9 +335,59 @@ Pengguna melaporkan hasil uji **end-to-end** pada plugin ChatGPT `Zagent Multi P
 
 **Status:** `OAUTH_AUTHENTICATED_PASS`; `TOOLS_DISCOVERY_PASS`; `FILES_STAT_ROOT_END_TO_END_PASS`; `FILES_READ_SCOPE_ENFORCED` (untuk kasus ini); `STARTUP_ORDER_REGRESSION_NOT_RUN`; `SCHEDULER_ACCESS_LABEL_REVIEW_PENDING`. Langkah perbaikan berikut yang disarankan: dependency readiness Files sebelum initial Router discovery atau bounded retry yang aman, regression test tool discovery/restart serta pengujian read-only dengan granted `files_stat` dan malformed path. Jangan memperluas OAuth scopes/grants atau menyentuh Zagent Production.
 
+## Perubahan Core startup/readiness — 2 November 2026 (SOURCE, BELUM TERVALIDASI BUILD)
+
+- Checkpoint sebelum perubahan telah **commit dan push** pada branch `zagent-v1`, commit `3fe1919` (`feat(oauth): checkpoint working ChatGPT MCP read-only integration`). Hasil `files_stat path="."` end-to-end yang dilaporkan pengguna sudah terdokumentasi pada checkpoint tersebut.
+- Koreksi desain dari pengguna: **Core harus memastikan semua agent MCP yang terdaftar siap sebelum Router memulai `tools/list` discovery**. Ini mencakup Files, Web, ArcMap serta tambahan QGIS bila terdaftar. Tidak hanya Files.
+- Source lokal yang belum di-commit: `Program.cs` menjalankan `StartManagedRuntimeAsync` setelah Core dibangun dan sebelum Dashboard dimulai. `ManagerControlService` melakukan Start All dengan urutan dependency sebelum `system.tunnel`, menghentikan startup ketika agent wajib hilang/gagal. Perintah Start/Restart Tunnel individual memeriksa upstream: melakukan health refresh jika proses sudah berjalan atau memulai agent dan menunggu readiness jika belum. Tidak ada fallback ke Production. Jika gagal, Core tetap membuka Dashboard lokal untuk diagnosis dan Router tidak dijalankan.
+- Unit test baru pada `tests/Zagent.ManagerTests/Program.cs`: Start All fail-closed bila Web gagal, individual Tunnel start otomatis memulai dependensi, dan individual Tunnel start ditolak bila Files gagal. Test existing mempertahankan urutan normal/reverse.
+- **PENTING:** percobaan menjalankan `dotnet run --project tests/Zagent.ManagerTests/Zagent.ManagerTests.csproj` melalui Zagent Files **ditolak allowlist executable** (`Executable is not allowed: dotnet`). Specialized tool `files_test` memilih npm dan gagal dengan `ENOENT package.json`; ini bukan hasil uji .NET. Maka **BUILD/UNIT TEST/REGRESSION STARTUP = BLOCKED/NOT RUN**, bukan PASS. Jangan commit/push perubahan startup sebagai code verified sebelum pengujian tersebut.
+- Tidak melakukan restart Core di instalasi uji, tidak merestart atau mengubah Zagent Production, tidak memperluas OAuth scope/grant, tidak menyentuh Cloudflare/Keycloak.
+- Saat .NET tersedia melalui perintah owner-approved, jalankan `dotnet run --project tests/Zagent.ManagerTests/Zagent.ManagerTests.csproj` di source repo, kemudian build Core dan regression terkait, uji instalasi uji terisolasi, dan baru commit + push perubahan startup secara terpisah.
+
+## Koreksi startup independen — 2 November 2026 (working tree)
+
+Pengguna menolak ketentuan sebelumnya bahwa satu upstream gagal menyebabkan Router tidak dijalankan. Ketentuan **terbaru dan otoritatif** ada di `ARCHITECTURE_TARGET.md`: tiap agent berdiri sendiri; Core hanya mengatur startup berurutan (Files → Web → ArcMap → ekstensi seperti QGIS → Tunnel). Kegagalan agent dilaporkan tetapi startup lainnya, termasuk Tunnel, tetap dicoba. `Start/Restart Tunnel` individual tidak mengoperasikan agent upstream.
+
+**Source yang diubah:** `src/Zagent.Core/Manager/ManagerControlService.cs` (urut startup/stop, non-blocking, direct Tunnel independence), `src/Zagent.Core/Program.cs` (diagnostik partial startup), `agents/tunnel/engine/router/registry.py` dan `server.py` (Router mempublikasikan tools healthy subset dan mencoba kembali discovery agent gagal tiap 10 detik tanpa menghalangi tools/list), serta `tests/Zagent.ManagerTests/Program.cs` dan `agents/tunnel/engine/tests/test_startup_isolation.py` (regresi independensi dan auto recovery). OAuth, grant `files:read`, `files_stat`, dan konfigurasi Zagent Production tidak diubah.
+
+**Hasil pengujian source setelah koreksi:** `dotnet run --project tests/Zagent.ManagerTests/Zagent.ManagerTests.csproj --configuration Debug` → **MANAGER_TEST_PASS 19/0**; `dotnet build src/Zagent.Core/Zagent.Core.csproj --configuration Debug --no-restore` → **Build succeeded, 0 warning/0 error**; Router Python `py -3.11 -m unittest discover -s tests -p test_*.py -q` → **163 tests OK, 3 skipped**; focused `test_startup_isolation` → **2/2 PASS** (termasuk recovery katalog tanpa restart); SupervisorTests → **11/11 PASS**; ArchitectureTests → **29/29 PASS**; DashboardTests → **exit 0**; Python syntax tiga file → **PASS**. `Zagent.TunnelTests` lama → **1 PASS/4 FAIL** karena test config field mismatch, transport-client fixture belum ada, dan internal channel belum diprovision; statusnya FAIL, bukan diabaikan. Output pengguna `16/0` menjadi baseline historis. **Windows live Core/Tunnel/agent, discovery OAuth setelah patch, dan deployment/installer NOT_RUN**. Source ada di repository, bukan instalasi uji, tanpa restart/commit/push atau perubahan Zagent Production.
+
+## Audit port independen — 3 November 2026
+
+Source default Multi Platform dipisahkan ke 191xx dan development 192xx; dibandingkan konfigurasi/livestream listener Zagent Master Production. Instalasi uji masih memiliki endpoint Cloudflare→Router `127.0.0.3:18812` yang tidak diubah; port Core di `data/config/zagent.machine.json` diubah **18800 → 18802** ketika tidak ada proses Multi Platform aktif. Gateway installed `18900–18999` **belum diubah** karena binary lama akan menolak kombinasi `188xx+192xx`; tuntutan migrasi masih terbuka sampai published source Core tervalidasi. Tidak ada tes live OAuth setelah patch, tidak ada restart, tidak ada perubahan scope/grant/Keycloak/Cloudflare/Production. Bukti, source files, test PASS, caveat dan rencana migrasi ada di `docs/PORT_ISOLATION_AUDIT_20261103.md`.
+
+## Instalasi uji dan origin baru — 3 November 2026
+
+SetupEngine berhasil memasang kandidat lokal di `ZohrSystem/Zagent Multi Platform` dengan **7.014 file verified, 8 changed**, tanpa mengganti persistent OAuth/grants/DPAPI. Port Router installed `18812 → 19110` dan Files `18821 → 19120`; Web `18831 → 19130`, ArcMap `18841 → 19140`, Core `18802 → 19100`; development gateway menjadi `19200–19299`. Pengujian readback konfigurasi memastikan resource server OAuth, tool policy dan workflow policy identik dengan backup. Detail: `INSTALLATION_20261103.md`.
+
+**PENTING:** permintaan startup Core dari tool Zagent ditolak allowlist executable; **Router belum aktif di port 19110**. Cloudflare **belum** diarahkan ke origin baru dan OAuth after-install **NOT_TESTED**. Setelah owner menjalankan launcher/otorisasi executable resmi dan Router siap, langkah Cloudflare yang diperlukan hanya ubah service URL published application Multi Platform dari `http://127.0.0.3:18812` ke `http://127.0.0.3:19110`, lalu verifikasi metadata OAuth 200, MCP anonim 401 dan `files_stat` terautorisasi. Jangan menyentuh tunnel/API key Zagent Production.
+
+## Profil default dan paket terpasang final — 3 November 2026
+
+Setelah pemasangan ulang, **7.014 file program** terverifikasi langsung di target instalasi dengan SetupEngine dan Core Release Dashboard fallback sudah terpasang. `appBridge` tetap read-only pada folder `workspace`. Karena `files:write` / `profile_management` belum diprovision, Dashboard menampilkan local inventory read-only melalui endpoint terautentikasi khusus tanpa hak mutasi saat katalog admin gagal. Grant/OAuth tidak diubah. Router port baru tetap `19110`; **Core dan Router belum start** akibat executable allowlist sehingga Cloudflare/OAuth belum live-tested. Detail: `FULL_INSTALL_AND_DEFAULT_PROFILE_20261103.md`.
+
 ## Aturan tindak lanjut
 
 - Jangan mengasumsikan endpoint siap hanya karena Hermes pernah terhubung. Periksa keadaan saat ini.
 - Jangan memigrasikan domain atau kredensial dari Zagent Production.
 - Catat setiap perubahan kode, hasil uji live, config (tanpa rahasia) dan blocker di sini serta docs terkait.
 - Jangan aktifkan akses write/execute sebelum OAuth, grant dan read-only tool teruji.
+
+## Laporan uji ChatGPT yang dikirim pengguna — 3 November 2026
+
+Pengguna melaporkan **PING SUCCESS** pada plugin Zagent Multi Platform setelah menyesuaikan port Cloudflare sendiri dan mengaktifkan Core: MCP OK, autentikasi OK, workspace `zagent-mp-test`, API `1.0.0`, scope `files:read`, policy `oauth-read-v1`, 8 tools, workflow blocker null. **Bukti ini berasal dari output pengujian yang dikirim pengguna**, bukan klaim bahwa seluruh operasi MCP/OAuth login sudah diuji ulang dari sesi ini. Empat operasi manajemen allowlist tetap terbatas.
+
+Pekerjaan branding Launcher berikutnya tidak mengubah Cloudflare, Keycloak, issuer, grant atau permission. Pada pemeriksaan sebelum instalasi logo, proses Multi Platform tidak lagi aktif sehingga installer resmi dapat dijalankan; alasan Core berhenti tidak dapat disimpulkan dari pemeriksaan. Pemasangan ikon lulus verifikasi manifest 7.014/7.014; remote MCP pascainstalasi ikon belum dites ulang. Lihat `docs/LAUNCHER_ICON_20261103.md`.
+
+## Pemeriksaan setelah Core dinyalakan pemilik — 3 November 2026 (malam WITA)
+
+**Read-only Windows + HTTPS; tidak ada perubahan Keycloak, Cloudflare, Production, grants atau Core.**
+- Proses dari instalasi Multi Platform terdeteksi: `Zagent.Core.exe` dan dua `python.exe`. Listeners: Dashboard `127.0.0.1:19444`, Router `127.0.0.3:19110`, Files `127.0.0.3:19120`. Web `19130` dan ArcMap `19140` belum listening pada snapshot.
+- Semua lima listener utama Production tetap aktif: `18810/18811/18820/18830/18840`, tidak dilakukan restart.
+- Local `GET /.well-known/oauth-protected-resource/mcp`: **200**, resource `https://zagent.ikbalzohr.web.id/mcp`, authorization server `https://vmi3669591.contaboserver.net/realms/zagent`, advertised scope `files:read`.
+- Local root protected-resource metadata: **200**; GET unauthenticated `/mcp`: **401 Bearer** (diharapkan).
+- Keycloak OIDC discovery VPS: **200**, issuer **cocok**, advertised PKCE `S256`, authorization/token endpoints ada.
+- Public `GET /.well-known/oauth-protected-resource/mcp`: **200**, resource/issuer cocok; public unauthenticated `GET /mcp`: **401 Bearer**. Ini menunjukkan ada ingress yang merespons dengan kontrak OAuth serupa, **tidak membuktikan konfigurasi origin Cloudflare aktual atau authorized MCP call**.
+- Old local origin `127.0.0.3:18812`: **NETWORK_ERROR / no listener**; local new origin `19110` merespons 401 Bearer. Jangan mengubah Cloudflare secara asumtif sebelum memeriksa route aktual, karena domain publik sudah memiliki respons yang benar.
+- **Kesimpulan:** perubahan port internal tidak memerlukan perubahan realm/client/redirect Keycloak VPS selama issuer, public resource URL dan callback tetap sama. Verifikasi login PKCE/token introspection/audience dan authenticated `initialize/tools/list/files_stat` pada domain publik masih **NOT_RUN**.

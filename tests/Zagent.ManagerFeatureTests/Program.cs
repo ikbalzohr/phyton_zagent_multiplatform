@@ -74,7 +74,7 @@ try
                 new ManagerDevelopmentAgentRequest(
                     "Dev Search",
                     "devsearch",
-                    "http://127.0.0.3:18955/mcp"));
+                    "http://127.0.0.3:19255/mcp"));
 
             Equal("dev_devsearch", row.Id);
             Equal(1, (await store.SnapshotAsync()).Count);
@@ -117,7 +117,7 @@ try
                 new ManagerDevelopmentAgentRequest(
                     "Dev MCP",
                     "devmcp",
-                    "http://127.0.0.3:18960/mcp"));
+                    "http://127.0.0.3:19260/mcp"));
 
             // The production writer requires an owner-only, inheritance-protected
             // config root. Test that unsafe temporary fixtures are rejected,
@@ -328,7 +328,7 @@ try
                 new ManagerDevelopmentAgentRequest(
                     "Dev Agent",
                     "devagent",
-                    "http://127.0.0.3:18977/mcp"));
+                    "http://127.0.0.3:19277/mcp"));
 
             True(added.Success, added.Message);
             Equal(1, calls.Count);

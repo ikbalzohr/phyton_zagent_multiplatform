@@ -12,7 +12,7 @@ using Zagent.Shared.Manager;
 namespace Zagent.Core.Agents.Qgis;
 
 public sealed record QgisIntegrationOptions(string PythonExecutable, string UpstreamRoot,
-    string BindHost = "127.0.0.1", int Port = 18850);
+    string BindHost = "127.0.0.1", int Port = Zagent.Core.Network.ZagentNetworkPolicy.QgisPort);
 
 /// <summary>Core owns the upstream MCP process, never the external QGIS GUI.</summary>
 public static class QgisIntegration

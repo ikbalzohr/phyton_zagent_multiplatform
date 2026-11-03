@@ -134,31 +134,55 @@ Run("capability ownership lookup", () =>
 Run("development port policy boundaries", () =>
 {
     False(
-        ZagentNetworkPolicy.IsDevelopmentPort(18899),
-        "Port below development range was accepted.");
-    True(
         ZagentNetworkPolicy.IsDevelopmentPort(18900),
-        "Development range start was rejected.");
-    True(
-        ZagentNetworkPolicy.IsDevelopmentPort(18999),
-        "Development range end was rejected.");
+        "Production Development Gateway overlaps Multi Platform.");
     False(
-        ZagentNetworkPolicy.IsDevelopmentPort(19000),
-        "Port above development range was accepted.");
+        ZagentNetworkPolicy.IsDevelopmentPort(19199),
+        "Port below Multi Platform development range was accepted.");
+    True(
+        ZagentNetworkPolicy.IsDevelopmentPort(19200),
+        "Multi Platform development range start was rejected.");
+    True(
+        ZagentNetworkPolicy.IsDevelopmentPort(19299),
+        "Multi Platform development range end was rejected.");
+    False(
+        ZagentNetworkPolicy.IsDevelopmentPort(19300),
+        "Port above Multi Platform development range was accepted.");
 });
 
 Run("neutral install policy and path-scoped IPC do not depend on client audience", () =>
 {
     var ports = ZagentNetworkPolicy.For();
-    Equal(18800, ports.Core);
-    Equal(18900, ports.DevelopmentGatewayStart);
-    Equal(19000, ports.DevRuntimeStart);
+    Equal(19100, ports.Core);
+    Equal(19110, ports.Tunnel);
+    Equal(19111, ports.TunnelHealth);
+    Equal(19120, ports.Files);
+    Equal(19130, ports.Web);
+    Equal(19140, ports.ArcMap);
+    Equal(19200, ports.DevelopmentGatewayStart);
+    Equal(19300, ports.DevRuntimeStart);
     True(ZagentNetworkPolicy.IsSupportedPortBlock(
         new[] { 18800, 18810, 18811, 18820, 18830, 18840 }, 18900, 18999),
-        "Neutral production ports rejected.");
+        "Legacy installed production ports rejected.");
     True(ZagentNetworkPolicy.IsSupportedPortBlock(
         new[] { 19100, 19110, 19111, 19120, 19130, 19140 }, 19200, 19299),
-        "Existing persisted ports must be readable without a role.");
+        "Independent Multi Platform ports rejected.");
+    True(ZagentNetworkPolicy.IsSupportedPortBlock(
+        new[] { 18802, 18812, 18813, 18821, 18831, 18841 }, 18900, 18999),
+        "Installed Core port correction must remain compatible with the old binary.");
+    True(ZagentNetworkPolicy.IsSupportedPortBlock(
+        new[] { 18802, 18812, 18813, 18821, 18831, 18841 }, 19200, 19299),
+        "Non-disruptive existing installation port migration rejected.");
+    var separatePorts = new[] { ports.Core, ports.Tunnel, ports.TunnelHealth,
+        ports.Files, ports.Web, ports.ArcMap, ZagentNetworkPolicy.QgisPort };
+    False(separatePorts.Any(p => p >= 18800 && p <= 18999),
+        "Fresh Multi Platform defaults overlap the Production reservation.");
+    False(ZagentNetworkPolicy.IsSupportedPortBlock(
+        new[] { 18802, 18812, 18813, 19120, 18831, 18841 }, 19200, 19299),
+        "Mixed production port blocks were accepted.");
+    False(ZagentNetworkPolicy.IsSupportedPortBlock(
+        new[] { 19100, 19110, 19111, 19120, 19130, 19140 }, 18900, 18999),
+        "New production ports combined with legacy gateway were accepted.");
     var rootA = Path.Combine(ValidationPath("instance-roots", "a"), "Zagent");
     var rootB = Path.Combine(ValidationPath("instance-roots", "b"), "Zagent");
     Equal(ZagentInstanceScope.Key(rootA.ToLowerInvariant()),
@@ -181,28 +205,35 @@ Run("neutral install policy and path-scoped IPC do not depend on client audience
 Run("neutral allocator and bootstrap reject mixed port blocks", () =>
 {
     var root = ValidationPath("neutral-bootstrap", "Zagent");
+    // Fresh-install allocation must not load ports persisted by prior test runs.
+    // Only this disposable test fixture may be removed.
+    if (Directory.Exists(root))
+        Directory.Delete(root, recursive: true);
     var layout = new BasePathResolver().Resolve(root);
     var engine = new ZagentConfigurationEngine();
     var preferred = engine.CreateDefaultMachineConfiguration(layout);
-    Equal(18830, preferred.WebPort);
-    var allocator = new ZagentPortAllocator((_, port) => port != 18830);
+    Equal(19130, preferred.WebPort);
+    var qgisReserved = new ZagentPortAllocator((_, _) => true)
+        .Allocate(preferred with { WebPort = ZagentNetworkPolicy.QgisPort });
+    Equal(19151, qgisReserved.WebPort);
+    var allocator = new ZagentPortAllocator((_, port) => port != 19130);
     var allocated = allocator.Allocate(preferred);
-    Equal(18831, allocated.WebPort);
+    Equal(19131, allocated.WebPort);
     True(new[] { allocated.CorePort, allocated.TunnelPort, allocated.TunnelHealthPort,
                  allocated.FilesPort, allocated.WebPort, allocated.ArcMapPort }
-         .All(port => port >= 18800 && port <= 18899),
+         .All(port => port >= 19100 && port <= 19199),
          "Neutral allocator escaped reserved production range.");
     var rejected = false;
     try
     {
-        engine.SaveMachineConfigurationAsync(layout, allocated with { ArcMapPort = 19140 })
+        engine.SaveMachineConfigurationAsync(layout, allocated with { ArcMapPort = 18840 })
               .GetAwaiter().GetResult();
     }
     catch (InvalidDataException) { rejected = true; }
     True(rejected, "Mixed legacy and neutral port blocks accepted.");
     var snapshot = new ZagentConfigurationBootstrapper(portAllocator: allocator)
         .BootstrapAsync(root).GetAwaiter().GetResult();
-    Equal(18831, snapshot.Machine.WebPort);
+    Equal(19131, snapshot.Machine.WebPort);
 });
 
 Run("existing machine configuration ignores obsolete installation-role metadata", () =>
@@ -467,7 +498,7 @@ Run("first install allocates around occupied production ports and persists the r
     Equal(ZagentNetworkPolicy.TunnelPort, first.Machine.TunnelPort);
     Equal(ZagentNetworkPolicy.TunnelHealthPort, first.Machine.TunnelHealthPort);
     Equal(ZagentNetworkPolicy.FilesPort, first.Machine.FilesPort);
-    Equal(18831, first.Machine.WebPort);
+    Equal(19131, first.Machine.WebPort);
     Equal(ZagentNetworkPolicy.ArcMapPort, first.Machine.ArcMapPort);
 
     var preserveBootstrapper =

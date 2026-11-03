@@ -27,19 +27,19 @@ public sealed record ManagerCoreHostOptions(
     string? WebNode = null,
     string? ArcMapPython = null,
     string BindHost = "127.0.0.3",
-    int TunnelPort = 18810,
-    int TunnelHealthPort = 18811,
-    int FilesPort = 18820,
-    int WebPort = 18830,
-    int ArcMapPort = 18840,
+    int TunnelPort = 19110,
+    int TunnelHealthPort = 19111,
+    int FilesPort = 19120,
+    int WebPort = 19130,
+    int ArcMapPort = 19140,
     string? SupervisorLeaseName = null,
     AgentEnvironment Environment = AgentEnvironment.Production,
     string? WorkspaceId = null,
     string? QgisPython = null,
     string? QgisRoot = null,
-    int QgisPort = 18850,
-    int DevelopmentGatewayStart = 18900,
-    int DevelopmentGatewayEnd = 18999);
+    int QgisPort = ZagentNetworkPolicy.QgisPort,
+    int DevelopmentGatewayStart = 19200,
+    int DevelopmentGatewayEnd = 19299);
 
 public sealed class ManagerCoreHost : IAsyncDisposable
 {

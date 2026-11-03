@@ -57,7 +57,7 @@
                    "development_endpoint_source":  "DEV runtime ZAGENT_BIND_HOST + ZAGENT_WEB_PORT",
                    "production_endpoint_source":  "persisted zagent.machine.json BindHost + WebPort",
                    "production_payload_endpoint":  "UNCONFIGURED until install initializer runs",
-                   "first_install_port_allocation":  "preferred production ports with automatic free-port fallback inside 18800-18899",
+                   "first_install_port_allocation":  "preferred Multi Platform ports with automatic free-port fallback inside 19100-19199",
                    "endpoint_override_storage_key":  "zagentBridgeBase",
                    "endpoint_environment_storage_key":  "zagentBridgeEnvironment",
                    "production_packaging_endpoint_guard":  true,

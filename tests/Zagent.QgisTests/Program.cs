@@ -5,6 +5,8 @@ Directory.CreateDirectory(Path.Combine(root,"src","qgis_mcp"));
 var python=Path.Combine(root,"python.exe");File.WriteAllText(python,"");
 File.WriteAllText(Path.Combine(root,"src","qgis_mcp","server.py"),"");
 try {
+ Check(new QgisIntegrationOptions(python,root).Port==19150,"isolated QGIS default port");
+ Check(new ManagerCoreHostOptions(root,root,root).QgisPort==19150,"Core QGIS port default");
  var options=new QgisIntegrationOptions(python,root,"127.0.0.1",18850);
  var process=QgisIntegration.CreateProcess(options);
  Check(process.AgentId=="qgis.mcp","process id");

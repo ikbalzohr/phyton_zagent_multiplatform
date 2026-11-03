@@ -398,6 +398,19 @@ if (args.Contains("--serve-dashboard", StringComparer.Ordinal))
     await using var host =
         await ManagerCoreHost.CreateAsync(hostOptions);
 
+    // Core starts agents in a predictable order, with Tunnel last. Each agent
+    // remains independently operable: an unavailable peer is reported, not a
+    // reason to withhold Tunnel or prevent other agents from starting.
+    var runtimeStart = await host.ControlService.StartManagedRuntimeAsync();
+    if (!runtimeStart.Success)
+    {
+        host.ControlService.Logs.Write(
+            "WARN", "Core", "startup.partial", runtimeStart.Message);
+        Console.Error.WriteLine(
+            "One or more agents failed to start; other agents and the Tunnel " +
+            "were attempted independently. Inspect Dashboard agent status.");
+    }
+
     // Product host owns Core/UI; the private diagnostic pipe is created only for shutdown compatibility.
     await Zagent.Core.Dashboard.DashboardHost.RunAsync(host, dashboardOptions, dashboardConfig);
     return 0;

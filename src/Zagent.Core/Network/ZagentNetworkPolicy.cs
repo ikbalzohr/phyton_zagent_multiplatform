@@ -9,36 +9,48 @@ public sealed record ZagentPortProfile(
 public static class ZagentNetworkPolicy
 {
     public const string DefaultBindHost = "127.0.0.3";
-    public const int CorePort = 18800;
-    public const int TunnelPort = 18810;
-    public const int TunnelHealthPort = 18811;
-    public const int FilesPort = 18820;
-    public const int WebPort = 18830;
-    public const int ArcMapPort = 18840;
-    public const int ProductionPortStart = 18800;
-    public const int ProductionPortEnd = 18899;
-    public const int DevelopmentPortStart = 18900;
-    public const int DevelopmentPortEnd = 18999;
+    // Multi Platform defaults are isolated from the separately installed
+    // Zagent Production 188xx and 189xx ranges.
+    public const int CorePort = 19100;
+    public const int TunnelPort = 19110;
+    public const int TunnelHealthPort = 19111;
+    public const int FilesPort = 19120;
+    public const int WebPort = 19130;
+    public const int ArcMapPort = 19140;
+    public const int QgisPort = 19150;
+    public const int ProductionPortStart = 19100;
+    public const int ProductionPortEnd = 19199;
+    public const int DevelopmentPortStart = 19200;
+    public const int DevelopmentPortEnd = 19299;
 
-    // All new installations use one neutral port policy. Port availability is
-    // checked when generating configuration; no operator or client role selects ports.
+    // Fresh installs allocate within Multi Platform's independent range.
+    // Existing deployments keep their persisted, externally routed ports.
     public static ZagentPortProfile For() => new(
-        18800, 18899, 18800, 18810, 18811, 18820, 18830, 18840,
-        18900, 18999, 19000, 19099);
+        ProductionPortStart, ProductionPortEnd, CorePort, TunnelPort,
+        TunnelHealthPort, FilesPort, WebPort, ArcMapPort,
+        DevelopmentPortStart, DevelopmentPortEnd, 19300, 19399);
 
     public static bool IsDevelopmentPort(int port) =>
         port >= DevelopmentPortStart && port <= DevelopmentPortEnd;
 
-    // Read-only compatibility with existing machine configs. These numeric
-    // blocks do not confer a client/installation role or authorization.
+    // Preserve the installed 188xx service endpoints without touching the
+    // Cloudflare MCP route. An old Multi Platform machine configuration may
+    // retain its unique 188xx service ports while moving its dev gateway to
+    // 192xx. Fresh installations use the fully isolated 191xx + 192xx block.
     public static bool IsSupportedPortBlock(
         IReadOnlyList<int> productionPorts, int gatewayStart, int gatewayEnd)
     {
-        if (gatewayEnd != gatewayStart + 99 ||
-            gatewayStart is not (18900 or 19200))
+        if (gatewayEnd != gatewayStart + 99)
             return false;
-        var productionStart = gatewayStart - 100;
-        return productionPorts.All(port =>
-            port >= productionStart && port <= productionStart + 99);
+        var validRange = gatewayStart switch
+        {
+            18900 => 18800, // Previously persisted 188xx installation.
+            19200 when productionPorts.All(port => port is >= 18800 and <= 18899)
+                => 18800, // Non-disruptive migration of existing installation.
+            19200 => 19100,
+            _ => -1
+        };
+        return validRange > 0 && productionPorts.All(port =>
+            port >= validRange && port <= validRange + 99);
     }
 }

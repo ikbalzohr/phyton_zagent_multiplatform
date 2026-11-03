@@ -1,7 +1,7 @@
 {
   "router": {
     "host": "127.0.0.1",
-    "port": 18810,
+    "port": 19110,
     "mcp_path": "/mcp",
     "log_level": "info"
   },

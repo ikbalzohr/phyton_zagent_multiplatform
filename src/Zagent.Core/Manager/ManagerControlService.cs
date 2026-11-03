@@ -58,6 +58,26 @@ public sealed class ManagerControlService
     }
 
     public ManagerTechnicalLogStore Logs => _logs;
+
+    // Core owns lifecycle ordering, not cross-agent availability. Start each
+    // agent independently before Tunnel so its initial discovery sees every
+    // upstream that is ready. A failed agent must not stop the other agents.
+    private static readonly string[] PreferredStartupOrder =
+        ["files.service", "web.service", "arcmap.service"];
+
+    private string[] AgentStartupOrder() =>
+        PreferredStartupOrder.Concat(
+            _controllers.Snapshot()
+                .Select(item => item.AgentId)
+                .Where(id => id != "system.tunnel" &&
+                    !PreferredStartupOrder.Contains(id, StringComparer.Ordinal)))
+            .Append("system.tunnel")
+            .ToArray();
+
+    public Task<ManagerOperationResult> StartManagedRuntimeAsync(
+        CancellationToken cancellationToken = default) =>
+        LifecycleAllAsync("start", cancellationToken);
+
     public CoreShutdownCoordinator Shutdown { get; } = new();
     public CoreCommandGate Commands { get; } = new();
     public async Task StopForShutdownAsync()
@@ -726,6 +746,8 @@ public sealed class ManagerControlService
 
         LifecycleOperationResult result;
 
+        // Direct lifecycle actions affect only the selected agent. Tunnel
+        // discovery tolerates unavailable peers; it never starts them implicitly.
         switch (request.Operation)
         {
             case "start":
@@ -881,30 +903,9 @@ public sealed class ManagerControlService
     {
         var order = operation switch
         {
-            "start" =>
-                new[]
-                {
-                    "files.service",
-                    "web.service",
-                    "arcmap.service",
-                    "system.tunnel"
-                },
-            "stop" =>
-                new[]
-                {
-                    "system.tunnel",
-                    "arcmap.service",
-                    "web.service",
-                    "files.service"
-                },
-            "restart" =>
-                new[]
-                {
-                    "system.tunnel",
-                    "arcmap.service",
-                    "web.service",
-                    "files.service"
-                },
+            "start" => AgentStartupOrder(),
+            "stop" => AgentStartupOrder().Reverse().ToArray(),
+            "restart" => AgentStartupOrder().Reverse().ToArray(),
             "refresh" =>
                 _controllers.Snapshot()
                     .Select(item => item.AgentId)
@@ -952,6 +953,8 @@ public sealed class ManagerControlService
                     out var controller) ||
                 controller is null)
             {
+                if (operation == "start")
+                    errors.Add($"{agentId}: agent controller is not registered.");
                 continue;
             }
 
@@ -990,6 +993,9 @@ public sealed class ManagerControlService
             {
                 errors.Add($"{agentId}: {ex.Message}");
             }
+
+            // Continue independently after agent failures. A later Router
+            // can discover the healthy subset and retry unavailable services.
         }
 
         if (operation == "stop")

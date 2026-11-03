@@ -13,7 +13,7 @@ from .server import (
 HOST = os.environ.get("ZAGENT_ARCMAP_HOST", "127.0.0.3")
 if HOST not in ('localhost', '127.0.0.1', '127.0.0.3', '::1'):
     raise ValueError('ArcMap backend must bind private loopback')
-PORT = int(os.environ.get("ZAGENT_ARCMAP_PORT", "18840"))
+PORT = int(os.environ.get("ZAGENT_ARCMAP_PORT", "19140"))
 PATH = os.environ.get("ZAGENT_ARCMAP_MCP_PATH", "/mcp")
 if not PATH.startswith("/"):
     PATH = "/" + PATH

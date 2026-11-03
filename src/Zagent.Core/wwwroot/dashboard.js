@@ -124,10 +124,28 @@ async function render(current, stamp) {
       table($('capabilities-content'), capabilities, ['agentId','capability','access','execution','supportsCancel','supportsResume']); });
   }
   if (current === 'workspaces') {
-    const d = await data('workspaces'); apply(() => {
-      profileRevision = d.revision;
-      const target = $('workspaces-content'); target.replaceChildren(node('p', `Workspace: ${d.workspaceId} · default profile: ${d.defaultProfile} · unavailable dependencies: ${display(d.unavailableDependencies)}`));
+    let d, localOnly = false;
+    try { d = await data('workspaces'); }
+    catch (error) {
+      if (error.status !== 503) throw error;
+      // Read-only owner inventory, never an administrative grant or fallback
+      // for create/update/default/delete operations.
+      d = await data('workspaces/local-profiles');
+      localOnly = true;
+    }
+    apply(() => {
+      profileRevision = localOnly ? undefined : d.revision;
+      $('profile-form').hidden = localOnly;
+      const target = $('workspaces-content');
+      target.replaceChildren(node('p', localOnly
+        ? 'Local profile configuration (READ ONLY). Profile administration is not provisioned or reachable; no create, edit, default change or delete permission is assumed.'
+        : `Workspace: ${d.workspaceId} · default profile: ${d.defaultProfile} · unavailable dependencies: ${display(d.unavailableDependencies)}`));
       const profiles = node('div'); target.append(profiles);
+      if (localOnly) {
+        target.append(node('p', `Configured default: ${d.defaultProfile || 'none'} · This is not a validated backend authorization catalog.`));
+        table(profiles, d.profiles, ['name','root','mode','enabled','active','authorized_by_user']);
+        return;
+      }
       table(profiles, d.profiles, ['name','root','mode','enabled','description','authorized_by_user'], row => [
         button('Edit', () => { const editor = profileEditor(row, target); if (!editor) return; target.append(editor); editor.querySelector('input').focus(); }),
         button('Set default', () => profileCommand('workspaces/profiles/' + encodeURIComponent(row.name) + '/default', {})),

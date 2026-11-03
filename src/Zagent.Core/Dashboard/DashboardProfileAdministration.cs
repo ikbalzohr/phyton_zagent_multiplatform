@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Zagent.Core.Manager;
+using Zagent.Shared.Manager;
 
 namespace Zagent.Core.Dashboard;
 
@@ -34,6 +36,23 @@ public static class DashboardProfileAdministration
                 return DependencyProblem(ctx, 503, "Trusted profile catalog unavailable; no local fallback.", DependencyStage(ex), DependencyReason(ex));
             }
         }).RequireAuthorization("Administrator");
+        // A separate read-only owner inventory is safe when the private Files
+        // administration capability has not been provisioned. It cannot mutate
+        // or confer authorization; the authoritative route above still fails
+        // closed and never substitutes this inventory for profile grants.
+        app.MapGet(route + "/local-profiles", async (HttpContext ctx) => {
+            try {
+                var local = await queries.ReadAsync("profiles.snapshot", null, ctx.RequestAborted);
+                if (!local.Success || local.Result is not { } result)
+                    return Results.StatusCode(503);
+                var snapshot = JsonSerializer.Deserialize<ManagerProfilesSnapshot>(
+                    result.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (snapshot is null) return Results.StatusCode(503);
+                return Results.Ok(BuildLocalProfileInventory(snapshot));
+            } catch (Exception ex) when (DependencyFailure(ex)) {
+                return Results.StatusCode(503);
+            }
+        }).RequireAuthorization("Administrator");
         app.MapGet(route + "/profiles/{id}", async (string id, HttpContext ctx) => {
             try { using var client = Client(); return Results.Ok(await client.AdminAsync("get", new JsonObject { ["target_profile_id"] = id }, Actor(ctx), ctx.RequestAborted)); }
             catch (Exception ex) when (DependencyFailure(ex)) { return DependencyProblem(ctx, 503, "Trusted profile unavailable.", DependencyStage(ex), DependencyReason(ex)); }
@@ -47,6 +66,28 @@ public static class DashboardProfileAdministration
         app.MapPost(route + "/profiles/{id}/default", async (string id, JsonObject request, HttpContext ctx) =>
             await Mutate("set_default", id, request, ctx, Client)).RequireAuthorization("Administrator").RequireRateLimiting("commands");
     }
+    // This is a display-only projection of the local Windows-owner configuration,
+    // not a principal-authorized backend catalog. Never reuse it for mutations.
+    public static object BuildLocalProfileInventory(ManagerProfilesSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        return new { data = new {
+            source = "local-config-read-only",
+            defaultProfile = snapshot.DefaultProfile,
+            profiles = snapshot.Profiles.Select(profile => new {
+                name = profile.Name,
+                root = profile.Root,
+                mode = profile.Mode,
+                enabled = profile.Enabled,
+                active = profile.Active,
+                authorized_by_user = profile.AuthorizedByUser,
+                authorization_source = profile.AuthorizationSource
+            }).ToArray(),
+            administrativeAccess = false,
+            unavailableDependencies = snapshot.UnavailableDependencies
+        } };
+    }
+
     // Administrator routes only. Stage names a boundary, not a cause or dependency health.
     private static IResult DependencyProblem(HttpContext ctx, int statusCode, string title, string stage = "UNKNOWN", string reason = "UNKNOWN") =>
         Results.Problem(statusCode: statusCode, title: title,

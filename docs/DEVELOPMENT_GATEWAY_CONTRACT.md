@@ -4,7 +4,7 @@
 Development Gateway is the mandatory isolation lane for new or modified agents before production registration.
 
 ## Network policy
-- Development range: **18900-18999**.
+- Development range **untuk fresh install source terbaru Multi Platform: 19200–19299**. Range 18900–18999 adalah konfigurasi legacy yang masih dipertahankan oleh binary instalasi uji sampai migrasi setelah publish kompatibel. Range tersebut juga dipakai Zagent Production dan **bukan target baru**. Lihat `PORT_ISOLATION_AUDIT_20261103.md`.
 - Default bind is loopback only.
 - A port is allocated only after conflict preflight.
 - An agent may not self-assign a production route.

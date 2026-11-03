@@ -8,7 +8,7 @@ from .owner_loader import OwnerConfiguration
 BUNDLE_KIND='zagent.allowlist.public-bootstrap.v1'
 MANIFEST_KIND='zagent.allowlist.owner-host.v1'
 RUNTIME_URL='https://zagent.ikbalzohr.web.id/runtime/allowlist-context'
-ROUTER_URL='http://127.0.0.1:18810'
+ROUTER_URL='http://127.0.0.3:19110'
 
 
 def validate_bundle(raw, acknowledged_sha256, placement):
