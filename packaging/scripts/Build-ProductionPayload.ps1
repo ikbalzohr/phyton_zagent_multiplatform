@@ -234,6 +234,35 @@ Copy-Tree (Join-Path $runtime "arcmap-python-3.11.9") (Join-Path $arcOut "runtim
 Set-EmbeddedPythonPath (Join-Path $arcOut "runtime\python")
 Copy-Tree (Join-Path $Root "agents\arcmap\artifacts") (Join-Path $arcOut "artifacts")
 
+# QGIS - independent Python 3.12 MCP agent (QGIS Desktop is not bundled).
+$qgisOut = Join-Path $agentsOut "qgis"
+$qgisSource = Join-Path $Root "agents\qgis"
+Require-File (Join-Path $qgisSource "qgis.component.json")
+Require-File (Join-Path $qgisSource "UPSTREAM-SNAPSHOT.json")
+Require-File (Join-Path $qgisSource "engine\LICENSE")
+Require-File (Join-Path $qgisSource "engine\src\qgis_mcp\server.py")
+Require-File (Join-Path $qgisSource "engine\qgis_mcp_plugin\metadata.txt")
+Copy-Tree (Join-Path $qgisSource "engine") (Join-Path $qgisOut "engine") @("__pycache__", ".venv", ".git", "tests") @("*.pyc", "*.pyo")
+Copy-Item -LiteralPath (Join-Path $qgisSource "qgis.component.json") -Destination $qgisOut
+Copy-Item -LiteralPath (Join-Path $qgisSource "UPSTREAM-SNAPSHOT.json") -Destination $qgisOut
+
+$qgisPython = Join-Path $qgisSource "runtime\python"
+Require-File (Join-Path $qgisPython "python.exe")
+Require-File (Join-Path $qgisPython "python312.dll")
+Require-File (Join-Path $qgisPython "python312._pth")
+Copy-Tree $qgisPython (Join-Path $qgisOut "runtime\python") @("__pycache__") @("*.pyc", "*.pyo")
+$isoPath = Get-Content -LiteralPath (Join-Path $qgisOut "runtime\python\python312._pth")
+if ($isoPath -notcontains "..\..\engine\src") {
+  throw "QGIS runtime must resolve engine source relative to its own install root."
+}
+# All runtime dependencies are packaged. No absolute developer-venv .pth.
+$site = Join-Path $qgisOut "runtime\python\Lib\site-packages"
+Get-ChildItem -LiteralPath $site -File -Filter "*.pth" | ForEach-Object {
+  $body = [IO.File]::ReadAllText($_.FullName)
+  if ($body -match '(?i)[a-z]:\\' -or $body -match '(?i)/home/|/users/') {
+    throw "Absolute host source path in the bundled QGIS dependency path."
+  }
+}
 # ArcMap Orchestrator RC gate: fail closed before the installer is assembled.
 Require-File (Join-Path $arcEngine "orchestrator\__init__.py")
 Require-File (Join-Path $arcEngine "mcp_server\workflow_runtime_client.py")
@@ -272,6 +301,8 @@ No Chromium, Firefox, or WebKit browser binaries are bundled.
 FFmpeg is bundled under agents\web\runtime\browsers only to preserve Chrome video recording.
 
 ArcMap Desktop 10.6.1 is external software and is not bundled with Zagent.
+
+QGIS Desktop is external and remains user-controlled. Zagent bundles the independent QGIS MCP server/plugin source 0.15.2 (GPL-2.0-or-later) with original LICENSE/source. Python 3.12.16 runtime includes its own LICENSE.txt; see agents\qgis\engine\LICENSE for QGIS MCP terms.
 "@
 [IO.File]::WriteAllText(
   (Join-Path $OutputRoot "THIRD_PARTY_RUNTIME_NOTICES.txt"),
@@ -350,6 +381,7 @@ $payload = [pscustomobject]@{
     files_python = "3.11.9-embedded"
     tunnel_python = "3.11.9-embedded"
     arcmap_python = "3.11.9-embedded"
+    qgis_python = "3.12.16-bundled"
     node = "24.19.0-portable"
     playwright = "1.63.0"
     browsers = @()

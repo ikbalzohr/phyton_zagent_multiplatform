@@ -1618,6 +1618,7 @@ public sealed class ManagerControlService
             "files.service" => 1,
             "web.service" => 2,
             "arcmap.service" => 3,
+            "qgis.service" => 4,
             _ => 100
         };
 }

@@ -51,6 +51,14 @@
       "canonical_version": "1.0.0",
       "source": "agents/arcmap/engine",
       "baseline_product_version": "3.0.1-zagent.1"
+    },
+    "qgis": {
+      "product_line": "zagent-qgis-v1",
+      "canonical_version": "1.0.0",
+      "source": "agents/qgis/engine",
+      "upstream_version": "0.15.2",
+      "external_desktop": "QGIS 3.44.2",
+      "license": "GPL-2.0-or-later"
     }
   },
   "management": {

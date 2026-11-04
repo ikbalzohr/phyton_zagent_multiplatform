@@ -28,6 +28,7 @@ from .execution_context import authority_arguments, new_context, policy_resource
 from .files_policy import scope_for_files_tool, validate_files_tool_scope
 from .files_selection import files_tool_schema, selected_profile
 from .files_policy import FILES_TOOL_SCOPES
+from .full_catalog import inferred_policy
 from .profile_admin import (PROFILE_ADMIN_SCOPES, require_profile_management, catalog_context,
                             validate_catalog, new_admin_context, revalidate_admin)
 from .identity import Placement, internal_token, verify_internal_token
@@ -98,6 +99,8 @@ def _policy(name: str) -> dict[str, Any]:
     if name not in policies and _qgis_tool(name):
         return {'scope': 'files:execute', 'enabled': True}
     policy = policies.get(name)
+    if name not in policies and (load_tunnel_config().get("catalog_exposure") or {}).get("mode") == "all_discovered":
+        policy = inferred_policy(name, registry)
     if not isinstance(policy, dict) or not policy.get("scope"):
         raise AuthorizationError("TOOL_NOT_AUTHORIZED", 403)
     if name.startswith("files_") and policy["scope"] != scope_for_files_tool(name):

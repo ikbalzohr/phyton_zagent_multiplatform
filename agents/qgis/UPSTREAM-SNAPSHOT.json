@@ -1,0 +1,10 @@
+{
+    "schema_version":  1,
+    "agent_id":  "qgis.service",
+    "upstream":  "https://github.com/nkarasiak/qgis-mcp",
+    "upstream_commit":  "dae432367fcb2873a151b94c4faaadef2033cf9f",
+    "upstream_version":  "0.15.2",
+    "license":  "GPL-2.0-or-later",
+    "source_files_copied":  43,
+    "source_only":  true
+}

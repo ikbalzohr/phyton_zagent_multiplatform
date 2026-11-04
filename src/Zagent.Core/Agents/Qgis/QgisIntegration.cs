@@ -24,7 +24,19 @@ public static class QgisIntegration
     {
         var python = options.QgisPython ?? Environment.GetEnvironmentVariable("ZAGENT_QGIS_PYTHON");
         var root = options.QgisRoot ?? Environment.GetEnvironmentVariable("ZAGENT_QGIS_ROOT");
-        if (string.IsNullOrWhiteSpace(python) && string.IsNullOrWhiteSpace(root)) return null;
+        // Prefer this installation's bundled QGIS agent. The external QGIS
+        // Desktop is not a supervised/owned process.
+        if (string.IsNullOrWhiteSpace(python) && string.IsNullOrWhiteSpace(root))
+        {
+            var agent = Path.Combine(Path.GetFullPath(options.ZagentRoot), "agents", "qgis");
+            var bundledPython = Path.Combine(agent, "runtime", "python", "python.exe");
+            var bundledEngine = Path.Combine(agent, "engine");
+            if (!File.Exists(bundledPython) ||
+                !File.Exists(Path.Combine(bundledEngine, "src", "qgis_mcp", "server.py")) ||
+                !File.Exists(Path.Combine(bundledEngine, "src", "zagent_qgis", "launch.py")))
+                return null; // Optional: an incomplete bundle cannot block Core startup.
+            return new(bundledPython, bundledEngine, "127.0.0.1", options.QgisPort);
+        }
         if (string.IsNullOrWhiteSpace(python) || string.IsNullOrWhiteSpace(root))
             throw new ArgumentException("QGIS requires both ZAGENT_QGIS_PYTHON and ZAGENT_QGIS_ROOT.");
         return new(python, root, "127.0.0.1", options.QgisPort);
@@ -39,12 +51,14 @@ public static class QgisIntegration
         var source = Path.Combine(Path.GetFullPath(options.UpstreamRoot), "src");
         if (!File.Exists(Path.Combine(source,"qgis_mcp","server.py")))
             throw new FileNotFoundException("QGIS upstream src/qgis_mcp/server.py missing.");
+        if (!File.Exists(Path.Combine(source,"zagent_qgis","launch.py")))
+            throw new FileNotFoundException("Zagent QGIS managed launcher missing.");
         return new AgentProcessDefinition(ProcessId, Path.GetFullPath(options.PythonExecutable),
-            ["-m", "qgis_mcp.server"], Path.GetFullPath(options.UpstreamRoot),
+            ["-m", "zagent_qgis.launch"], Path.GetFullPath(options.UpstreamRoot),
             EnvironmentVariables: new Dictionary<string,string> {
-                ["PYTHONPATH"] = source, ["PYTHONUNBUFFERED"] = "1",
+                ["PYTHONPATH"] = source, ["PYTHONUNBUFFERED"] = "1", ["PYTHONDONTWRITEBYTECODE"] = "1",
                 ["QGIS_MCP_TRANSPORT"] = "streamable-http",
-                ["FASTMCP_HOST"] = options.BindHost, ["FASTMCP_PORT"] = options.Port.ToString(),
+                ["ZAGENT_QGIS_BIND_HOST"] = options.BindHost, ["ZAGENT_QGIS_BIND_PORT"] = options.Port.ToString(),
                 ["QGIS_MCP_HOST"] = "127.0.0.1", ["QGIS_MCP_PORT"] = "9876",
                 ["QGIS_MCP_LOG_FILE"] = ""
             }, GracefulShutdownSeconds: 3, AutoRestart: true, MaxRestartAttempts: 3);
@@ -61,13 +75,13 @@ public static class QgisIntegration
         var process = CreateProcess(options);
         var manifest = new AgentManifest(ZagentProductInfo.AgentProtocolVersion,
             new AgentIdentity(AgentId,"QGIS upstream MCP","1.0.0","nkarasiak/qgis-mcp"), environment,
-            new AgentRuntimeDescriptor("python",">=3.12","qgis_mcp.server"),
+            new AgentRuntimeDescriptor("python",">=3.12","zagent_qgis.launch"),
             new AgentTransportDescriptor("http-mcp",options.BindHost,options.Port,"/mcp",true),
             new AgentLifecycleDescriptor(GracefulShutdownSeconds:3),
             new AgentHealthDescriptor("mcp",CreateService(options).Url),
             [new CapabilityDescriptor("qgis.tools","Dynamic complete upstream MCP tool catalog.",
                 CapabilityAccess.Action,CapabilityExecution.Background,CapabilityApproval.None,SupportsCancel:false)],
-            Dependencies: [new AgentDependencyDescriptor("qgis.desktop",true,"3.44.2",External:true)],
+            Dependencies: [new AgentDependencyDescriptor("qgis.desktop",true,">=3.28",External:true)],
             Metadata: new Dictionary<string,string> { ["desktop_ownership"]="external", ["catalog"]="dynamic" });
         var registration=registry.Register(manifest,productionApproved);
         if (!registration.Success) throw new InvalidOperationException(string.Join("; ",registration.Errors));

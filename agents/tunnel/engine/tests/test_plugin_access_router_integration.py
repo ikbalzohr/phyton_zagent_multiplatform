@@ -46,6 +46,64 @@ class RouterPerimeterTests(unittest.IsolatedAsyncioTestCase):
         for p in reversed(self.patches): p.stop()
         self.tmp.cleanup()
 
+    async def test_opt_in_all_discovered_exposes_only_granted_known_agents(self):
+        from router.registry import UpstreamState
+        import router.config as config
+
+        path = config.TUNNEL_FILE
+        original = json.loads(path.read_text(encoding="utf-8"))
+        principal = principal_id("https://issuer.example", "alice")
+        original["catalog_exposure"] = {"mode": "all_discovered"}
+        original["resource_server"]["grants"][principal] = {
+            "scopes": ["files:read", "files:write", "files:execute", "web:control", "arcmap:execute"],
+            "tools": ["*"],
+            "files_resource": {"kind": "files", "profile_id": "appBridge",
+                "resource_id": "workspace:ws:approved", "device_id": "device",
+                "installation_id": "install", "revoked": False},
+        }
+        path.write_text(json.dumps(original), encoding="utf-8")
+        async def full_introspection(request):
+            return httpx.Response(200, json={
+                "active": True, "iss": "https://issuer.example", "sub": "alice",
+                "aud": "https://resource.example/mcp",
+                "scope": "files:read files:write files:execute web:control arcmap:execute",
+                "exp": time.time() + 300})
+        await self.server._auth_client.aclose()
+        self.server._auth_client = httpx.AsyncClient(transport=httpx.MockTransport(full_introspection))
+        catalog = {
+            "zagent_files": ("files", ["files_list", "files_write", "files_powershell_run",
+                                      "files_update_apply"]),
+            "zagent_web": ("web", ["web_snapshot"]),
+            "zagent_arcmap": ("arcmap", ["arcmap_status"]),
+            "zagent_qgis": ("qgis", ["qgis_project_info"]),
+        }
+        self.server.registry.states = {}
+        for service_id, (namespace, names) in catalog.items():
+            state = UpstreamState(service={"id": service_id, "name": service_id,
+                "namespace": namespace, "url": "http://127.0.0.3:10000/mcp",
+                "enabled": True, "internal_auth": service_id != "zagent_qgis"})
+            state.tools = [{"name": name, "description": name,
+                            "inputSchema": {"type": "object", "properties": {}}}
+                           for name in names]
+            self.server.registry.states[service_id] = state
+        self.server.registry.rebuild_index()
+        async def listing():
+            response = await self.client.post("/mcp",
+                headers={"Authorization": "Bearer synthetic"},
+                json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+            self.assertEqual(response.status_code, 200)
+            return {row["name"] for row in response.json()["result"]["tools"]}
+        names = await listing()
+        for expected in ("files_list", "files_write", "files_powershell_run",
+                         "web_snapshot", "arcmap_status", "qgis_project_info"):
+            self.assertIn(expected, names)
+        self.assertNotIn("files_update_apply", names)
+        original["tool_policy"]["files_write"] = {"scope": "files:write", "enabled": False}
+        path.write_text(json.dumps(original), encoding="utf-8")
+        self.assertNotIn("files_write", await listing())
+        del original["catalog_exposure"]
+        path.write_text(json.dumps(original), encoding="utf-8")
+        self.assertNotIn("files_list", await listing())
     async def test_missing_bearer_rejected_before_initialize(self):
         response = await self.client.post("/mcp",json={"jsonrpc":"2.0","id":1,"method":"initialize"})
         self.assertEqual(response.status_code,401)

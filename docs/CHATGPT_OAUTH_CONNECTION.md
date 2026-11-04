@@ -391,3 +391,126 @@ Pekerjaan branding Launcher berikutnya tidak mengubah Cloudflare, Keycloak, issu
 - Public `GET /.well-known/oauth-protected-resource/mcp`: **200**, resource/issuer cocok; public unauthenticated `GET /mcp`: **401 Bearer**. Ini menunjukkan ada ingress yang merespons dengan kontrak OAuth serupa, **tidak membuktikan konfigurasi origin Cloudflare aktual atau authorized MCP call**.
 - Old local origin `127.0.0.3:18812`: **NETWORK_ERROR / no listener**; local new origin `19110` merespons 401 Bearer. Jangan mengubah Cloudflare secara asumtif sebelum memeriksa route aktual, karena domain publik sudah memiliki respons yang benar.
 - **Kesimpulan:** perubahan port internal tidak memerlukan perubahan realm/client/redirect Keycloak VPS selama issuer, public resource URL dan callback tetap sama. Verifikasi login PKCE/token introspection/audience dan authenticated `initialize/tools/list/files_stat` pada domain publik masih **NOT_RUN**.
+
+## 4 November 2026 — keputusan plugin baru dan mode full discovered catalog (SOURCE ONLY)
+
+Pengguna memilih menghapus plugin/MCP ChatGPT yang lama secara manual dan membuat
+plugin ChatGPT baru untuk mengekspos tools **yang sudah ada** pada Zagent Multi
+Platform, tanpa MCP server tambahan dan tanpa memindahkan source Production.
+
+Source Router sekarang memiliki opt-in `catalog_exposure.mode=all_discovered`
+dengan fallback scope berdasarkan tool yang benar-benar ditemukan di katalog
+trusted Files, Web, ArcMap, dan QGIS; explicit deny tetap berlaku. Grant owner
+dapat memakai daftar `tools:["*"]`, tetapi token OAuth, scope, binding profil,
+command allowlist, dan capability owner tetap harus diperiksa.
+
+**Validasi source:** 9/9 unit test, 6/6 ASGI integration test; Router regression
+173 tests (3 skipped), exit 0. **Tidak ada perubahan live**: konfigurasi private
+tunnel.json, scope Keycloak, status profil read-only, binary terinstal, maupun
+plugin ChatGPT saat ini tidak disentuh. Katalog penuh masih **NOT_ACTIVE**.
+Checklist dan cuplikan konfigurasi nonrahasia: `docs/MCP_FULL_CATALOG_20261104.md`.
+## 4 November 2026 — installed full catalog, authorization/token and live scan pending
+
+User approved work on all four previously pending stages. **Installed offline**
+Router source (4 files) and updated installed payload manifest; SetupEngine verify
+**7015/7015 PASS**. Opt-in `catalog_exposure=all_discovered`, owner tool grant
+wildcard and six scope grants have been published to Multi Platform config
+without changing issuer, client identity, device placement or credentials.
+Files `appBridge` is approved `read-write` and native command policy has
+six executable paths. Native policy validation PASS; Router test suite
+173 tests (3 skip), PASS.
+
+Keycloak OIDC metadata returns HTTP 200 with six required advertised scopes,
+but unauthenticated client authorization probe HTTP 403 and authenticated
+full-scope token issuance are **NOT VERIFIED**. Multi Platform Launcher is
+currently **offline**, Production allowlist correctly denied a remote launch,
+so complete ChatGPT `tools/list` and `tools/call` acceptance **NOT RUN**.
+Old plugin untouched; user creates replacement independently.
+
+Detailed backup, status and next actions:
+`docs/MCP_FULL_CATALOG_DEPLOY_20261104.md`.
+## 4 November 2026 — live OAuth login invalid_scope diagnosis
+
+The user reported a ChatGPT OAuth login error: `upstream connect error or
+disconnect/reset before headers; remote connection failure`. Read-only
+investigation via the existing independent Production Files management access
+confirmed:
+
+- Multi Platform Windows **is now running**: Core plus local Files, Web,
+  ArcMap and Tunnel processes; Router `127.0.0.3:19110`, Files `19120`,
+  Web `19130`, ArcMap `19140`, Dashboard `19444` were listening.
+  Local Router metadata and Dashboard returned HTTP 200.
+- Public MCP resource metadata at both RFC9728 paths returned HTTP 200.
+  Both local and public unauthenticated POST `/mcp` returned HTTP 401 with
+  a `WWW-Authenticate` header, as expected.
+- Keycloak OIDC discovery URL returned HTTP 200 with correct issuer.
+- OAuth authorization request for public client `chatgpt-zagent-mp`, using
+  the expected callback and PKCE S256, returned Keycloak login HTML HTTP
+  200 for `openid files:read` and `openid files:read files:write`.
+- Repeating that request with **any of** `files:execute`,
+  `web:control`, `arcmap:inspect`, or `arcmap:execute` yielded HTTP
+  302 redirect to the callback with OAuth error **`invalid_scope`**.
+  Independent OIDC `profile` and `email` scope requests also yielded
+  `invalid_scope`; `offline_access` was accepted.
+- This means the realm advertises scopes which the specific ChatGPT
+  OAuth client is not currently assigned to request. Realm discovery is
+  not proof of per-client permission. This is a **verified blocker**
+  independent of the reported upstream proxy reset; exact origin of
+  proxy reset itself is not proven.
+- Recommended remediation by authorized Keycloak realm administrator:
+  Clients > `chatgpt-zagent-mp` > Client scopes: assign missing Files,
+  Web, ArcMap scopes as optional; add OIDC profile/email (typically default
+  when the client needs them). Retain public client, PKCE S256, exact
+  redirect, issuer and audience. Repeat OAuth login and authenticated
+  `tools/list` after scope assignment.
+- No Keycloak administrative write, Cloudflare change, Zagent Production
+  change, or service restart occurred during diagnostics.
+## 4 November 2026 — Keycloak client scopes ditambahkan lewat Admin Console
+
+Dengan persetujuan eksplisit pengguna, melalui Zagent Web terhubung ke Chrome
+Admin Console, pada realm `zagent` dan OAuth client `chatgpt-zagent-mp`,
+empat scope berikut ditambahkan sebagai **Optional**:
+`files:execute`, `web:control`, `arcmap:inspect`,
+`arcmap:execute`.
+
+Readback langsung dari halaman Client scopes mengonfirmasi seluruh empat
+scope sebagai Optional dan mempertahankan `files:read` (Default),
+`files:write` (Optional), `offline_access` (Optional),
+dan `zagent-resource-audience` (Default). Total terdaftar 9 entries,
+termasuk dedicated scope.
+
+Pengujian HTTP authorization Code + PKCE S256 untuk client
+`chatgpt-zagent-mp` dengan keenam scope
+`files:read files:write files:execute web:control arcmap:inspect
+arcmap:execute` menghasilkan **HTTP 200 halaman login**, baik dengan
+maupun tanpa `resource=https://zagent.ikbalzohr.web.id/mcp`;
+**tidak lagi menghasilkan invalid_scope**. Sebelum assignment, permintaan
+sama menghasilkan HTTP 302 invalid_scope. Tidak mengirim password, tidak
+menerbitkan/menyalin token, tidak mengubah realm, klien lain, atau Production.
+
+Hasil ini membuktikan assignment scope dan permintaan authorization diterima;
+**belum membuktikan** proses login pengguna, penerbitan access token dengan
+scope dan audience yang diminta, atau hasil runtime ChatGPT tools/list.
+Pengguna perlu mengulang OAuth dari plugin baru untuk acceptance akhir.
+## 4 November 2026 — QGIS rollout MCP catalog pending
+
+QGIS agent 125 tools installed in Multi Platform program tree and verified
+by local HTTP MCP smoke. Existing ChatGPT plugin and OAuth grant were not
+changed. Router and Core remained offline at final check: current ChatGPT
+`zagent_access_status`/`zagent_capabilities` returned internal tool
+errors. User must launch Windows Multi Platform Launcher via its approved
+local UI before refreshing the same MCP plugin's tools/list. The previous
+374-tool catalog is an established older baseline, **not** proof of
+current 499-tool live discovery. Full status:
+`docs/QGIS_ACTIVE_INSTALL_20261104.md`.
+## 4 November 2026 — live 499-tool MCP catalog acceptance
+
+The existing Zagent Multi Platform ChatGPT connection authenticated with
+six approved scopes and reported exactly **499 tools**: Files 51, Web 151,
+ArcMap 160, QGIS 125, Zagent Management 12. Live `qgis_ping` executed
+through the ChatGPT connector, returned a durable task receipt and
+completed `succeeded` with `pong=true`. Fifth agent QGIS appears as
+Ready/Running on the owner's Dashboard screenshot. The earlier
+NOT VERIFIED state for QGIS live catalog is now **PASS**; unrelated
+ArcMap runtime status remains Degraded. No additional ChatGPT plugin,
+realm or OAuth scope change was required.

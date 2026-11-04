@@ -1,14 +1,5 @@
 {
-  "services": [
-    {
-      "id": "zagent_qgis",
-      "name": "QGIS MCP",
-      "namespace": "qgis",
-      "url": "http://127.0.0.1:8000/mcp",
-      "enabled": true,
-      "permanent": false,
-      "timeout_seconds": 25,
-      "internal_auth": false
-    }
-  ]
+    "services":  [
+
+                 ]
 }

@@ -37,7 +37,7 @@ def require_profile_management(auth, placement, authorizer, tool, *, check_autho
     if check_authority:
         auth.require(PROFILE_ADMIN_SCOPES[tool], tool)
         # Read/write authority is necessary but never sufficient.
-        if PROFILE_ADMIN_SCOPES[tool] not in grant.get('scopes', []) or tool not in grant.get('tools', []):
+        if PROFILE_ADMIN_SCOPES[tool] not in grant.get('scopes', []) or (tool not in grant.get('tools', []) and '*' not in grant.get('tools', [])):
             _deny()
     cap = grant.get('profile_management')
     if (not isinstance(cap, dict) or set(cap) != {'version', 'enabled', 'workspace_id', 'device_id', 'installation_id', 'actions'}

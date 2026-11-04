@@ -415,6 +415,7 @@ public sealed class RouterManagerService
                 "files" => "files.service",
                 "web" => "web.service",
                 "arcmap" => "arcmap.service",
+                "qgis" => "qgis.service",
                 _ => ""
             };
 

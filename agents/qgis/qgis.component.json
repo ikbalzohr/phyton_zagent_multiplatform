@@ -1,0 +1,59 @@
+{
+    "schema_version":  "1.0",
+    "id":  "qgis.service",
+    "product":  "Zagent QGIS",
+    "version":  "1.0.0",
+    "upstream":  {
+                     "name":  "nkarasiak/qgis-mcp",
+                     "version":  "0.15.2",
+                     "commit":  "dae432367fcb2873a151b94c4faaadef2033cf9f",
+                     "license":  "GPL-2.0-or-later",
+                     "embedded_source":  "agents\\qgis\\engine"
+                 },
+    "engine":  {
+                   "relative_path":  "agents\\qgis\\engine",
+                   "entrypoint":  "zagent_qgis.launch",
+                   "runtime":  "Python 3.12.16",
+                   "dependencies":  "mcp[cli]\u003e=1.20.0,\u003c3; pydantic\u003e=2.11,\u003c3",
+                   "source_isolated":  true
+               },
+    "runtime":  {
+                    "relative_path":  "agents\\qgis\\runtime\\python",
+                    "python_executable":  "python.exe",
+                    "staging_runtime":  "qgis-python-3.12.16",
+                    "runtime_is_installer_owned":  true
+                },
+    "transport":  {
+                      "host":  "127.0.0.1",
+                      "port":  19150,
+                      "path":  "/mcp",
+                      "internal_auth":  false,
+                      "client_access":  "authenticated Zagent Router only",
+                      "desktop_bridge_host":  "127.0.0.1",
+                      "desktop_bridge_port":  9876
+                  },
+    "lifecycle":  {
+                      "owner":  "Zagent Core",
+                      "process_id":  "qgis.mcp",
+                      "auto_restart":  true,
+                      "max_restart_attempts":  3,
+                      "qgis_desktop_external":  true,
+                      "start_order":  "before Tunnel Router",
+                      "missing_plugin":  "agent ready but qgis_ping fails"
+                  },
+    "discovery":  {
+                      "namespace":  "qgis",
+                      "service_id":  "zagent_qgis",
+                      "tools":  "dynamic upstream",
+                      "estimated_upstream_tool_count":  125,
+                      "tool_publication":  "existing Router and OAuth owner command authority"
+                  },
+    "plugin":  {
+                   "source":  "agents\\qgis\\engine\\qgis_mcp_plugin",
+                   "install_into_qgis":  "user-controlled",
+                   "minimum_qgis_version":  "3.28",
+                   "tested_installed":  "3.44.2",
+                   "default_local_socket_port":  9876
+               },
+    "status":  "SOURCE_TESTED_NOT_DEPLOYED"
+}

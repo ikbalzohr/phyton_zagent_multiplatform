@@ -524,6 +524,7 @@ public sealed class TunnelManagerReadModel
             "files" => "files.service",
             "web" => "web.service",
             "arcmap" => "arcmap.service",
+                "qgis" => "qgis.service",
             _ => ""
         };
 

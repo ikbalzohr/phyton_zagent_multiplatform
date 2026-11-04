@@ -63,7 +63,7 @@ class AuthContext:
     def require(self, scope: str, tool: str = "") -> None:
         if self.expires_at <= time.time():
             raise AuthorizationError("invalid_token", 401)
-        if scope not in self.scopes or (tool and tool not in self.tools):
+        if scope not in self.scopes or (tool and tool not in self.tools and "*" not in self.tools):
             raise AuthorizationError("insufficient_scope", 403, scope)
 
     def public(self) -> dict[str, Any]:

@@ -119,3 +119,53 @@ Ini adalah **ketentuan desain**, bukan pernyataan bahwa kode sudah mengikuti per
 - Rangkaian test dan deployment harus diverifikasi secara terpisah; jangan mengklaim sudah siap hanya berdasarkan diagram atau source.
 
 **Referensi terkait:** `docs/MCP_FIRST_ARCHITECTURE.md`, `docs/MCP-OAUTH-MULTICLIENT.md`, `README.md`.
+
+## Status aktivasi MCP Full Catalog — 4 November 2026
+
+Mode publikasi `catalog_exposure.mode=all_discovered` telah diterapkan **pada
+instalasi uji Multi Platform secara offline**, tanpa mengubah arsitektur
+Core/Tunnel/Files/Web/ArcMap maupun instalasi Zagent Production. Router
+memverifikasi kebijakan yang diinferensi dari tiga upstream terdaftar dan
+SetupEngine memverifikasi 7.015 file. Scope grant serta profil Files telah
+disesuaikan untuk akses yang lebih luas, tetapi Keycloak client/token
+full-scope dan Router/ChatGPT `tools/list` **belum tervalidasi live** karena
+Multi Platform belum dinyalakan (Launcher ditolak oleh allowlist Production).
+Catatan lengkap: `MCP_FULL_CATALOG_DEPLOY_20261104.md`.
+## 4 November 2026 — QGIS sebagai additional Core-managed agent (source ready)
+
+Atas permintaan pengguna, QGIS MCP upstream 0.15.2 telah diintegrasikan
+ke `agents/qgis` dalam repository Multi Platform. Ini perluasan kelima
+yang dikelola Core, bukan pengganti empat agent utama pada diagram target:
+Core mengelola proses MCP Python3.12 pada port loopback `19150`, sedangkan
+QGIS Desktop + pluginnya tetap eksternal dan menggunakan socket `9876`.
+Router mempublikasikan tools dengan namespace `qgis` melalui koneksi OAuth
+yang sama dengan Files/Web/ArcMap. Sebelum Router startup, QGIS termasuk
+urutan percobaan startup tetapi kegagalannya tidak menghalangi komponen lain.
+
+Source yang diuji: 125 tools terdaftar, MCP initialize/list/ping PASS,
+QgisTests PASS, Core build PASS, Architecture 29/29, Manager 19/19,
+Router 173 (3 SKIP), lokasi runtime relokasi PASS. **Instalasi Multi
+Platform aktif belum dipasang ulang/restart**; tidak ada klaim katalog
+QGIS live ChatGPT. Detil, batas keamanan, lisensi GPL dan aktivasi:
+`docs/QGIS_AGENT_INTEGRATION_20261104.md`.
+## 4 November 2026 — QGIS installed; live activation blocked
+
+QGIS agent source (upstream 0.15.2) dan Core Release sudah disalin ke
+instalasi Multi Platform yang ada **tanpa membuat backup baru**. Manifest
+payload 7.015 → **12.001/12.001 verified PASS**. Installed Python3.12
+MCP initialize, 125 tools, `ping` terhadap QGIS Desktop nyata PASS.
+Namun proses Core saat pemeriksaan akhir masih OFFLINE dan upaya
+`Zagent.Launcher.exe` dari tool Production ditolak oleh executable
+allowlist. Tidak dilakukan bypass/konfigurasi ulang Production.
+Katalog Dashboard dan ChatGPT setelah penambahan QGIS **NOT VERIFIED**.
+Commit/push ditangguhkan sesuai syarat pengguna: semua live test PASS.
+Referensi: `docs/QGIS_ACTIVE_INSTALL_20261104.md`.
+## 4 November 2026 — QGIS live MCP acceptance completed
+
+Core now manages QGIS as `qgis.service`; the owner's Dashboard shows
+Ready/Running, the installed service binds loopback port 19150, and
+the pre-existing authenticated Router exposes 499 total ChatGPT tools
+including 125 QGIS tools. Read-only `qgis_ping` succeeded end-to-end.
+Files/Web/Tunnel remain Ready; ArcMap remains independently Degraded
+due to HTTP probe timeout. No production service or secrets changed.
+Live acceptance supplements the earlier offline-only deployment notes.
