@@ -617,8 +617,17 @@ async def mcp(request: Request):
             if name == task_recovery.TOOL and set(params) - {'name', 'arguments'}:
                 raise ValueError('CLIENT_AUTHORITY_NOT_ALLOWED')
             target = arguments.get('tool_name') if name == 'zagent_task_submit' else name
-            if isinstance(target, str) and target in PROFILE_ADMIN_SCOPES and set(params) - {'name', 'arguments'}:
-                raise ValueError('PROFILE_ADMIN_PUBLIC_META_DENIED')
+            if isinstance(target, str) and target in PROFILE_ADMIN_SCOPES:
+                # MCP clients may attach opaque params._meta (e.g. progressToken).
+                # Client metadata is never forwarded as trusted owner authority.
+                if set(params) - {'name', 'arguments', '_meta'}:
+                    raise ValueError('PROFILE_ADMIN_PUBLIC_META_DENIED')
+                client_meta = params.get('_meta', {})
+                if (not isinstance(client_meta, dict)
+                        or any(not isinstance(k, str) or k.startswith('zagent.')
+                               or k in {'execution_context', 'profile_admin_context',
+                                        'profile_catalog_context'} for k in client_meta)):
+                    raise ValueError('PROFILE_ADMIN_PUBLIC_META_DENIED')
             result = await _dispatch(name, arguments, auth, request.headers.get("authorization", ""),
                                      request.headers.get("idempotency-key", ""))
             return rpc_result(req_id, result)

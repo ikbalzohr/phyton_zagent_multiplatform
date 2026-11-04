@@ -21,6 +21,8 @@ def main():
             'ZAGENT_TUNNEL_CONFIG_DIR': base/'tunnel/config', 'ZAGENT_TUNNEL_RUNTIME_DIR': base/'tunnel/runtime'}
         for key, path in paths.items():
             path.mkdir(parents=True, exist_ok=True); env[key] = str(path)
+        core_root = base/'core'; core_root.mkdir()
+        env['ZAGENT_CORE_DATA_ROOT'] = str(core_root)
         env.update(ZAGENT_DEVICE_ID='fixture-device', ZAGENT_INSTALLATION_ID='fixture-installation',
                    ZAGENT_INTERNAL_TOKEN='fixture-private-channel-'+'x'*40, ZAGENT_DIRECT_PROFILE_FIXTURE_ROOT=str(base))
         env['PYTHONPATH'] = os.pathsep.join([str(repo/'agents/files/engine'), str(repo/'agents/tunnel/engine')])

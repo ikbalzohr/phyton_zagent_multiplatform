@@ -169,3 +169,25 @@ including 125 QGIS tools. Read-only `qgis_ping` succeeded end-to-end.
 Files/Web/Tunnel remain Ready; ArcMap remains independently Degraded
 due to HTTP probe timeout. No production service or secrets changed.
 Live acceptance supplements the earlier offline-only deployment notes.
+## 4 November 2026 — owner-approved Files ancestor profile
+
+The installed Files service now allows owner-approved ancestor profile
+roots; private service targets remain protected at the file-operation
+boundary. Dashboard committed read-only profile agent rooted at
+D:\3-Ikbalzohr\Agent; live ChatGPT list/read PASS and read-only
+write denial PASS. Existing appBridge default preserved.
+See docs/PROFILE_PARENT_ROOT_FIX_20261104.md.
+## 4 November 2026 — Hermes connected and chat profile administration fixed
+
+Owner confirms Hermes Agent is connected to Zagent Multi Platform,
+alongside the separately verified ChatGPT OAuth MCP client.
+This is a shared service with independent client authorization,
+not an integration through Zagent Production. See
+docs/HERMES_CONNECTION_20261104.md.
+
+ChatGPT direct profile administration previously failed because
+the public Router rejected client-supplied MCP params._meta.
+The installed Router was updated to ignore safe opaque transport
+metadata while rejecting forged authority; direct ChatGPT
+profile list/create/get/update/delete calls now PASS. See
+docs/PROFILE_ADMIN_CHATGPT_FIX_20261104.md.

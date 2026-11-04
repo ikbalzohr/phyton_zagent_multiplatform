@@ -35,3 +35,13 @@ For an eligible read-only `files_search`, `zagent_task_recover` provides a two-p
 ## Development boundary
 
 Use disposable fixtures and source-local builds. Never restart, reconfigure, overwrite or migrate other installed Zagent products. No automatic commit, deployment, or installer promotion. Build/test success is not full remote-MCP interoperability acceptance; verify each client OAuth/PKCE, initialize, tools/list, authorized tools/call, task receipt and readback on a separately provisioned installation.
+
+## Client connection update — 4 November 2026
+
+Hermes Agent is now CONNECTED to the existing Zagent Multi Platform
+MCP endpoint, as confirmed by the owner. This is the current client
+status, superseding historical-only Hermes notes above. ChatGPT is
+independently verified with the live 506-tool catalog and profile
+administration end-to-end; Hermes-specific tool receipts have not
+been separately examined in this work. Details:
+docs/HERMES_CONNECTION_20261104.md.

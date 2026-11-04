@@ -27,6 +27,7 @@ with tempfile.TemporaryDirectory(prefix='zagent-profile-admin-') as temporary:
         os.environ['ZAGENT_FILES_' + variable] = str(target)
     os.environ['ZAGENT_FILES_ENGINE_ROOT'] = str(Path(__file__).resolve().parents[1])
     sys.path.insert(0, os.environ['ZAGENT_FILES_ENGINE_ROOT'])
+    (private/'config'/'settings.json').write_text(json.dumps({'secret_names':['.env','secrets.json']}),encoding='utf-8')
     from app.profiles import manager
     from app.profiles import administration as a
     from app.core.execution_context import request_meta, TrustedMetadata, VerifiedContext, validate_profile, owner_key
@@ -137,10 +138,29 @@ with tempfile.TemporaryDirectory(prefix='zagent-profile-admin-') as temporary:
         args = {**args,'expected_revision':result['revision'],'idempotency_key':'recreate-1'}
         result = await call('create',args)
         assert a.current_catalog()['generations']['_new'] != generation
-        # Reject private directory itself AND a parent wrapping credentials.
-        for number, forbidden in enumerate((private,base,private/'config')):
-            await denied('create',{'target_profile_id':'forbidden'+str(number),'root':str(forbidden),'expected_revision':result['revision'],'idempotency_key':'private-'+str(number)},'PRIVATE_ROOT_OVERLAP')
-        # A writer waits for the real read lease; cancellation/control remains reachable.
+        # Parent folder is an owner-approved profile root, even when it
+        # contains service-private folders. The private folders themselves
+        # cannot be roots and remain inaccessible through that parent.
+        parent_args = {'target_profile_id':'parent_root','root':str(base),
+                       'mode':'read-only','expected_revision':result['revision'],
+                       'idempotency_key':'approved-parent'}
+        result = await call('create',parent_args)
+        assert result['status'] == 'committed'
+        assert result['profile']['mode'] == 'read-only'
+        from app.core import fsops
+        parent_profile = manager.get_profile('parent_root')
+        assert fsops.resolve('original/marker.txt',parent_profile).is_file()
+        for relative in ('private/config','private/runtime','private'):
+            try:
+                fsops.resolve(relative,parent_profile)
+            except PermissionError as error:
+                assert 'FILES_PRIVATE_DATA_DENIED' in str(error)
+            else:
+                raise AssertionError('Owner parent profile exposed private service data')
+        for number, forbidden in enumerate((private,private/'config')):
+            await denied('create',{'target_profile_id':'forbidden'+str(number),
+                'root':str(forbidden),'expected_revision':result['revision'],
+                'idempotency_key':'private-'+str(number)},'PRIVATE_ROOT_DIRECT_ACCESS_DENIED')        # A writer waits for the real read lease; cancellation/control remains reachable.
         async with a.read_lease():
             pending = asyncio.create_task(call('update',{'target_profile_id':'_new','changes':{'description':'lease test'},'expected_revision':result['revision'],'idempotency_key':'lease-1'}))
             await asyncio.sleep(0.05)
@@ -196,7 +216,7 @@ with tempfile.TemporaryDirectory(prefix='zagent-profile-admin-') as temporary:
             a.os.replace = replace
         assert manager.PROFILES_FILE.read_bytes() == previous
         assert (original/'marker.txt').read_text(encoding='utf-8') == 'unchanged'
-        print('PASS Windows behavior: direct CRUD/default/CAS/idempotency/generation/no-ABA/private-roots/leases/atomic-fault/legacy-writer/token-serialization')
+        print('PASS Windows behavior: direct CRUD/default/CAS/idempotency/generation/no-ABA/owner-parent-root-protected-private/leases/atomic-fault/legacy-writer/token-serialization')
     try:
         asyncio.run(run())
     finally:

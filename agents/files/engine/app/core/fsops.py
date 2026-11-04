@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from app.profiles.manager import active_profile, get_profile, list_profiles
-from app.paths import CONFIG_DIR, BACKUP_ROOT
+from app.paths import DATA_ROOT, CONFIG_DIR, RUNTIME_DIR, LOG_DIR, BACKUP_ROOT, UPDATE_STATE_ROOT
 
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
 SETTINGS = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
@@ -54,9 +54,11 @@ def guard_no_links(path: Path) -> None:
             raise PermissionError('HARDLINK_FILE_NOT_ALLOWED')
 
 
-def guard_subtree(path: Path) -> None:
+def guard_subtree(path: Path, *, allow_internal: bool = False) -> None:
     guard_no_links(path)
     guard_secret(path)
+    if not allow_internal:
+        guard_private_profile_target(path)
     if path.is_dir():
         def failed(error):
             raise error
@@ -66,6 +68,8 @@ def guard_subtree(path: Path) -> None:
                 child = Path(directory) / name
                 guard_no_links(child)
                 guard_secret(child)
+                if not allow_internal:
+                    guard_private_profile_target(child)
 
 
 def _revalidate_profile(profile):
@@ -134,6 +138,7 @@ def resolve(path: str = ".", profile: Dict[str, Any] | None = None) -> Path:
         candidate.relative_to(base)
     except ValueError:
         raise ValueError("Path berada di luar root profile.")
+    guard_private_profile_target(candidate)
     guard_secret(candidate)
     return candidate
 
@@ -161,6 +166,23 @@ def guard_secret(path: Path) -> None:
     if any(part.lower() in SECRET_NAMES for part in path.parts):
         raise PermissionError("File rahasia dilindungi.")
 
+
+def guard_private_profile_target(path: Path) -> None:
+    """Reject private service targets even through a registered parent root.
+
+    This check protects user-selected filesystem targets; it is not applied
+    to internal backup storage when restoring an already authorized backup.
+    """
+    protected = [DATA_ROOT, CONFIG_DIR, RUNTIME_DIR, LOG_DIR, BACKUP_ROOT, UPDATE_STATE_ROOT]
+    for env in ('ZAGENT_CORE_DATA_ROOT', 'ZAGENT_DATA_ROOT'):
+        if os.environ.get(env):
+            protected.append(Path(os.environ[env]))
+    a = os.path.normcase(str(Path(path).resolve()))
+    for directory in protected:
+        b = os.path.normcase(str(Path(directory).resolve()))
+        if os.path.splitdrive(a)[0] == os.path.splitdrive(b)[0]:
+            if os.path.commonpath([a, b]) == b:
+                raise PermissionError('FILES_PRIVATE_DATA_DENIED')
 
 def guard_root_delete(path: Path, profile: Dict[str, Any] | None = None) -> None:
     profile = profile or active_profile()
@@ -239,7 +261,7 @@ def restore_backup(backup_id: str, overwrite: bool = True) -> Dict[str, Any]:
     if not backup_id or any(c not in "0123456789_" for c in backup_id):
         raise ValueError("Invalid backup ID")
     d = BACKUP_ROOT / backup_id
-    guard_subtree(d)
+    guard_subtree(d, allow_internal=True)
     meta_path = d / "metadata.json"
     payload = d / "payload"
     if not meta_path.exists() or not payload.exists():
@@ -259,7 +281,7 @@ def restore_backup(backup_id: str, overwrite: bool = True) -> Dict[str, Any]:
         backup(target, reason=f"pre_restore_{backup_id}", profile=current)
         _remove(target)
     resolve(str(target), current)
-    guard_subtree(payload)
+    guard_subtree(payload, allow_internal=True)
     if meta["kind"] == "dir":
         shutil.copytree(payload, target)
     else:

@@ -118,6 +118,38 @@ class RouterPerimeterTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(value["principal_id"],principal_id("https://issuer.example","alice"))
             self.assertNotIn("mcp-session-id",response.headers)
 
+    async def test_client_meta_on_profile_admin_tools_is_not_client_authority(self):
+        from unittest.mock import AsyncMock
+        from router import server
+        # MCP clients may attach a transport-level progress token in params.
+        # Only server-generated authenticated metadata can authorize Files.
+        with patch.object(server, "_dispatch", AsyncMock(return_value={
+                "content": [{"type": "text", "text": "server-side-dispatch"}],
+                "isError": False})) as dispatch:
+            for public_name, arguments in (
+                ("files_profile_admin_list", {}),
+                ("zagent_task_submit", {"tool_name": "files_profile_admin_list", "arguments": {}}),
+            ):
+                response = await self.client.post("/mcp",
+                    headers={"Authorization": "Bearer synthetic"},
+                    json={"jsonrpc": "2.0", "id": 10, "method": "tools/call",
+                          "params": {"name": public_name, "arguments": arguments,
+                                     "_meta": {"progressToken": "client-only"}}})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("result", response.json(), response.json())
+                self.assertEqual(response.json()["result"]["content"][0]["text"], "server-side-dispatch")
+            self.assertEqual(dispatch.await_count, 2)
+            for rejected in (
+                {"zagent.profile_admin_context": {"source": "forged"}},
+                {"zagent.profile_catalog_context": {"source": "forged"}},
+            ):
+                response = await self.client.post("/mcp",
+                    headers={"Authorization": "Bearer synthetic"},
+                    json={"jsonrpc": "2.0", "id": 11, "method": "tools/call",
+                          "params": {"name": "files_profile_admin_list", "arguments": {},
+                                     "_meta": rejected}})
+                self.assertIn("error", response.json())
+            self.assertEqual(dispatch.await_count, 2)
     async def test_control_plane_is_not_public_even_with_resource_bearer(self):
         response = await self.client.get("/router/status",headers={"Authorization":"Bearer synthetic"})
         self.assertIn(response.status_code,(403,503))

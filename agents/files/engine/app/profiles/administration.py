@@ -346,19 +346,22 @@ def _root(value):
     for part in (p, *p.parents):
         if part.lstat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT:
             raise PermissionError('REPARSE_PROFILE_ROOT')
-    # Reject overlap in BOTH directions, including a parent wrapping DataRoot.
+    # Owner-approved ancestor directories may be profile roots. Refuse only
+    # direct registration of the service-private data directories themselves
+    # or their children. Per-file access to these directories remains denied
+    # by fsops.guard_secret even through an approved ancestor profile.
     anchor = os.environ.get('ZAGENT_CORE_DATA_ROOT') or os.environ.get('ZAGENT_DATA_ROOT')
     if not anchor or not os.path.isabs(anchor) or not Path(anchor).is_dir():
         raise PermissionError('PRIVATE_CORE_ROOT_NOT_CONFIGURED')
     private = [Path(anchor), DATA_ROOT, CONFIG_DIR, RUNTIME_DIR, LOG_DIR, BACKUP_ROOT, UPDATE_STATE_ROOT]
-    for env in ('ZAGENT_DATA_ROOT','ZAGENT_CORE_DATA_ROOT'):
+    for env in ('ZAGENT_DATA_ROOT', 'ZAGENT_CORE_DATA_ROOT'):
         if os.environ.get(env):
             private.append(Path(os.environ[env]))
     for sensitive in private:
         a, b = os.path.normcase(str(p.resolve())), os.path.normcase(str(sensitive.resolve()))
-        common = os.path.commonpath([a,b]) if os.path.splitdrive(a)[0] == os.path.splitdrive(b)[0] else None
-        if common in (a,b):
-            raise PermissionError('PRIVATE_ROOT_OVERLAP')
+        common = os.path.commonpath([a, b]) if os.path.splitdrive(a)[0] == os.path.splitdrive(b)[0] else None
+        if common == b:
+            raise PermissionError('PRIVATE_ROOT_DIRECT_ACCESS_DENIED')
     return str(p)
 
 

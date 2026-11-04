@@ -514,3 +514,45 @@ Ready/Running on the owner's Dashboard screenshot. The earlier
 NOT VERIFIED state for QGIS live catalog is now **PASS**; unrelated
 ArcMap runtime status remains Degraded. No additional ChatGPT plugin,
 realm or OAuth scope change was required.
+## 4 November 2026 — profile administration provisioned
+
+The existing Multi Platform owner grant now has explicit profile_management
+authority with six policies and six named tools. Live ChatGPT discovery:
+506 tools. Dashboard owner profile CRUD and ChatGPT Files selection of a
+newly created disposable profile succeeded; appBridge remains the only
+profile and the default after cleanup. Three .NET profile/owner test
+suites PASS; Windows isolated Router-to-Files fixture 14/14 PASS.
+The current chat tool schema was cached before provisioning, so direct
+new tool invocation needs refreshed app metadata. Generic nested
+zagent_task_submit for profile admin was not verified. Full report:
+docs/PROFILE_ADMIN_PROVISIONING_20261104.md.
+## 4 November 2026 — live owner-approved ancestor Files profile
+
+Profile agent was created via Dashboard with read-only access to
+D:\3-Ikbalzohr\Agent. ChatGPT File list/read confirmed, direct
+private-store targets rejected, write denial confirmed; OAuth
+unchanged. Full installation verification 12001/12001 PASS.
+See docs/PROFILE_PARENT_ROOT_FIX_20261104.md.
+## 4 November 2026 — Hermes connected and ChatGPT profile admin PASS
+
+Hermes Agent is currently CONNECTED to Zagent Multi Platform
+per explicit owner confirmation. This updates earlier documentation
+of historical Hermes connectivity. Hermes-specific tools/call
+acceptance was not independently exercised in this task.
+Reference: docs/HERMES_CONNECTION_20261104.md.
+
+ChatGPT previously discovered 506 tools, but direct public
+files_profile_admin_list was rejected with JSON-RPC -32602.
+Confirmed Router bug: blanket denial of optional transport
+params._meta on profile-admin calls. One minimal Router fix
+now permits opaque client metadata without using it for owner
+authority. ASGI test pre-fix FAIL / post-fix PASS; Router full
+regression 174 tests (3 skipped); owner Router/Files tests 14/14.
+Installed Router restarted independently; Setup verify 12001/12001.
+Direct ChatGPT profile list/create/get/update/delete now succeeded,
+including a disposable create and cleanup. Original appBridge
+default unchanged. Reference:
+docs/PROFILE_ADMIN_CHATGPT_FIX_20261104.md.
+Additional verification on 4 Nov 2026: the generic zagent_task_submit
+wrapper targeting files_profile_admin_list also succeeded as a durable
+owned task; all three retained profiles were returned.

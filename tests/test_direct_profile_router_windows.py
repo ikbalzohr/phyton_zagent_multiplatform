@@ -13,6 +13,7 @@ import pytest
 if os.name != 'nt' or not os.environ.get('ZAGENT_DIRECT_PROFILE_FIXTURE_ROOT'):
     pytest.skip('Windows disposable runner required before product imports', allow_module_level=True)
 
+from mcp.types import CallToolResult
 from app.core.execution_context import request_meta, verify, validate_profile
 from app.mcp import server as files
 from app.profiles import administration as domain, manager
@@ -62,6 +63,10 @@ def setup(tmp_path, monkeypatch):
         # manually seeded engine session. Simulate only the HTTP request context.
         monkeypatch.setattr(files.mcp, 'get_context', lambda: ctx)
         result = await files.mcp.call_tool(tool, args)
+        if isinstance(result, CallToolResult):
+            if result.isError:
+                raise PermissionError('Files frontdoor denied fixture operation')
+            return {'result': result.model_dump(exclude_none=True)}
         if isinstance(result, tuple):
             content, structured = result
             return {'result':{'content':[item.model_dump() for item in content], 'structuredContent':structured}}
