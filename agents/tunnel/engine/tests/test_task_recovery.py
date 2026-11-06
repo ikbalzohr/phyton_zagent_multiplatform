@@ -94,6 +94,30 @@ class RecoveryTests(unittest.IsolatedAsyncioTestCase):
                 'name': 'zagent_reconciliation_status', 'arguments': {}})
             self.assertEqual(denied.status_code, 403)
 
+    async def test_orphaned_arcmap_ping_diagnostic_is_nonblocking(self):
+        historical = dict(self.context)
+        historical.update({
+            'public_tool': 'arcmap_ping',
+            'required_scope': 'arcmap:inspect',
+            'effective_access': 'write',
+            'effective_resources': [
+                {'resource_id': 'installation:install', 'kind': 'arcmap'}
+            ],
+        })
+        await self.orch.journal.update(
+            self.task_id, service_id='zagent_arcmap',
+            tool_name='arcmap_ping', arguments_json='{}',
+            execution_context_json=json.dumps(historical))
+        response = await self.rpc('tools/call', {
+            'name': 'zagent_reconciliation_status', 'arguments': {}})
+        value = self.value(response)
+        self.assertEqual(value['tasks'], [{
+            'task_id': self.task_id, 'tool': 'arcmap_ping',
+            'recovery': 'nonblocking_observation_no_action_required',
+        }])
+        self.assertEqual((await self.orch.journal.get(self.task_id))['state'],
+                         'orphaned')
+
     async def test_write_orphan_is_diagnostic_only_never_automatically_recovered(self):
         row = await self.orch.journal.get(self.task_id)
         write_id = 'tsk_'+'e'*32

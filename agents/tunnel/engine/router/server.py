@@ -33,6 +33,7 @@ from .profile_admin import (PROFILE_ADMIN_SCOPES, require_profile_management, ca
                             validate_catalog, new_admin_context, revalidate_admin)
 from .identity import Placement, internal_token, verify_internal_token
 from .orchestration import Orchestrator, PreDispatchRejected
+from .orphan_conflicts import blocks_service
 from .registry import MCPRegistry
 from .workflow_domain import WorkflowDomainJournal
 from .workflow_runtime import WorkflowRuntimeService
@@ -191,8 +192,13 @@ async def _request_context(auth, policy, name, arguments):
 async def _executor(service: str, tool: str, arguments: dict[str, Any], ctx):
     try:
         async with orchestrator.journal._lock:
-            isolated = orchestrator.journal.conn.execute("SELECT 1 FROM tasks WHERE resource_key=? AND state='orphaned' AND started_at IS NOT NULL AND task_id<>? LIMIT 1", (ctx.resource_key, ctx.task_id)).fetchone()
-        if isolated and tool not in _FILES_IMMEDIATE_CONTROLS:
+            historical = orchestrator.journal.conn.execute(
+                "SELECT resource_key, service_id, tool_name, arguments_json, execution_context_json, "
+                "target_device_id, executed_on FROM tasks WHERE resource_key=? "
+                "AND state='orphaned' AND started_at IS NOT NULL AND task_id<>?",
+                (ctx.resource_key, ctx.task_id)).fetchall()
+        if tool not in _FILES_IMMEDIATE_CONTROLS and any(
+                blocks_service(dict(row), service) for row in historical):
             raise AuthorizationError("RESOURCE_RECONCILIATION_REQUIRED", 409)
         auth = await _revalidate(ctx.execution_context)
         if ctx.session_id != auth.owner:

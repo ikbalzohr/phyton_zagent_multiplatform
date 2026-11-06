@@ -10,20 +10,26 @@ import unittest
 from unittest.mock import AsyncMock
 from router import orchestration as m
 from router.access import AuthorizationError, owner_key
+from router.orphan_conflicts import blocks_service
 
 SERVER = Path(__file__).resolve().parents[1] / 'router/server.py'
 
 
 class PreDispatchTests(unittest.IsolatedAsyncioTestCase):
-    def executor(self, *, isolated=False, preflight_error=None, invoke_error=None):
+    def executor(self, *, isolated=False, preflight_error=None, invoke_error=None, orphan_rows=None):
         lock = asyncio.Lock()
-        conn = SimpleNamespace(execute=lambda *_args: SimpleNamespace(fetchone=lambda: (1,) if isolated else None))
+        orphan = {'service_id': 'zagent_files', 'tool_name': 'files_write',
+                  'execution_context_json': '{}', 'arguments_json': '{}',
+                  'target_device_id': 'device', 'executed_on': 'device'}
+        rows = orphan_rows if orphan_rows is not None else ([orphan] if isolated else [])
+        conn = SimpleNamespace(execute=lambda *_args: SimpleNamespace(fetchall=lambda: rows))
         auth = SimpleNamespace(owner='owner')
         revalidate = AsyncMock(return_value=auth, side_effect=preflight_error)
         invoke = AsyncMock(return_value={'ok': True}, side_effect=invoke_error)
         registry = SimpleNamespace(get_mapping=lambda _: ('zagent_files', 'files_write'), invoke=invoke)
         space = dict(asyncio=asyncio, Any=object, orchestrator=SimpleNamespace(journal=SimpleNamespace(_lock=lock, conn=conn)),
                      _FILES_IMMEDIATE_CONTROLS=frozenset(), AuthorizationError=AuthorizationError,
+                     blocks_service=blocks_service,
                      PreDispatchRejected=getattr(m,'PreDispatchRejected',RuntimeError), _revalidate=revalidate,
                      placement=SimpleNamespace(validate=lambda *_:None), _policy=lambda _:{'enabled':True}, registry=registry)
         node = next(n for n in ast.parse(SERVER.read_text(encoding='utf-8')).body if isinstance(n,ast.AsyncFunctionDef) and n.name=='_executor')
@@ -39,6 +45,44 @@ class PreDispatchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_existing_isolation_rejection_does_not_dispatch(self):
         execute,ctx,invoke=self.executor(isolated=True)
+        with self.assertRaises(getattr(m,'PreDispatchRejected',RuntimeError)):
+            await execute('zagent_files','files_write',{},ctx)
+        invoke.assert_not_awaited()
+
+    async def test_orphaned_arcmap_ping_does_not_block_files_dispatch(self):
+        import json
+        ping = {
+            'service_id': 'zagent_arcmap', 'tool_name': 'arcmap_ping',
+            'resource_key': 'installation:fixture',
+            'arguments_json': '{}', 'target_device_id': 'device',
+            'executed_on': 'device',
+            'execution_context_json': json.dumps({
+                'context_version': 1, 'public_tool': 'arcmap_ping',
+                'required_scope': 'arcmap:inspect', 'device_id': 'device',
+                'installation_id': 'fixture',
+                'effective_resources': [{'kind': 'arcmap',
+                                         'resource_id': 'installation:fixture'}],
+            }),
+        }
+        execute,ctx,invoke=self.executor(orphan_rows=[ping])
+        self.assertEqual(await execute('zagent_files','files_write',{},ctx),
+                         {'ok': True})
+        invoke.assert_awaited_once()
+
+    async def test_orphaned_arcmap_mutation_is_scoped_not_global(self):
+        orphan={'service_id':'zagent_arcmap','tool_name':'arcmap_set_title',
+                'arguments_json':'{}','execution_context_json':'{}',
+                'target_device_id':'device','executed_on':'device'}
+        execute,ctx,invoke=self.executor(orphan_rows=[orphan])
+        self.assertEqual(await execute('zagent_files','files_write',{},ctx),
+                         {'ok': True})
+        invoke.assert_awaited_once()
+
+    async def test_orphaned_files_mutation_still_blocks_files(self):
+        orphan={'service_id':'zagent_files','tool_name':'files_write',
+                'arguments_json':'{}','execution_context_json':'{}',
+                'target_device_id':'device','executed_on':'device'}
+        execute,ctx,invoke=self.executor(orphan_rows=[orphan])
         with self.assertRaises(getattr(m,'PreDispatchRejected',RuntimeError)):
             await execute('zagent_files','files_write',{},ctx)
         invoke.assert_not_awaited()

@@ -8,6 +8,7 @@ import time
 from .access import AuthorizationError, digest
 from .execution_context import policy_resources
 from .files_policy import validate_files_tool_scope
+from .orphan_conflicts import nonblocking_probe
 
 TOOL = 'zagent_task_recover'
 ORIGINAL = 'files_search'
@@ -45,7 +46,8 @@ async def reconciliation_status(orch, auth, limit=50):
     limit = max(1, min(int(limit), 100))
     async with orch.journal._lock:
         rows = orch.journal.conn.execute(
-            """SELECT task_id, service_id, tool_name, execution_context_json
+            """SELECT task_id, resource_key, service_id, tool_name, execution_context_json,
+                        arguments_json, target_device_id, executed_on
                  FROM tasks
                  WHERE session_id=? AND state='orphaned'
                    AND started_at IS NOT NULL
@@ -67,8 +69,9 @@ async def reconciliation_status(orch, auth, limit=50):
         blockers.append({
             'task_id': row['task_id'],
             'tool': row['tool_name'],
-            'recovery': 'review_read_only_recovery_plan' if is_search
-                        else 'manual_owner_reconciliation_required'
+            'recovery': 'nonblocking_observation_no_action_required' if nonblocking_probe(dict(row))
+                        else ('review_read_only_recovery_plan' if is_search
+                              else 'manual_owner_reconciliation_required')
         })
     return {
         'ok': True,
