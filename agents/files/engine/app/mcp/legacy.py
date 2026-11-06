@@ -7,7 +7,7 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-from app.core import fsops
+from app.core import fsops, project_instructions
 from app.profiles.manager import (
     active_profile,
     default_profile,
@@ -200,6 +200,16 @@ def files_search(
     max_results: int = 200,
 ) -> str:
     return _json(fsops.search(query, path, glob, case_sensitive, max_results))
+
+
+def files_project_instructions(path: str, allow_unmarked: bool = False) -> str:
+    """Read current project-local ZAGENT.md; never writes on a read grant."""
+    return _json(project_instructions.instructions(path, allow_unmarked))
+
+
+def files_project_open(path: str, allow_unmarked: bool = False) -> str:
+    """Open a project and exclusively create ZAGENT.md if missing and write-authorized."""
+    return _json(project_instructions.open_project(path, allow_unmarked))
 
 
 def files_hash(path: str, algorithm: str = "sha256") -> str:

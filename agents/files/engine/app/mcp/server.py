@@ -212,7 +212,11 @@ def register(op, fn):
     wrapped.__annotations__ = {p.name:p.annotation for p in params}
     wrapped.__annotations__['return'] = dict
     cap = engine.capability(op)
-    mcp.add_tool(wrapped, description='Workspace-scoped '+op+'. Authenticated resource scope and approved roots are required.',
+    descriptions = {
+        'project_instructions': 'Read the current ZAGENT.md from an explicitly selected project root. Safe for read-only profiles; never creates files. Re-read on the next action after edits.',
+        'project_open': 'Open an explicitly selected project root and create ZAGENT.md only if missing and write-authorized. Existing instructions are preserved; use allow_unmarked only for a confirmed new project.',
+    }
+    mcp.add_tool(wrapped, description=descriptions.get(op, 'Workspace-scoped '+op+'. Authenticated resource scope and approved roots are required.'),
                  annotations=ToolAnnotations(readOnlyHint=op in READ, destructiveHint=op not in READ,
                                              idempotentHint=op in READ, openWorldHint=False),
                  meta={'zagent.capability':cap})

@@ -77,7 +77,9 @@ def _validate_state(state):
         raise ValueError('INVALID_PROFILE_ROWS')
     names = []
     for row in state['profiles']:
-        if (not isinstance(row, dict) or set(row) - {'name','root','mode','enabled','description','authorized_by_user','authorized_at','authorization_source','authorized_by','device_id','installation_id'}
+        if (not isinstance(row, dict) or set(row) - {'name','root','mode','enabled','description','authorized_by_user','authorized_at','authorization_source','authorized_by','device_id','installation_id','execution_access'}
+                or ('execution_access' in row and row['execution_access'] not in ('disabled','developer','full'))
+                or (row.get('mode') == 'read-only' and row.get('execution_access','disabled') != 'disabled')
                 or not isinstance(row.get('root'),str) or not 1 <= len(row['root']) <= 32768
                 or row.get('mode') not in ('read-only','read-write')
                 or any(k in row and type(row[k]) is not bool for k in ('enabled','authorized_by_user'))
@@ -136,7 +138,7 @@ def _catalog(state):
 
 def _public(row):
     return {k: copy.deepcopy(v) for k,v in row.items() if k in
-            {'name','root','mode','enabled','description','authorized_by_user','authorization_source'}}
+            {'name','root','mode','enabled','description','execution_access','authorized_by_user','authorization_source'}}
 
 
 def _resource(value, placement=True):
@@ -303,7 +305,7 @@ def _arguments(action, args):
         required |= {'expected_revision','idempotency_key'}
     if action == 'create':
         required |= {'root'}
-        optional = {'mode','enabled','description'}
+        optional = {'mode','enabled','description','execution_access'}
     elif action == 'update':
         required |= {'changes'}
     elif action == 'delete':
@@ -320,9 +322,11 @@ def _arguments(action, args):
         raise ValueError('INVALID_IDEMPOTENCY_KEY')
     if 'replacement_default_id' in args:
         _id(args['replacement_default_id'])
-    changes = args.get('changes') if action == 'update' else ({k:args[k] for k in ('root','mode','enabled','description') if k in args} if action == 'create' else {})
-    if not isinstance(changes,dict) or (action == 'update' and not changes) or set(changes) - {'root','mode','enabled','description'}:
+    changes = args.get('changes') if action == 'update' else ({k:args[k] for k in ('root','mode','enabled','description','execution_access') if k in args} if action == 'create' else {})
+    if not isinstance(changes,dict) or (action == 'update' and not changes) or set(changes) - {'root','mode','enabled','description','execution_access'}:
         raise ValueError('INVALID_PROFILE_CHANGES')
+    if 'execution_access' in changes and changes['execution_access'] not in ('disabled','developer','full'):
+        raise ValueError('INVALID_PROFILE_EXECUTION_ACCESS')
     if 'mode' in changes and changes['mode'] not in ('read-only','read-write'):
         raise ValueError('INVALID_PROFILE_MODE')
     if 'enabled' in changes and type(changes['enabled']) is not bool:
@@ -468,7 +472,8 @@ class ProfileAdministrationService:
             if action == 'create':
                 if row is not None:
                     raise ValueError('PROFILE_ALREADY_EXISTS')
-                row = {'name':target,'root':_root(arguments['root']),'mode':arguments.get('mode','read-only'),'enabled':arguments.get('enabled',True),'description':arguments.get('description','')}
+                row = {'name':target,'root':_root(arguments['root']),'mode':arguments.get('mode','read-only'),'enabled':arguments.get('enabled',True),'description':arguments.get('description',''),
+                       'execution_access':arguments.get('execution_access','disabled')}
                 rows.append(row)
                 owner['allowed_profile_ids'].append(target)
             else:
@@ -480,9 +485,11 @@ class ProfileAdministrationService:
                 changes = arguments.get('changes',{})
                 if 'root' in changes:
                     changes = {**changes,'root':_root(changes['root'])}
-                if action == 'create' or any(k in changes and changes[k] != row.get(k) for k in ('root','mode','enabled')):
+                if action == 'create' or any(k in changes and changes[k] != row.get(k) for k in ('root','mode','enabled','execution_access')):
                     managed['generations'][target] = uuid.uuid4().hex
                 row.update(changes)
+                if row.get('mode') != 'read-write' and row.get('execution_access','disabled') != 'disabled':
+                    raise ValueError('READ_ONLY_EXECUTION_DISABLED_REQUIRED')
                 if any(r is not row and os.path.normcase(r.get('root','')) == os.path.normcase(row['root']) for r in rows):
                     raise ValueError('PROFILE_ROOT_ALREADY_EXISTS')
                 row.update(authorized_by_user=True, authorization_source=context['source'] + '_owner_admin', authorized_at=manager._now(), authorized_by=context['actor_id'])

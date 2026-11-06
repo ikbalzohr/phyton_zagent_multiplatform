@@ -58,9 +58,10 @@ def request_meta(ctx):
 
 # Deliberately closed native catalog. Commands have a separate owner-managed gate.
 NATIVE_READ = frozenset({'ping', 'runtime_info', 'get_root', 'exists', 'list', 'tree',
-    'stat', 'read', 'read_bytes_b64', 'search', 'hash', 'diff', 'syntax_check', 'backup_list'})
+    'stat', 'read', 'read_bytes_b64', 'search', 'hash', 'diff', 'syntax_check', 'backup_list',
+    'project_instructions'})
 NATIVE_WRITE = frozenset({'write', 'append', 'patch', 'mkdir', 'copy', 'move', 'delete',
-    'backup', 'restore', 'zip', 'unzip'})
+    'backup', 'restore', 'zip', 'unzip', 'project_open'})
 READ_CONTROLS = frozenset({'workspace_status', 'workspace_list', 'operation_status',
     'operation_list', 'capabilities'})
 WRITE_CONTROLS = frozenset({'workspace_open', 'workspace_switch', 'operation_cancel'})

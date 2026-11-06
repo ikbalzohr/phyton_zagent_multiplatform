@@ -31,6 +31,8 @@ FILES_TOOL_SCOPES = {
     'files_diff': 'files:read',
     'files_backup_list': 'files:read',
     'files_syntax_check': 'files:read',
+    'files_project_instructions': 'files:read',
+    'files_project_open': 'files:write',
     'files_workspace_status': 'files:read',
     'files_workspace_list': 'files:read',
     'files_operation_status': 'files:read',

@@ -26,7 +26,8 @@ def main():
                 path.mkdir(parents=True, exist_ok=True)
                 os.environ[key] = str(path)
             import pytest
-            return pytest.main(['-q', str(engine / 'tests/test_managed_commands_windows.py')])
+            return pytest.main(['-q', str(engine / 'tests/test_managed_commands_windows.py'),
+                                str(engine / 'tests/test_profile_execution_access_windows.py')])
         finally:
             for key, value in previous.items():
                 if value is None:

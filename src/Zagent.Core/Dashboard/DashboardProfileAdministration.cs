@@ -81,7 +81,8 @@ public static class DashboardProfileAdministration
                 enabled = profile.Enabled,
                 active = profile.Active,
                 authorized_by_user = profile.AuthorizedByUser,
-                authorization_source = profile.AuthorizationSource
+                authorization_source = profile.AuthorizationSource,
+                execution_access = profile.ExecutionAccess
             }).ToArray(),
             administrativeAccess = false,
             unavailableDependencies = snapshot.UnavailableDependencies
@@ -125,7 +126,7 @@ public static class DashboardProfileAdministration
         if (string.IsNullOrWhiteSpace(key) || key.Length > 128) return Results.BadRequest(new { code = "IDEMPOTENCY_KEY_REQUIRED" });
         // Browser body contains domain selectors/values only. Unknown fields, including authority, fail closed.
         var allowed = action switch {
-            "create" => new[] { "target_profile_id", "root", "mode", "enabled", "description" },
+            "create" => new[] { "target_profile_id", "root", "mode", "enabled", "description", "execution_access" },
             "update" => new[] { "changes" }, "delete" => new[] { "replacement_default_id" }, _ => Array.Empty<string>()
         };
         if (request.Any(p => !allowed.Contains(p.Key, StringComparer.Ordinal) || p.Value is null)) return Results.BadRequest(new { code = "INVALID_PROFILE_FIELDS" });

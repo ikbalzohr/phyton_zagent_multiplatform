@@ -3,6 +3,7 @@
 # Never commit runtime state, device credentials, generated packages, or backups.
 
 # Generated release/installers and external runtimes
+/artifacts/
 /packaging/bundle/
 /packaging/publish/
 /packaging/staging/

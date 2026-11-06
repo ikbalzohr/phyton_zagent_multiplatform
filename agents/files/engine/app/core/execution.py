@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from app.core import fsops
+from app.core import fsops, project_instructions
 from app.core.execution_context import (VerifiedContext, owner_key, CURRENT,
                                        authorize_operation, validate_profile)
 from app.profiles import manager
@@ -23,6 +23,7 @@ from app.paths import CONFIG_DIR, RUNTIME_DIR
 from app.core.diagnostic_events import request_id, traced
 READ = {'ping','runtime_info','get_root','exists','list','tree','stat','read',
         'read_bytes_b64','search','hash','diff','syntax_check','backup_list',
+        'project_instructions',
         'cross_profile_capabilities','profile_list','profile_get','profile_default_get','profile_reload',
         'profile_pending_list','profile_request_status'}
 CONTROL = {'ping','runtime_info','get_root','profile_list','profile_get','profile_default_get','profile_reload',
@@ -495,15 +496,28 @@ class Engine:
                             if flag.is_set():
                                 raise InterruptedError('Cancelled before execution')
                             self.preflight(op, args, profile)
-                            return self.operations[op](**args)
+                            value = self.operations[op](**args)
+                            project_context = None
+                            if op not in {'project_open', 'project_instructions'}:
+                                try:
+                                    project_context = project_instructions.for_operation(
+                                        op, args, can_create=meta['effective_access'] == 'write')
+                                except (OSError, UnicodeError, ValueError, PermissionError):
+                                    # Incidental discovery must not misreport an already
+                                    # completed Files operation as a failed write.
+                                    project_context = {'status': 'unavailable'}
+                            return value, project_context
                         finally:
                             CURRENT.reset(authority_token)
                             WORK.reset(worktoken)
                             manager.BOUND_PROFILE.reset(token)
                     from app.profiles.administration import catalog_worker
-                    result = await catalog_worker(asyncio.get_running_loop().run_in_executor(self.pool, work))
+                    result, project_context = await catalog_worker(
+                        asyncio.get_running_loop().run_in_executor(self.pool, work))
                     meta.update(lock_wait_ms=round(lock_ms,3), duration_ms=round((time.monotonic()-started)*1000,3))
                     output = self.envelope(result, meta)
+                    if project_context is not None:
+                        output['project_instructions'] = project_context
                     self.journal.update(opid, state='succeeded', result=output)
                     return output
         except asyncio.CancelledError:

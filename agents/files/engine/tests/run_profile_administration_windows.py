@@ -120,6 +120,18 @@ with tempfile.TemporaryDirectory(prefix='zagent-profile-admin-') as temporary:
         generation = state['owner_management']['generations']['_new']
         native = VerifiedContext({'profile_id':'_new','effective_access':'read','effective_resources':[{'profile_generation':generation}]})
         validate_profile(native,manager.get_profile('_new'))
+        assert manager.get_profile('_new')['execution_access'] == 'disabled'
+        enabled = {'target_profile_id':'_new','changes':{'execution_access':'developer'},
+                   'expected_revision':result['revision'],'idempotency_key':'execution-developer'}
+        result = await call('update',enabled)
+        assert result['profile']['execution_access'] == 'developer'
+        await denied('update',{'target_profile_id':'_new','changes':{'mode':'read-only'},
+            'expected_revision':result['revision'],'idempotency_key':'bad-readonly-execution'},
+            'READ_ONLY_EXECUTION_DISABLED_REQUIRED')
+        result = await call('update',{'target_profile_id':'_new',
+            'changes':{'execution_access':'disabled'},'expected_revision':result['revision'],
+            'idempotency_key':'execution-disable'})
+        assert result['profile']['execution_access'] == 'disabled'
         update = {'target_profile_id':'_new','changes':{'mode':'read-only'},'expected_revision':result['revision'],'idempotency_key':'update-1'}
         result = await call('update',update)
         try:

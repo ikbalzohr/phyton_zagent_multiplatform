@@ -117,7 +117,8 @@ public sealed record ManagerProfileRow(
     bool Enabled,
     bool Active,
     bool AuthorizedByUser,
-    string AuthorizationSource);
+    string AuthorizationSource,
+    string ExecutionAccess = "legacy");
 
 public sealed record ManagerApprovalRow(
     string RequestId,

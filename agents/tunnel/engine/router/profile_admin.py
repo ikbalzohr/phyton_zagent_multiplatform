@@ -79,7 +79,8 @@ def tool_schema(name):
     row = {'root': {'type': 'string', 'minLength': 1, 'maxLength': 32768},
            'mode': {'type': 'string', 'enum': ['read-only', 'read-write'], 'default': 'read-only'},
            'enabled': {'type': 'boolean', 'default': True},
-           'description': {'type': 'string', 'maxLength': 512}}
+           'description': {'type': 'string', 'maxLength': 512},
+           'execution_access': {'type': 'string', 'enum': ['disabled','developer','full'], 'default': 'disabled'}}
     if action == 'create':
         props.update(row); required.append('root')
     elif action == 'update':

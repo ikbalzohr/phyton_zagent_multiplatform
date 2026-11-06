@@ -207,7 +207,7 @@ registry.TrySetHealth(
     "External ArcMap bridge offline.");
 
 await RunAsync(
-    "registry contains exactly 390 manager-visible capabilities",
+    "registry contains exactly 392 manager-visible capabilities",
     async () =>
     {
         await using var supervisor =
@@ -228,9 +228,9 @@ await RunAsync(
                 service,
                 "registry.capabilities");
 
-        Equal(390, rows.Count);
+        Equal(392, rows.Count);
         Equal(
-            390,
+            392,
             rows.Select(item => item.Capability)
                 .Distinct(StringComparer.Ordinal)
                 .Count());
@@ -243,7 +243,7 @@ await RunAsync(
                     TunnelAgentManifestFactory.AgentId));
 
         Equal(
-            71,
+            73,
             rows.Count(
                 item =>
                     item.AgentId ==
@@ -288,7 +288,7 @@ await RunAsync(
                 "manager.dashboard");
 
         Equal(4, dashboard.RegisteredAgents);
-        Equal(390, dashboard.CapabilityCount);
+        Equal(392, dashboard.CapabilityCount);
 
         var arc = dashboard.Agents.Single(
             item =>
@@ -561,7 +561,7 @@ await RunAsync(
     });
 
 await RunAsync(
-    "named pipe client roundtrip returns 390 capabilities",
+    "named pipe client roundtrip returns 392 capabilities",
     async () =>
     {
         await using var supervisor =
@@ -593,7 +593,7 @@ await RunAsync(
                 "registry.capabilities",
                 timeout: TimeSpan.FromSeconds(4));
 
-        Equal(390, rows.Count);
+        Equal(392, rows.Count);
 
         await server.StopAsync();
     });

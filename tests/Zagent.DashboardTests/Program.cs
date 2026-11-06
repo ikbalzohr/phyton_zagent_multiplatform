@@ -100,7 +100,11 @@ try { await gate.EnterAsync(); throw new Exception("command after shutdown accep
 catch (InvalidOperationException) { }
 var offlineProfiles = new ManagerProfilesSnapshot(
     [new ManagerProfileRow("appBridge", @"D:\Zagent Multi Platform\workspace",
-        "read-only", true, true, true, "zagent_install")],
+        "read-only", true, true, true, "zagent_install", "disabled"),
+     new ManagerProfileRow("agent-dev", @"D:\Zagent Multi Platform\project",
+        "read-write", true, false, true, "oauth_owner_admin", "full"),
+     new ManagerProfileRow("legacy", @"D:\Zagent Multi Platform\old",
+        "read-write", true, false, true, "zagent_install")],
     [], [], "appBridge", DateTimeOffset.UtcNow);
 var offlineInventoryJson = JsonSerializer.SerializeToElement(
     DashboardProfileAdministration.BuildLocalProfileInventory(offlineProfiles));
@@ -113,4 +117,35 @@ Check(offlineInventory.GetProperty("defaultProfile").GetString() == "appBridge",
     "Default profile must come from installed local configuration.");
 Check(offlineInventory.GetProperty("profiles")[0].GetProperty("root").GetString() ==
     @"D:\Zagent Multi Platform\workspace", "Offline profile root is preserved.");
+Check(offlineInventory.GetProperty("profiles")[0].GetProperty("execution_access").GetString() == "disabled",
+    "Offline inventory displays Disabled without changing file access.");
+Check(offlineInventory.GetProperty("profiles")[1].GetProperty("execution_access").GetString() == "full",
+    "Offline inventory displays explicit Full mode.");
+Check(offlineInventory.GetProperty("profiles")[2].GetProperty("execution_access").GetString() == "legacy",
+    "Missing execution mode must remain labeled Legacy, not silently inferred Disabled.");
+var localProfileFixture = Path.Combine(Path.GetTempPath(),
+    "zagent-execution-inventory-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(Path.Combine(localProfileFixture, "config"));
+try
+{
+    File.WriteAllText(Path.Combine(localProfileFixture, "config", "profiles.json"), """
+        {"schema_version":"2.0","active_profile":"appBridge","profiles":[
+          {"name":"appBridge","root":"D:\\fixture\\read","mode":"read-only",
+            "enabled":true,"authorized_by_user":true,"execution_access":"disabled"},
+          {"name":"agent-dev","root":"D:\\fixture\\dev","mode":"read-write",
+            "enabled":true,"authorized_by_user":true,"execution_access":"full"},
+          {"name":"legacy","root":"D:\\fixture\\legacy","mode":"read-write",
+            "enabled":true,"authorized_by_user":true}]}
+        """);
+    var readModel = new FilesManagerReadModel(new Uri("http://127.0.0.1:19120/mcp"),
+        new FilesLocalApprovalOptions("unused", "unused", new Dictionary<string, string> {
+            ["ZAGENT_FILES_CONFIG_DIR"] = Path.Combine(localProfileFixture, "config"),
+            ["ZAGENT_FILES_DATA_ROOT"] = localProfileFixture
+        }));
+    var loaded = await readModel.GetProfilesAsync(includeWorkspace: false);
+    Check(loaded.Profiles.Select(p => p.ExecutionAccess)
+        .SequenceEqual(new[] { "disabled", "full", "legacy" }),
+        "Core local profile reader preserves explicit execution modes and legacy absence.");
+}
+finally { Directory.Delete(localProfileFixture, true); }
 Console.WriteLine("Dashboard policy/coordinator/security/source and read-only profile inventory tests complete.");

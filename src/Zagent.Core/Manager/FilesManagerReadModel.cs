@@ -98,7 +98,15 @@ public sealed class FilesManagerReadModel
                         GetString(
                             item,
                             "authorization_source") ??
-                            ""));
+                            "",
+                        GetString(item, "execution_access") switch
+                        {
+                            "disabled" => "disabled",
+                            "developer" => "developer",
+                            "full" => "full",
+                            null => "legacy",
+                            _ => "unknown"
+                        }));
             }
         }
 

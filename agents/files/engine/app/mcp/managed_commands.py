@@ -51,6 +51,7 @@ class CommandGrant:
     output_limit: int
     expires_at: float
     generation: str | None = None
+    mode: str = 'legacy'
 
     @property
     def owner(self):
@@ -164,20 +165,6 @@ def authorize_command_call(tool, arguments, authority):
     for key in ('principal_id', 'workspace_id'):
         if not isinstance(authority.get(key), str) or not authority[key]:
             raise PermissionError('OWNER_REQUIRED')
-    policies = _policy_profiles(_json(POLICY_FILE))
-    if profile_id not in policies:
-        raise PermissionError('COMMAND_POLICY_PROFILE_MISMATCH')
-    policy = policies[profile_id]
-    if type(policy['version']) is not int or policy['version'] != 1 or policy['enabled'] is not True or policy['acknowledge_host_access'] is not True or policy['execution_mode'] != 'owner-account':
-        raise PermissionError('EXPLICIT_OWNER_ACCOUNT_APPROVAL_REQUIRED')
-    if policy['profile_id'] != profile_id:
-        raise PermissionError('COMMAND_POLICY_PROFILE_MISMATCH')
-    tools = policy['allowed_tools']
-    if not isinstance(tools, list) or not tools or not all(isinstance(t, str) and t in COMMAND_TOOL_NAMES for t in tools) or len(tools) != len(set(tools)) or tool not in tools:
-        raise PermissionError('COMMAND_TOOL_NOT_LOCALLY_APPROVED')
-    for key, upper in (('max_timeout_seconds', 1800), ('max_output_chars', 200000)):
-        if type(policy[key]) is not int or not 1 <= policy[key] <= upper:
-            raise PermissionError('INVALID_COMMAND_POLICY_LIMIT')
     profiles = _json(PROFILES_FILE)
     rows = profiles.get('profiles') if isinstance(profiles, dict) else None
     if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
@@ -199,6 +186,37 @@ def authorize_command_call(tool, arguments, authority):
     if profile.get('enabled') is not True or profile.get('authorized_by_user') is not True or profile.get('mode') != 'read-write':
         raise PermissionError('LOCALLY_APPROVED_READ_WRITE_PROFILE_REQUIRED')
     root = _local_path(profile.get('root'), directory=True)
+    execution_access = profile.get('execution_access')
+    if execution_access is not None:
+        # An owner-managed mode replaces manual per-executable approval for
+        # THIS profile only. OAuth tool scope, resource generation, owner
+        # approval and Windows process lifetime enforcement are still required.
+        if execution_access not in ('developer','full'):
+            raise PermissionError('PROFILE_EXECUTION_DISABLED')
+        if tool not in _mode_tools(execution_access):
+            raise PermissionError('TOOL_NOT_AVAILABLE_IN_PROFILE_MODE')
+        executables = _trusted_executables(execution_access)
+        if not executables:
+            raise PermissionError('NO_INSTALLED_DEVELOPER_EXECUTABLES')
+        return CommandGrant(authority['principal_id'], authority['workspace_id'], profile_id,
+                            resource['resource_id'], root, executables, 900, 100000,
+                            float(expiry), generation, execution_access)
+    # A pre-existing profile without an execution_access field continues to
+    # follow its explicit v1/v2 host policy until the owner migrates it.
+    policies = _policy_profiles(_json(POLICY_FILE))
+    if profile_id not in policies:
+        raise PermissionError('COMMAND_POLICY_PROFILE_MISMATCH')
+    policy = policies[profile_id]
+    if type(policy['version']) is not int or policy['version'] != 1 or policy['enabled'] is not True or policy['acknowledge_host_access'] is not True or policy['execution_mode'] != 'owner-account':
+        raise PermissionError('EXPLICIT_OWNER_ACCOUNT_APPROVAL_REQUIRED')
+    if policy['profile_id'] != profile_id:
+        raise PermissionError('COMMAND_POLICY_PROFILE_MISMATCH')
+    tools = policy['allowed_tools']
+    if not isinstance(tools, list) or not tools or not all(isinstance(t, str) and t in COMMAND_TOOL_NAMES for t in tools) or len(tools) != len(set(tools)) or tool not in tools:
+        raise PermissionError('COMMAND_TOOL_NOT_LOCALLY_APPROVED')
+    for key, upper in (('max_timeout_seconds', 1800), ('max_output_chars', 200000)):
+        if type(policy[key]) is not int or not 1 <= policy[key] <= upper:
+            raise PermissionError('INVALID_COMMAND_POLICY_LIMIT')
     if _local_path(policy['root'], directory=True) != root:
         raise PermissionError('COMMAND_POLICY_ROOT_MISMATCH')
     raw_exes = policy['allowed_executables']
@@ -208,6 +226,44 @@ def authorize_command_call(tool, arguments, authority):
     return CommandGrant(authority['principal_id'], authority['workspace_id'], profile_id,
                         resource['resource_id'], root, executables, policy['max_timeout_seconds'],
                         policy['max_output_chars'], float(expiry), generation)
+
+def _mode_tools(mode):
+    common = {'files_command_capabilities','files_command_cancel','files_process_list',
+              'files_process_stop','files_exec_command','files_git','files_node',
+              'files_npm','files_npx','files_build','files_test'}
+    return common | ({'files_powershell_run'} if mode == 'full' else set())
+
+
+def _trusted_executables(mode):
+    """Discover only fixed Windows installations, never a project-controlled PATH."""
+    if os.name != 'nt':
+        raise PermissionError('WINDOWS_OWNER_JOB_REQUIRED')
+    program = Path(os.environ.get('ProgramFiles', r'C:\Program Files'))
+    local = Path(os.environ.get('LOCALAPPDATA', r'C:\Users\Default\AppData\Local'))
+    system = Path(os.environ.get('SystemRoot', r'C:\Windows'))
+    candidate_groups = [
+        (program / 'Git/cmd/git.exe', program / 'Git/bin/git.exe'),
+        (program / 'nodejs/node.exe',),
+        (program / 'nodejs/npm.cmd',),
+        (program / 'nodejs/npx.cmd',),
+        tuple(local / 'Programs/Python' / ('Python' + version) / 'python.exe'
+              for version in ('314','313','312','311','310')),
+    ]
+    if mode == 'full':
+        candidate_groups.extend([
+            (system / 'System32/WindowsPowerShell/v1.0/powershell.exe',),
+        ])
+    found = []
+    for group in candidate_groups:
+        for candidate in group:
+            try:
+                executable = _local_path(str(candidate))
+            except PermissionError:
+                continue
+            if executable not in found:
+                found.append(executable)
+            break
+    return tuple(found)
 
 
 def resolve_cwd(grant, cwd):
@@ -232,6 +288,11 @@ def resolve_executable(requested, grant):
         matches = [p for p in grant.executables if p.name.casefold() in names]
     else:
         matches = []
+    if grant.mode == 'full' and path.is_absolute() and not matches:
+        # Explicit owner-selected Full mode: absolute existing native executables.
+        candidate = _local_path(requested)
+        if candidate.suffix.casefold() == '.exe':
+            return candidate
     if len(matches) != 1:
         raise PermissionError('EXECUTABLE_NOT_EXPLICITLY_APPROVED')
     return _local_path(str(matches[0]))
@@ -267,7 +328,7 @@ def _audit(tool, grant, state):
     # Never serialize arguments, environment, scripts, output or public metadata.
     payload = dict(time=time.time(), tool=tool, principal_id=grant.principal,
                    workspace_id=grant.workspace, profile_id=grant.profile,
-                   resource_id=grant.resource, state=state)
+                   resource_id=grant.resource, execution_access=grant.mode, state=state)
     with _LOCK:
         AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
         with AUDIT_LOG.open('a', encoding='utf-8') as stream:
@@ -506,11 +567,12 @@ async def execute(tool, arguments):
         arguments.pop('profile')
     grant = authorize_command_call(tool, arguments, authority)
     if tool == 'files_command_capabilities':
-        return dict(execution_mode='owner-account', os_sandbox=False,
+        return dict(execution_mode='owner-account', profile_execution_access=grant.mode, os_sandbox=False,
                     warning='Approved commands have the Windows owner account rights, not root-confined filesystem rights.',
                     persistent_process_start=False, batch_wrappers=False, windows_runtime_verified=False,
                     max_timeout_seconds=grant.timeout, max_output_chars=grant.output_limit,
-                    supports=sorted(SUPPORTED_COMMAND_TOOLS), unsupported=sorted(UNSUPPORTED_COMMAND_TOOLS))
+                    supports=sorted(_mode_tools(grant.mode) if grant.mode != 'legacy' else SUPPORTED_COMMAND_TOOLS),
+                    unsupported=sorted(UNSUPPORTED_COMMAND_TOOLS))
     if tool in UNSUPPORTED_COMMAND_TOOLS:
         raise NotImplementedError('UNSUPPORTED_MANAGED_COMMAND_NO_BATCH_OR_PERSISTENT_FALLBACK')
     if tool == 'files_process_list':

@@ -8,6 +8,7 @@ let shutdownPhase = 'idle';
 const $ = id => document.getElementById(id);
 const node = (tag, text) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = String(text); return n; };
 const display = value => value == null ? 'unknown' : typeof value === 'object' ? JSON.stringify(value) : String(value);
+const executionAccessLabel = value => ({ disabled: 'Disabled', developer: 'Developer', full: 'Full', legacy: 'Legacy (local policy)', unknown: 'Unknown' })[value] || (value == null ? 'Legacy (local policy)' : 'Unknown');
 const visualMetadata = (value) => value ? { source: value.source, label: value.label, mimeType: value.mimeType, bytes: value.bytes, capturedAtUtc: value.capturedAtUtc } : null;
 async function request(path, options = {}) {
   const response = await fetch(path.startsWith('/') ? path : base + path, { credentials: 'same-origin', cache: 'no-store', ...options });
@@ -38,8 +39,8 @@ function table(target, rows, fields, actions) {
   target.replaceChildren();
   if (!rows?.length) { target.append(node('p', 'No records in the current bounded snapshot.')); return; }
   const wrapper = node('div'); wrapper.className = 'table-scroll'; const t = node('table'), head = node('tr');
-  fields.forEach(f => head.append(node('th', f))); if (actions) head.append(node('th', 'Actions')); t.append(head);
-  rows.slice(0, 200).forEach(row => { const tr = node('tr'); fields.forEach(f => tr.append(node('td', display(row[f]))));
+  fields.forEach(f => head.append(node('th', f === 'execution_access' ? 'Execution Access' : f))); if (actions) head.append(node('th', 'Actions')); t.append(head);
+  rows.slice(0, 200).forEach(row => { const tr = node('tr'); fields.forEach(f => tr.append(node('td', f === 'execution_access' ? executionAccessLabel(row[f]) : display(row[f]))));
     if (actions) { const td = node('td'); actions(row).forEach(b => td.append(b)); tr.append(td); } t.append(tr); });
   wrapper.append(t); target.append(wrapper);
 }
@@ -92,11 +93,15 @@ function profileEditor(row, target) {
   const form = node('form'); form.className = 'form-row';
   const root = node('input'); root.value = row.root; root.required = true;
   const mode = node('select'); ['read-only','read-write'].forEach(value => { const option = node('option',value); option.value = value; mode.append(option); }); mode.value = row.mode;
+  const execution = node('select'); const executionModes = row.execution_access ? ['disabled','developer','full'] : ['legacy','disabled','developer','full'];
+  executionModes.forEach(value => { const option = node('option', value === 'legacy' ? 'Legacy (current local policy)' : value); option.value = value; execution.append(option); });
+  execution.value = row.execution_access || 'legacy';
   const enabled = node('input'); enabled.type = 'checkbox'; enabled.checked = row.enabled;
   const description = node('input'); description.value = row.description || ''; description.maxLength = 512;
-  [['Root',root],['Mode',mode],['Enabled',enabled],['Description',description]].forEach(([text,input]) => { const label = node('label',text); label.append(input); form.append(label); });
+  [['Root',root],['Mode',mode],['Execution Access',execution],['Enabled',enabled],['Description',description]].forEach(([text,input]) => { const label = node('label',text); label.append(input); form.append(label); });
   form.append(button('Save profile', async () => { await profileCommand('workspaces/profiles/' + encodeURIComponent(row.name),
-    { changes: { root: root.value, mode: mode.value, enabled: enabled.checked, description: description.value } }, 'PUT'); form.remove(); }));
+    { changes: { root: root.value, mode: mode.value, enabled: enabled.checked, description: description.value,
+      ...(execution.value === 'legacy' ? {} : { execution_access: execution.value }) } }, 'PUT'); form.remove(); }));
   form.append(button('Cancel edit', () => form.remove()));
   form.addEventListener('submit', e => e.preventDefault());
   return form;
@@ -143,10 +148,10 @@ async function render(current, stamp) {
       const profiles = node('div'); target.append(profiles);
       if (localOnly) {
         target.append(node('p', `Configured default: ${d.defaultProfile || 'none'} · This is not a validated backend authorization catalog.`));
-        table(profiles, d.profiles, ['name','root','mode','enabled','active','authorized_by_user']);
+        table(profiles, d.profiles, ['name','root','mode','execution_access','enabled','active','authorized_by_user']);
         return;
       }
-      table(profiles, d.profiles, ['name','root','mode','enabled','description','authorized_by_user'], row => [
+      table(profiles, d.profiles, ['name','root','mode','execution_access','enabled','description','authorized_by_user'], row => [
         button('Edit', () => { const editor = profileEditor(row, target); if (!editor) return; target.append(editor); editor.querySelector('input').focus(); }),
         button('Set default', () => profileCommand('workspaces/profiles/' + encodeURIComponent(row.name) + '/default', {})),
         button('Remove', async () => { let replacement_default_id;
