@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 
 from .config import load_services, public_tool_name
-from .orchestration import ExecContext
+from .orchestration import ExecContext, PreDispatchRejected
 from .identity import internal_token
 from .files_selection import forward_files_arguments
 from .profile_admin import PROFILE_ADMIN_SCOPES, CATALOG_TOOL
@@ -40,6 +40,20 @@ def _tool_call_timeout_seconds(
     tool: dict[str, Any],
     arguments: dict[str, Any],
 ) -> float | None:
+    # Server-declared per-mode worker bounds extend only the selected lane.
+    # Other modes (including legacy Attached) retain the ordinary Router timeout.
+    metadata = tool.get("_meta") or {}
+    mode_bounds = metadata.get("zagent.mode_worker_timeout_seconds") if isinstance(metadata, dict) else None
+    if isinstance(mode_bounds, dict):
+        mode = arguments.get("mode")
+        worker_timeout = mode_bounds.get(mode) if isinstance(mode, str) else None
+        if type(worker_timeout) in (int, float) and 1 <= worker_timeout <= 3600:
+            base = float(state.service.get("timeout_seconds", 25))
+            return min(
+                max(base, float(worker_timeout) + _LONG_CALL_TIMEOUT_MARGIN_SECONDS),
+                _MAX_LONG_CALL_TIMEOUT_SECONDS,
+            )
+
     properties = tool.get("inputSchema", {}).get("properties", {})
     timeout_schema = properties.get("timeout_seconds") if isinstance(properties, dict) else None
     if not isinstance(timeout_schema, dict):
@@ -431,7 +445,13 @@ class MCPRegistry:
     @traced('upstream.dispatch', 'ROUTER_UPSTREAM_UNAVAILABLE')
     async def invoke(self, service_id: str, upstream_name: str, arguments: dict[str, Any], ctx: ExecContext) -> dict[str, Any]:
         state = self.states[service_id]
-        await self.ensure_initialized(state)
+        # MCP initialize/tools-list only establish transport and discovery.
+        # If they fail, tools/call was NEVER sent. Persist a definitive failed
+        # task instead of poisoning the installation with a false orphan.
+        try:
+            await self.ensure_initialized(state)
+        except Exception as exc:
+            raise PreDispatchRejected("UPSTREAM_INITIALIZATION_UNAVAILABLE") from exc
         started = time.time()
 
         call_arguments = dict(arguments or {})

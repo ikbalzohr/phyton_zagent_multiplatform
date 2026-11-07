@@ -14,6 +14,8 @@ from .request_context import current
 from .config import AGENT
 
 _ARCMAP_LOCK = threading.RLock()
+# Disk ArcPy calls serialize independently of the Desktop IPC owner.
+_HEADLESS_LOCK = threading.RLock()
 
 _ENVIRONMENT = os.environ.get("ZAGENT_ENVIRONMENT", "").strip().upper()
 _UPSTREAM_IPC_ROOT = os.environ.get(
@@ -80,6 +82,58 @@ class AgentServices:
             return {"ok": False, "error": str(exc)}
         return None
 
+    def _inspection_context_locked(self):
+        """Recheck authenticated ingress authority and expiry at point of use."""
+        import time
+        from .request_context import correlation
+        from .execution_context import VerifiedContext, owner_key
+        if not isinstance(correlation.get(), VerifiedContext):
+            raise PermissionError('AUTHENTICATED_EXECUTION_CONTEXT_REQUIRED')
+        ctx = current()
+        if not ctx.get('principal_id') or not ctx.get('workspace_id') or not ctx.get('resource_id'):
+            raise PermissionError('AUTHENTICATED_EXECUTION_CONTEXT_REQUIRED')
+        if time.time() >= ctx.get('expires_at', 0):
+            raise PermissionError('CONTEXT_EXPIRED_WHILE_QUEUED')
+        if ctx.get('effective_access') not in ('read', 'write'):
+            raise PermissionError('READ_SCOPE_REQUIRED')
+        if not os.environ.get('ZAGENT_DEVICE_ID') or ctx.get('device_id') != os.environ['ZAGENT_DEVICE_ID']:
+            raise PermissionError('IDENTITY_MISMATCH_OR_DEVICE_NOT_CONFIGURED')
+        resources = [r for r in ctx.get('effective_resources', []) if r.get('kind') in ('arcmap', 'gis')]
+        if len(resources) != 1 or resources[0].get('resource_id') != ctx['resource_id']:
+            raise PermissionError('ONE_ARCMAP_RESOURCE_REQUIRED')
+        if ctx.get('session_id') != owner_key(ctx):
+            raise PermissionError('OWNER_CONTEXT_MISMATCH')
+        return ctx
+
+    def execution_capabilities(self):
+        """Authenticated static contract; never waits for Desktop or disk work."""
+        self._inspection_context_locked()
+        return {
+            'ok': True, 'status': 'source_only', 'deployment_verified': False,
+            'operations': {
+                'inspect_map': {'supported': True, 'modes': ['headless', 'attached']},
+                'export': {'supported': False, 'reason': 'NOT_YET_DUAL_MODE'},
+                'mutation': {'supported': False, 'reason': 'UNSUPPORTED_IN_MVP'},
+                'ui_control': {'supported': False, 'reason': 'ATTACHED_ONLY_LEGACY_TOOLS'},
+            },
+            'filesystem_sandbox': False,
+            'authority': 'authenticated ArcMap/GIS resource; not the Files profile',
+            'runtime_readiness': 'NOT_PROBED',
+            'legacy_tools': 'unchanged defaults; not implicitly dual-mode',
+        }
+
+    def inspect_mxd(self, *, mxd_path):
+        """One authenticated disk read; never contacts the UI bridge."""
+        from .execution_modes import mxd_error
+        from orchestrator.adapters.file_worker.arcgis_process import ArcGISProcessFileWorker
+        with _HEADLESS_LOCK:
+            self._inspection_context_locked()
+            code = mxd_error(mxd_path)
+            if code:
+                return {'ok': False, 'code': code}
+            worker = ArcGISProcessFileWorker(Path(__file__).resolve().parents[1], timeout_seconds=300)
+            return worker.inspect_mxd(mxd_path=mxd_path)
+
     def call(self, action, kind="read", **payload):
         # One UI-bound ArcMap owner; context expiry is rechecked under lock.
         with _ARCMAP_LOCK:
@@ -108,9 +162,23 @@ class AgentServices:
             }
 
         if kind != "read":
-            blocked = self.safety.guard(kind)
-            if blocked:
-                return blocked
+            required_kinds = [kind]
+            if action in ('stage3_build_blank_a4', 'stage3_build_no_data_a4'):
+                # Builders always clear layers, even when no input data is used.
+                required_kinds.append('destructive')
+                if payload.get('save_mxd', True):
+                    required_kinds.append('save')
+                if payload.get('export_pdf', True) or payload.get('export_png', True):
+                    required_kinds.append('export')
+            elif action == 'stage3_blank_init' and payload.get('clear_layers', True):
+                required_kinds.append('destructive')
+            elif action == 'stage3_restore_checkpoint':
+                # Restoring copies over an MXD on disk; it is not a live reopen.
+                required_kinds.append('save')
+            for required_kind in required_kinds:
+                blocked = self.safety.guard(required_kind)
+                if blocked:
+                    return blocked
             try:
                 health = self._send("ping", timeout=3)
                 if not health.get("ok"):
@@ -141,12 +209,17 @@ class AgentServices:
                     ),
                 )
                 if kind == "live_write" and result.get("ok"):
-                    observed = self._send(
-                        "inspect_current_map",
-                        _expected_context=payload.get(
-                            "_expected_context"
-                        ),
-                    )
+                    try:
+                        observed = self._send(
+                            "inspect_current_map",
+                            _expected_context=payload.get(
+                                "_expected_context"
+                            ),
+                        )
+                    except ArcMapBridgeError as exc:
+                        # The action already succeeded. Do not erase that fact
+                        # when its independent observation channel is unavailable.
+                        observed = {"ok": False, "error": str(exc)}
                     result["verification"] = {
                         "status": (
                             "OBSERVED"

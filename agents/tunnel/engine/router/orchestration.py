@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 from .diagnostic_events import record, request_id, traced
+from .resource_scope import scoped_write_key
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_DIR = Path(os.environ.get("ZAGENT_TUNNEL_RUNTIME_DIR", str(ROOT / "runtime"))).resolve()
@@ -261,31 +262,44 @@ class ResourceLockManager:
         self._writers: set[str] = set()
 
     @asynccontextmanager
-    async def acquire(self, key: str, mode: str):
+    async def acquire(self, key: str, mode: str, *, subresource: str | None = None):
         key = key or "global"
         mode = "read" if mode == "read" else "write"
+        # A narrow mutation leases installation READ + its exact file WRITE,
+        # atomically, so installation-wide writers still exclude every writer.
+        # No writer can interleave between the two acquisitions.
+        narrow = mode == "write" and isinstance(subresource, str) and subresource.startswith("filespath:")
         started = now()
         async with self._cond:
-            if mode == "read":
+            if narrow:
+                await self._cond.wait_for(
+                    lambda: key not in self._writers
+                    and subresource not in self._writers
+                    and self._readers.get(subresource, 0) == 0)
+                self._readers[key] = self._readers.get(key, 0) + 1
+                self._writers.add(subresource)
+            elif mode == "read":
                 await self._cond.wait_for(lambda: key not in self._writers)
                 self._readers[key] = self._readers.get(key, 0) + 1
             else:
                 await self._cond.wait_for(
                     lambda: key not in self._writers
-                    and self._readers.get(key, 0) == 0
-                )
+                    and self._readers.get(key, 0) == 0)
                 self._writers.add(key)
         wait_ms = (now() - started) * 1000
         try:
             yield wait_ms
         finally:
             async with self._cond:
-                if mode == "read":
+                if narrow:
+                    self._writers.discard(subresource)
                     count = self._readers.get(key, 0) - 1
-                    if count <= 0:
-                        self._readers.pop(key, None)
-                    else:
-                        self._readers[key] = count
+                    if count <= 0: self._readers.pop(key, None)
+                    else: self._readers[key] = count
+                elif mode == "read":
+                    count = self._readers.get(key, 0) - 1
+                    if count <= 0: self._readers.pop(key, None)
+                    else: self._readers[key] = count
                 else:
                     self._writers.discard(key)
                 self._cond.notify_all()
@@ -334,6 +348,7 @@ class Orchestrator:
         self.executor = executor
         self.journal = TaskJournal(journal_path or DB_PATH)
         self.locks = ResourceLockManager()
+        self._scoped_files_profile: str | None = None
         self.telemetry = Telemetry()
 
         self.interactive_queue: asyncio.PriorityQueue[QueueItem] = (
@@ -388,6 +403,22 @@ class Orchestrator:
 
     def _is_interactive(self, priority: int) -> bool:
         return priority in INTERACTIVE_PRIORITIES
+
+    def _subresource(self, ctx: ExecContext, arguments: dict[str, Any]) -> str | None:
+        if ctx.access_mode != "write":
+            return None
+        value = scoped_write_key(ctx.execution_context, ctx.service_id,
+                                 ctx.tool_name, arguments)
+        if not value:
+            return None
+        profile = ctx.execution_context["effective_resources"][0]["profile_id"]
+        # Only one profile may ever use scoped writes until Router stops.
+        # Other profiles remain global writers, even if their paths overlap.
+        if self._scoped_files_profile is None:
+            self._scoped_files_profile = profile
+        if self._scoped_files_profile != profile:
+            return None
+        return value
 
     def queue_depth(self) -> int:
         return self.interactive_queue.qsize() + self.background_queue.qsize()
@@ -588,7 +619,8 @@ class Orchestrator:
             capacity_wait_ms = (now() - started) * 1000
             await self.journal.update(ctx.task_id, state="waiting_lock", progress=0.03, heartbeat_at=now())
             async with self.locks.acquire(
-                ctx.resource_key, ctx.access_mode
+                ctx.resource_key, ctx.access_mode,
+                subresource=self._subresource(ctx, arguments)
             ) as lock_wait_ms:
                 self.telemetry.emit(
                     ctx,
@@ -996,7 +1028,8 @@ class Orchestrator:
                 )
 
                 async with self.locks.acquire(
-                    ctx.resource_key, ctx.access_mode
+                    ctx.resource_key, ctx.access_mode,
+                    subresource=self._subresource(ctx, args)
                 ) as lock_wait_ms:
                     if task_id in self._cancel:
                         raise asyncio.CancelledError()

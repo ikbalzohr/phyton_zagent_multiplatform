@@ -11,7 +11,7 @@ from .tools import (
     geoprocessing, export, project, observability, layer_management,
     cartography, analysis_extended, layout_automation, export_qa,
     map_recipe, analytics, stage2, window_capture, goals,
-    native_layer_properties, native_grids, smart_corner, arc_backlog,
+    native_layer_properties, native_grids, smart_corner, arc_backlog, execution_modes,
 )
 
 mcp = MCPServer("Zagent ArcMap")
@@ -23,7 +23,7 @@ TOOL_MODULES = (
     selection, geoprocessing, export, project, observability,
     layer_management, cartography, analysis_extended,
     layout_automation, export_qa, map_recipe, analytics, stage2, window_capture, goals,
-    native_layer_properties, native_grids, smart_corner, arc_backlog,
+    native_layer_properties, native_grids, smart_corner, arc_backlog, execution_modes,
 )
 
 

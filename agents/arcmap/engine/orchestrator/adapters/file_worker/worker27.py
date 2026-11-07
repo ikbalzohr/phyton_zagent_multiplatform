@@ -156,13 +156,139 @@ def _blank_seed(goal):
     return os.path.join(
         root,"MapTemplates","Standard Page Sizes","ISO (A) Page Sizes",leaf)
 
+def _inspect_mxd(path, engine_root):
+    """Read an explicit disk document; never use the attached/UI context."""
+    try:
+        string_types=(basestring,)
+    except NameError:
+        string_types=(str,)
+    if (not isinstance(path, string_types) or not path or
+            path.upper()=="CURRENT" or not os.path.isabs(path) or
+            (os.name=="nt" and not os.path.splitdrive(path)[0]) or
+            not path.lower().endswith(".mxd")):
+        return {"ok":False, "code":"INVALID_MXD_PATH",
+                "message":"An absolute existing disk .mxd path is required"}
+    if not os.path.isfile(path):
+        return {"ok":False, "code":"MXD_NOT_FOUND", "message":"Disk MXD not found"}
+    import arcpy
+    import math
+    engine=_engine(engine_root)
+    warnings=[]
+
+    def warn(message):
+        if len(warnings)<127:
+            warnings.append(message)
+        elif len(warnings)==127:
+            warnings.append("warnings: truncated; additional diagnostics omitted")
+
+    def read(obj, attribute, target, key, kind, label):
+        try:
+            value=getattr(obj, attribute)
+            if kind=="text":
+                if not isinstance(value, string_types):
+                    raise ValueError("not text")
+                if len(value)>2048:
+                    value=value[:2048]
+                    warn(label+"."+key+": truncated")
+            elif kind=="bool":
+                if not isinstance(value, bool):
+                    raise ValueError("not boolean")
+            elif kind=="number":
+                value=float(value)
+                if math.isnan(value) or math.isinf(value):
+                    raise ValueError("not finite")
+            target[key]=value
+        except Exception:
+            warn(label+"."+key+": unavailable")
+
+    mxd=None
+    frame=None
+    layer=None
+    sr=None
+    extent=None
+    all_frames=[]
+    all_layers=[]
+    try:
+        mxd=engine.open_mxd(path)
+        document={"path":path}
+        for key in ("title", "author", "description"):
+            read(mxd,key,document,key,"text","document")
+        frames=[]
+        remaining_layers=500
+        all_frames=arcpy.mapping.ListDataFrames(mxd)
+        if len(all_frames)>32:
+            warn("frames: truncated at 32")
+        for index,frame in enumerate(all_frames[:32]):
+            label="frames[%d]" % index
+            row={"layers":[]}
+            for attribute,key,kind in (("name","name","text"),
+                    ("scale","scale","number"),("rotation","rotation","number")):
+                read(frame,attribute,row,key,kind,label)
+            try:
+                sr=frame.spatialReference
+                reference={}
+                read(sr,"name",reference,"name","text",label+".spatial_reference")
+                read(sr,"factoryCode",reference,"factory_code","number",label+".spatial_reference")
+                row["spatial_reference"]=reference
+            except Exception:
+                warn(label+".spatial_reference: unavailable")
+            try:
+                extent=frame.extent
+                box={}
+                for attribute,key in (("XMin","xmin"),("YMin","ymin"),("XMax","xmax"),("YMax","ymax")):
+                    read(extent,attribute,box,key,"number",label+".extent")
+                row["extent"]=box
+            except Exception:
+                warn(label+".extent: unavailable")
+            try:
+                if not remaining_layers:
+                    warn(label+".layers: not inspected; total layer limit 500")
+                    frames.append(row)
+                    continue
+                all_layers=arcpy.mapping.ListLayers(mxd,"",frame)
+                if len(all_layers)>remaining_layers:
+                    warn(label+".layers: truncated at total layer limit 500")
+                for layer_index,layer in enumerate(all_layers[:remaining_layers]):
+                    remaining_layers-=1
+                    layer_label=label+".layers[%d]" % layer_index
+                    item={}
+                    for attribute,key,kind in (("name","name","text"),
+                            ("longName","long_name","text"),("visible","visible","bool"),
+                            ("isGroupLayer","is_group","bool"),("isBroken","is_broken","bool")):
+                        read(layer,attribute,item,key,kind,layer_label)
+                    try:
+                        if layer.supports("DATASOURCE"):
+                            read(layer,"dataSource",item,"data_source","text",layer_label)
+                        else:
+                            warn(layer_label+".data_source: unsupported")
+                    except Exception:
+                        warn(layer_label+".data_source: unavailable")
+                    row["layers"].append(item)
+            except Exception:
+                warn(label+".layers: unavailable")
+            frames.append(row)
+        return {"ok":True, "document_path":path, "document":document,
+                "frames":frames, "partial":bool(warnings), "warnings":warnings}
+    finally:
+        all_layers=[]
+        all_frames=[]
+        layer=None
+        frame=None
+        sr=None
+        extent=None
+        mxd=None
+
+
 def main():
     req_path=sys.argv[1]
     res_path=sys.argv[2]
     req=_read(req_path)
-    engine=_engine(req["engine_root"])
     op=req.get("operation")
     args=req.get("arguments") or {}
+    if op=="inspect_mxd":
+        _write(res_path, _inspect_mxd(args.get("mxd_path"), req["engine_root"]))
+        return
+    engine=_engine(req["engine_root"])
     if op=="probe":
         import arcpy
         result={

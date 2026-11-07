@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 import inspect
-import os
-import sys
 from typing import Any, Dict, List, Optional
 
 STAGE3_TOOL_NAMES = [
@@ -33,108 +31,38 @@ STAGE3_TOOL_NAMES = [
 _RUNTIME_NAMESPACE: Dict[str, Any] = {}
 
 
-def _invoke_transport(fn, action: str, payload: Dict[str, Any]) -> Any:
-    command = dict(payload or {})
-    command["action"] = action
-    attempts = [
-        # Preferred signature for Zagent ArcMap IPC:
-        # send_command(action, timeout=..., **payload)
-        lambda: fn(action, **payload),
-        lambda: fn(action=action, **payload),
-        # Command-object transports are the next safest fallback.
-        lambda: fn(command),
-        lambda: fn(command=command),
-        # Legacy payload-object signatures are last because a function with a
-        # positional timeout parameter can otherwise accept payload silently.
-        lambda: fn(action, payload),
-        lambda: fn(action=action, payload=payload),
-    ]
-    last_type_error = None
-    for call in attempts:
-        try:
-            return call()
-        except TypeError as exc:
-            last_type_error = exc
-    if last_type_error is not None:
-        raise last_type_error
-    raise RuntimeError("No compatible transport signature")
-
-
-def _service_transport_candidates() -> List[Any]:
-    out: List[Any] = []
-    services = _RUNTIME_NAMESPACE.get("services")
-    if services is None:
-        return out
-
-    names = (
-        "send_command", "_send_command",
-        "call_bridge", "_call_bridge",
-        "bridge_request", "_bridge_request",
-        "request_bridge", "_request_bridge",
-        "invoke_bridge", "_invoke_bridge",
-    )
-    for name in names:
-        fn = getattr(services, name, None)
-        if callable(fn):
-            out.append(fn)
-
-    for child_name in ("bridge", "client", "ipc", "transport", "bridge_client"):
-        child = getattr(services, child_name, None)
-        if child is None:
-            continue
-        for name in names:
-            fn = getattr(child, name, None)
-            if callable(fn):
-                out.append(fn)
-    return out
-
-
 def _send(action: str, payload: Optional[Dict[str, Any]] = None) -> Any:
     payload = dict(payload or {})
-    errors: List[str] = []
-
-    # 1) Prefer the transport already owned by the running AgentServices object.
-    for fn in _service_transport_candidates():
-        try:
-            return _invoke_transport(fn, action, payload)
-        except TypeError as exc:
-            errors.append("services transport signature: %r" % (exc,))
-        except Exception:
-            # A non-signature exception means we found a real transport and the
-            # bridge itself returned/raised an operational error. Preserve it.
-            raise
-
-    # 2) Known IPC module names used by earlier ArcMap Agent builds.
-    candidates = [
-        ("mcp_server.ipc_client", "send_command"),
-        ("ipc_client", "send_command"),
-    ]
-    for mod_name, fn_name in candidates:
-        try:
-            mod = __import__(mod_name, fromlist=[fn_name])
-            fn = getattr(mod, fn_name)
-            return _invoke_transport(fn, action, payload)
-        except (ImportError, AttributeError) as exc:
-            errors.append("%s.%s: %r" % (mod_name, fn_name, exc))
-        except TypeError as exc:
-            errors.append("%s.%s signature: %r" % (mod_name, fn_name, exc))
-        except Exception:
-            raise
-
-    # 3) Last-resort scan for a specifically named send_command function.
-    for mod in list(sys.modules.values()):
-        if mod is None:
-            continue
-        fn = getattr(mod, "send_command", None)
-        if callable(fn):
-            try:
-                return _invoke_transport(fn, action, payload)
-            except TypeError as exc:
-                errors.append("loaded.%s.send_command: %r" % (getattr(mod, "__name__", "?"), exc))
-            except Exception:
-                raise
-
-    raise RuntimeError("Stage3 could not find MCP->Bridge transport. " + " | ".join(errors[-8:]))
+    kinds = {
+        "stage3_health": "read",
+        "stage3_blank_init": "live_write",
+        "stage3_ensure_dataframe": "live_write",
+        "stage3_set_page_a4": "live_write",
+        "stage3_create_text": "live_write",
+        "stage3_create_neatline": "live_write",
+        "stage3_create_legend": "live_write",
+        "stage3_create_north_arrow": "live_write",
+        "stage3_create_scale_bar": "live_write",
+        "stage3_create_featureclass": "geoprocessing",
+        "stage3_create_xy_featureclass": "geoprocessing",
+        "stage3_create_geometry_features": "geoprocessing",
+        "stage3_add_dataset_auto": "live_write",
+        "stage3_ingest_folder": "live_write",
+        "stage3_set_extent_auto": "live_write",
+        "stage3_build_blank_a4": "live_write",
+        "stage3_build_no_data_a4": "live_write",
+        "stage3_save_checkpoint": "save",
+        "stage3_restore_checkpoint": "destructive",
+        "stage3_export_current": "export",
+    }
+    if action not in kinds:
+        raise RuntimeError("STAGE3_UNKNOWN_ACTION: %s" % action)
+    from mcp_server.services import AgentServices
+    service = _RUNTIME_NAMESPACE.get("services")
+    if not isinstance(service, AgentServices):
+        raise RuntimeError("STAGE3_SERVICE_REQUIRED")
+    # One authenticated call only. Operational TypeError must never replay work.
+    return service.call(action, kind=kinds[action], **payload)
 
 
 def arcmap_stage3_health() -> Any:

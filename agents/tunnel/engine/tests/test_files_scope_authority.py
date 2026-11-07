@@ -101,10 +101,10 @@ class FilesScopeAuthorityTests(unittest.TestCase):
                 validate_context(context, self.placement)
         self.assertEqual(context['deadline'], deadline)
 
-    def test_read_authority_keeps_installation_write_scheduler_lock(self):
+    def test_read_authority_shares_reader_lease_without_relaxing_installation_key(self):
         meta = scheduler_meta(self.context(), 'owner')
         self.assertEqual(meta['execution_context']['effective_access'], 'read')
-        self.assertEqual(meta['access_mode'], 'write')
+        self.assertEqual(meta['access_mode'], 'read')
         self.assertEqual(meta['resource_key'], 'installation:install')
 
     def test_client_cannot_override_effective_authority(self):

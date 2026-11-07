@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import AsyncMock
 from router import orchestration as m
 from router.access import AuthorizationError, owner_key
-from router.orphan_conflicts import blocks_service
+from router.orphan_conflicts import blocks_service, safe_read_target
 
 SERVER = Path(__file__).resolve().parents[1] / 'router/server.py'
 
@@ -29,7 +29,7 @@ class PreDispatchTests(unittest.IsolatedAsyncioTestCase):
         registry = SimpleNamespace(get_mapping=lambda _: ('zagent_files', 'files_write'), invoke=invoke)
         space = dict(asyncio=asyncio, Any=object, orchestrator=SimpleNamespace(journal=SimpleNamespace(_lock=lock, conn=conn)),
                      _FILES_IMMEDIATE_CONTROLS=frozenset(), AuthorizationError=AuthorizationError,
-                     blocks_service=blocks_service,
+                     blocks_service=blocks_service, safe_read_target=safe_read_target,
                      PreDispatchRejected=getattr(m,'PreDispatchRejected',RuntimeError), _revalidate=revalidate,
                      placement=SimpleNamespace(validate=lambda *_:None), _policy=lambda _:{'enabled':True}, registry=registry)
         node = next(n for n in ast.parse(SERVER.read_text(encoding='utf-8')).body if isinstance(n,ast.AsyncFunctionDef) and n.name=='_executor')

@@ -114,7 +114,7 @@ def _candidate(row, auth, placement, authorizer):
             or context.get('task_id') != row['task_id']
             or context.get('request_id') != row['request_id'] or context.get('trace_id') != row['trace_id']
             or row['resource_key'] != 'installation:'+placement.installation_id
-            or row['access_mode'] != 'write'):
+            or row['access_mode'] not in {'read', 'write'}):
         raise AuthorizationError('AUTHORIZATION_CHANGED', 403)
     validate_files_tool_scope(ORIGINAL, 'files:read', auth.scopes)
     resources = context.get('effective_resources')

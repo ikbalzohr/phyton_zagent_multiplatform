@@ -6,6 +6,7 @@ from .execution_context import verify, request_meta
 
 correlation = ContextVar("zagent_arcmap_correlation", default={})
 READ_TOOLS = frozenset((
+    'arcmap_inspect_map', 'arcmap_execution_capabilities',
     'arcmap_ping', 'arcmap_status', 'arcmap_goal_plan', 'arcmap_goal_validate',
     'arcmap_goal_status', 'arcmap_goal_report', 'arcmap_inspect_current_map',
     'arcmap_list_layers', 'arcmap_list_layout_elements', 'arcmap_get_dataframe_state',

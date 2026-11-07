@@ -124,11 +124,18 @@ def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
 
 
 def scheduler_meta(context: dict[str, Any], owner: str, key: str = "", arguments: Any = None) -> dict[str, Any]:
+    # Trusted Files read scopes may share a reader lease. Effectful commands
+    # keep the installation-wide writer lease until their resource footprints
+    # can be proven disjoint; never infer access from client arguments.
+    read_only = (context.get("required_scope") == "files:read"
+                 and context.get("effective_access") == "read")
     return {"session_id": owner, "request_id": context["request_id"],
         "trace_id": context["trace_id"], "task_id": context["task_id"],
         "target_device_id": context["device_id"], "executed_on": context["device_id"],
         # Profile policy must not split the existing shared installation lock.
-        "resource_key": "installation:"+context["installation_id"], "access_mode": "write", "priority": 2,
+        "resource_key": "installation:"+context["installation_id"],
+        "access_mode": "read" if read_only else "write",
+        "priority": 1 if read_only else 2,
         "execution_context": context,
         "idempotency_key": digest([owner, context["public_tool"], key]) if key else ""}
 

@@ -97,6 +97,7 @@ public static class DashboardHost
         app.UseStaticFiles(new StaticFileOptions { OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-store" });
         app.MapRazorPages();
         MapManagement(app, runtime, options);
+        app.MapCoreSelfUpdate(runtime, options);
         app.MapDiagnostics(runtime.Diagnostics, runtime.GetDiagnosticsSnapshot);
         // Only this process owns runtime. Browser unload/disconnect has no shutdown handler.
         await app.RunAsync();

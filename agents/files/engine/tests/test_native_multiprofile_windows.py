@@ -159,7 +159,7 @@ def test_default_omission_and_queued_default_changes_never_retarget(approval):
         'files:read', a.authorizer, selected_profile_id=before['effective_resources'][0]['profile_id'])
     assert policy_resources(a.auth, a.placement, 'files:read', a.authorizer)[0]['profile_id'] == 'otherApproved'
     assert scheduler_meta(before, a.auth.owner)['resource_key'] == 'installation:fixture-installation'
-    assert scheduler_meta(before, a.auth.owner)['access_mode'] == 'write'
+    assert scheduler_meta(before, a.auth.owner)['access_mode'] == 'read'  # verified read scope shares a reader lease
 
 
 @pytest.mark.parametrize('allowed', [[], ['agentRoot', 'agentRoot'], ['*'],

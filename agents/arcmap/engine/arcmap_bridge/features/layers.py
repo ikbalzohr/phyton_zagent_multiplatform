@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import arcpy
 from core.registry import action
-from core.current_map import get_mxd, find_layer, safe_layer_source
+from core.current_map import get_mxd, resolve_unique_layer, safe_layer_source
 from core.safety import require_live_write
 
 @action("list_layers")
@@ -30,13 +30,12 @@ def set_layer_visibility(command):
     if not name:
         return {"ok": False, "error": "layer_name is required"}
     mxd = get_mxd()
-    matches = find_layer(mxd, name, df_name)
-    if not matches:
-        return {"ok": False, "error": "Layer not found: {0}".format(name)}
-    changed = []
-    for df, lyr in matches:
-        lyr.visible = visible
-        changed.append({"name": lyr.name, "data_frame": df.name, "visible": lyr.visible})
+    try:
+        df, lyr = resolve_unique_layer(mxd, name, df_name)
+    except RuntimeError as exc:
+        return {"ok": False, "error": u"{0}".format(exc)}
+    lyr.visible = visible
+    changed = [{"name": lyr.name, "data_frame": df.name, "visible": lyr.visible}]
     arcpy.RefreshActiveView()
     arcpy.RefreshTOC()
     return {"ok": True, "matches": changed, "saved": False}
@@ -49,15 +48,17 @@ def set_definition_query(command):
     name = command.get("layer_name", "")
     query = command.get("definition_query", "")
     mxd = get_mxd()
-    matches = find_layer(mxd, name, command.get("data_frame", ""))
-    if not matches:
-        return {"ok": False, "error": "Layer not found: {0}".format(name)}
-    changed = []
-    for df, lyr in matches:
+    try:
+        df, lyr = resolve_unique_layer(mxd, name, command.get("data_frame", ""))
+    except RuntimeError as exc:
+        return {"ok": False, "error": u"{0}".format(exc)}
+    try:
         if not lyr.supports("DEFINITIONQUERY"):
-            continue
+            return {"ok": False, "error": u"DEFINITION_QUERY_UNSUPPORTED: {0}".format(name)}
         lyr.definitionQuery = query
-        changed.append({"name": lyr.name, "data_frame": df.name, "definition_query": query})
+    except Exception:
+        return {"ok": False, "error": u"DEFINITION_QUERY_FAILED: {0}".format(name)}
+    changed = [{"name": lyr.name, "data_frame": df.name, "definition_query": query}]
     arcpy.RefreshActiveView()
     arcpy.RefreshTOC()
     return {"ok": bool(changed), "matches": changed, "saved": False}

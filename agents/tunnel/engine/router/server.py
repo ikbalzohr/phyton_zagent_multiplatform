@@ -33,7 +33,7 @@ from .profile_admin import (PROFILE_ADMIN_SCOPES, require_profile_management, ca
                             validate_catalog, new_admin_context, revalidate_admin)
 from .identity import Placement, internal_token, verify_internal_token
 from .orchestration import Orchestrator, PreDispatchRejected
-from .orphan_conflicts import blocks_service
+from .orphan_conflicts import blocks_service, safe_read_target
 from .registry import MCPRegistry
 from .workflow_domain import WorkflowDomainJournal
 from .workflow_runtime import WorkflowRuntimeService
@@ -197,8 +197,9 @@ async def _executor(service: str, tool: str, arguments: dict[str, Any], ctx):
                 "target_device_id, executed_on FROM tasks WHERE resource_key=? "
                 "AND state='orphaned' AND started_at IS NOT NULL AND task_id<>?",
                 (ctx.resource_key, ctx.task_id)).fetchall()
-        if tool not in _FILES_IMMEDIATE_CONTROLS and any(
-                blocks_service(dict(row), service) for row in historical):
+        if (tool not in _FILES_IMMEDIATE_CONTROLS
+                and not safe_read_target(service, tool, ctx.execution_context)
+                and any(blocks_service(dict(row), service) for row in historical)):
             raise AuthorizationError("RESOURCE_RECONCILIATION_REQUIRED", 409)
         auth = await _revalidate(ctx.execution_context)
         if ctx.session_id != auth.owner:

@@ -46,7 +46,7 @@ class ArcGISProcessFileWorker:
                     payload=json.loads(res.read_text(encoding="utf-8"))
                 except Exception:
                     payload=None
-            if payload is None:
+            if not isinstance(payload, dict):
                 payload={
                     "ok":False,
                     "code":"FILE_WORKER_NO_RESULT",
@@ -60,6 +60,10 @@ class ArcGISProcessFileWorker:
                 payload["ok"]=False
                 payload["code"]="FILE_WORKER_EXIT_FAILED"
             return payload
+
+    def inspect_mxd(self, *, mxd_path):
+        """Inspect an explicit disk document in the trusted file-worker lane."""
+        return self._call('inspect_mxd', {'mxd_path': mxd_path}, timeout=60)
 
     def probe(self):
         return self._call("probe",timeout=60)

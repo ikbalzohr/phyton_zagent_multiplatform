@@ -25,6 +25,8 @@ _FAMILY = {
 # task's scheduler access_mode (legacy commands were all scheduled as write).
 _SAFE_PROBES = {
     ("zagent_arcmap", "arcmap_ping"): (frozenset({"arcmap:inspect", "arcmap:execute"}), "arcmap"),
+    ("zagent_arcmap", "arcmap_execution_capabilities"): (
+        frozenset({"arcmap:inspect", "arcmap:execute"}), "arcmap"),
 }
 
 
@@ -81,3 +83,58 @@ def blocks_service(row: Mapping[str, Any], target_service: str) -> bool:
     if not isinstance(tool, str) or not tool.startswith(prefix):
         return True
     return source == target
+
+# Explicitly reviewed, non-mutating Files tools.  Never infer observational
+# semantics from a "read" prefix or caller-provided scheduler access_mode.
+_FILES_OBSERVATIONS = frozenset({
+    "files_ping", "files_runtime_info", "files_get_root",
+    "files_exists", "files_list", "files_tree", "files_stat",
+    "files_read", "files_read_bytes_b64", "files_search", "files_hash",
+    "files_diff", "files_backup_list", "files_syntax_check",
+    "files_project_instructions", "files_workspace_status",
+    "files_workspace_list", "files_operation_status", "files_operation_list",
+    "files_capabilities", "files_allowlist_list",
+})
+
+
+def safe_read_target(service: str, tool: str, context: Mapping[str, Any]) -> bool:
+    """Permit independently authorized observations despite an uncertain write.
+
+    This only relaxes the *orphan conflict* gate. Live OAuth/grant, mapping,
+    profile-generation, device and deadline validation still execute normally.
+    The historical task and its quarantine for writes remain untouched.
+    """
+    if (not isinstance(context, Mapping)
+            or type(context.get("context_version")) is not int
+            or context["context_version"] != 1
+            or context.get("public_tool") != tool):
+        return False
+    resources = context.get("effective_resources")
+    if (not isinstance(resources, list) or len(resources) != 1
+            or not isinstance(resources[0], dict)
+            or not isinstance(context.get("installation_id"), str)
+            or not context["installation_id"]
+            or not isinstance(context.get("device_id"), str)
+            or not context["device_id"]):
+        return False
+    resource = resources[0]
+    if service in {"zagent_files", "zagent_files_v3"}:
+        return (
+            tool in _FILES_OBSERVATIONS
+            and context.get("required_scope") == "files:read"
+            and context.get("effective_access") == "read"
+            and resource.get("kind") == "files"
+            and isinstance(resource.get("resource_id"), str)
+            and bool(resource["resource_id"])
+            and isinstance(resource.get("profile_id"), str)
+            and bool(resource["profile_id"])
+        )
+    if service == "zagent_arcmap" and tool in {"arcmap_ping", "arcmap_execution_capabilities"}:
+        return (
+            context.get("required_scope") in {"arcmap:inspect", "arcmap:execute"}
+            and resource == {
+                "kind": "arcmap",
+                "resource_id": "installation:" + context["installation_id"],
+            }
+        )
+    return False

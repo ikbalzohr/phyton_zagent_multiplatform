@@ -35,6 +35,21 @@ def find_layer(mxd, layer_name, data_frame=""):
                 matches.append((df, lyr))
     return matches
 
+def resolve_unique_layer(mxd, layer_name, data_frame=""):
+    """Return one (data frame, layer) pair; never select the first duplicate."""
+    if not layer_name:
+        raise RuntimeError(u"LAYER_NAME_REQUIRED: layer_name is required")
+    if data_frame:
+        frames = [df for df in arcpy.mapping.ListDataFrames(mxd) if df.name == data_frame]
+        if len(frames) > 1:
+            raise RuntimeError(u"DATA_FRAME_AMBIGUOUS: {0} ({1} matches)".format(data_frame, len(frames)))
+    matches = find_layer(mxd, layer_name, data_frame)
+    if not matches:
+        raise RuntimeError(u"LAYER_NOT_FOUND: {0}".format(layer_name))
+    if len(matches) != 1:
+        raise RuntimeError(u"LAYER_AMBIGUOUS: {0} ({1} matches)".format(layer_name, len(matches)))
+    return matches[0]
+
 def safe_layer_source(layer):
     try:
         return layer.dataSource
