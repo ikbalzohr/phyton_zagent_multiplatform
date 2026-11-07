@@ -240,8 +240,14 @@ class Routing(unittest.TestCase):
         self.assertEqual('source_only', result['status'])
         self.assertFalse(result['deployment_verified'])
         self.assertEqual(['headless', 'attached'], result['operations']['inspect_map']['modes'])
-        for action in ('export', 'mutation', 'ui_control'):
+        for action in ('mutation', 'ui_control'):
             self.assertFalse(result['operations'][action]['supported'])
+        export = result['operations']['export']
+        self.assertTrue(export['supported'])
+        self.assertEqual(['headless'], export['modes'])
+        self.assertFalse(export['attached_supported'])
+        self.assertFalse(export['print_ready_accepted_by_export'])
+        self.assertEqual(['print_ready_template'], export['operations'])
         self.assertFalse(result['filesystem_sandbox'])
         self.assertEqual([], self.calls)
 
@@ -483,6 +489,52 @@ class Routing(unittest.TestCase):
                 self.assertEqual(code, result['code'])
                 self.assertIsNone(result['execution_lane'])
                 self.assertEqual([], self.calls)
+
+    def test_print_ready_contract_rejects_attached_and_read_only(self):
+        listing = asyncio.run(server.mcp.list_tools())
+        if hasattr(listing, 'tools'):
+            listing = listing.tools
+        tool = {item.name: item for item in listing}['arcmap_print_ready_template']
+        self.assertIs(False, tool.annotations.read_only_hint)
+        self.assertIs(False, tool.annotations.destructive_hint)
+        self.assertEqual({'headless': 300},
+                         tool.model_dump(by_alias=True)['_meta']['zagent.mode_worker_timeout_seconds'])
+        args = {'mode': 'headless', 'template_mxd': 'C:/template.mxd',
+                'data_root': 'C:/input', 'output_root': 'C:/output'}
+        with self.assertRaises(PermissionError):
+            self.invoke('arcmap_print_ready_template', args)
+        with self.assertRaises(Exception):
+            self.invoke('arcmap_print_ready_template',
+                        dict(args, unexpected='forbidden'),
+                        raw_context(effective_access='write'))
+        result = self.invoke('arcmap_print_ready_template', dict(args, mode='attached'),
+                             raw_context(effective_access='write'))
+        self.assertFalse(result['ok'])
+        self.assertEqual('HEADLESS_MODE_REQUIRED', result['code'])
+        self.assertEqual([], self.calls)
+
+    def test_print_ready_headless_dispatch_isolated_from_desktop(self):
+        from types import SimpleNamespace
+        worker_module = importlib.import_module('orchestrator.adapters.file_worker.arcgis_process')
+        args = {'mode': 'headless', 'template_mxd': 'C:/template.mxd',
+                'data_root': 'C:/input', 'output_root': 'C:/output'}
+        records = []
+        def print_disk(**kwargs):
+            records.append(kwargs)
+            return {'ok': True, 'execution_mode': 'headless',
+                    'print_ready_accepted': False}
+        with patch.object(worker_module, 'ArcGISProcessFileWorker',
+                          return_value=SimpleNamespace(print_ready_template=print_disk)) as factory:
+            with patch.object(server.services.safety, 'guard', return_value=None) as guard:
+                result = self.invoke('arcmap_print_ready_template', args,
+                                     raw_context(effective_access='write'))
+            self.assertTrue(result['ok'], result)
+            self.assertFalse(result['print_ready_accepted'])
+            self.assertEqual(['save','export'],[x.args[0] for x in guard.call_args_list])
+            factory.assert_called_once_with(ENGINE, timeout_seconds=300)
+        self.assertEqual('C:/template.mxd', records[0]['template_mxd'])
+        self.assertEqual(1,len(records))
+        self.assertEqual([], self.calls)
 
     def setUp(self):
         self.calls = []

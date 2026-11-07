@@ -112,7 +112,10 @@ class AgentServices:
             'ok': True, 'status': 'source_only', 'deployment_verified': False,
             'operations': {
                 'inspect_map': {'supported': True, 'modes': ['headless', 'attached']},
-                'export': {'supported': False, 'reason': 'NOT_YET_DUAL_MODE'},
+                'export': {'supported': True, 'modes': ['headless'],
+                           'operations': ['print_ready_template'],
+                           'attached_supported': False,
+                           'print_ready_accepted_by_export': False},
                 'mutation': {'supported': False, 'reason': 'UNSUPPORTED_IN_MVP'},
                 'ui_control': {'supported': False, 'reason': 'ATTACHED_ONLY_LEGACY_TOOLS'},
             },
@@ -133,6 +136,27 @@ class AgentServices:
                 return {'ok': False, 'code': code}
             worker = ArcGISProcessFileWorker(Path(__file__).resolve().parents[1], timeout_seconds=300)
             return worker.inspect_mxd(mxd_path=mxd_path)
+
+    def print_ready_template(self, *, template_mxd, data_root, output_root,
+                             scale=70000, dpi=400, main_frame='Layers',
+                             expected_crs='WGS_1984_UTM_Zone_51N'):
+        """Authenticated headless/disk export; never contacts the CURRENT bridge."""
+        from orchestrator.adapters.file_worker.arcgis_process import ArcGISProcessFileWorker
+        with _HEADLESS_LOCK:
+            ctx = self._inspection_context_locked()
+            if ctx.get('effective_access') != 'write':
+                raise PermissionError('WRITE_SCOPE_REQUIRED')
+            if self.upstream_read_only:
+                return {'ok': False, 'code': 'DEV_UPSTREAM_READ_ONLY'}
+            for required_kind in ('save', 'export'):
+                blocked = self.safety.guard(required_kind)
+                if blocked:
+                    return blocked
+            worker = ArcGISProcessFileWorker(Path(__file__).resolve().parents[1], timeout_seconds=300)
+            return worker.print_ready_template(
+                template_mxd=template_mxd, data_root=data_root,
+                output_root=output_root, scale=scale, dpi=dpi,
+                main_frame=main_frame, expected_crs=expected_crs)
 
     def call(self, action, kind="read", **payload):
         # One UI-bound ArcMap owner; context expiry is rechecked under lock.

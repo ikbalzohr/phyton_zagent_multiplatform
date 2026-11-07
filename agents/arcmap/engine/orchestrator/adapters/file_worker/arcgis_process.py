@@ -104,6 +104,37 @@ class ArcGISProcessFileWorker:
             "disposable":bool(disposable),
         })
 
+    def print_ready_template(self, *, template_mxd, data_root, output_root,
+                             scale=70000, dpi=400, main_frame='Layers',
+                             expected_crs='WGS_1984_UTM_Zone_51N'):
+        """Isolated Python2/ArcPy disk-only print job, never CURRENT."""
+        result = self._call('print_ready_template', {
+            'template_mxd': template_mxd, 'data_root': data_root,
+            'output_root': output_root, 'scale': float(scale),
+            'dpi': int(dpi), 'main_frame': main_frame,
+            'expected_crs': expected_crs,
+        }, timeout=300)
+        if not result.get('ok'):
+            return result
+        from orchestrator.validators.pdf_export import validate_pdf_png
+        exports = result.get('exports') or {}
+        pdf = (exports.get('PDF') or {}).get('path')
+        png = (exports.get('PNG') or {}).get('path')
+        if not pdf or not png:
+            return dict(result, ok=False, code='EXPORT_PATH_MISSING')
+        verification = validate_pdf_png(pdf, png, int(dpi))
+        result['structural_qa'] = verification
+        result['print_ready_accepted'] = False
+        if not verification['ok']:
+            result['ok'] = False
+            result['code'] = 'STRUCTURAL_QA_FAILED'
+        report = result.get('working_mxd')
+        if report and Path(report).is_file():
+            (Path(report).parent / 'structural_qa.json').write_text(
+                json.dumps(verification, ensure_ascii=False, indent=2),
+                encoding='utf-8')
+        return result
+
     def render_staging(self, *, working_mxd, staging_dir, outputs, base_name=""):
         return self._call("render_staging",{
             "working_mxd":working_mxd,
