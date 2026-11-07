@@ -35,3 +35,13 @@ if (-not (Test-Path -LiteralPath $config -PathType Leaf)) {
     throw 'Local-owner Dashboard configuration missing after provisioning.'
 }
 Write-Host 'One-time HTTPS provisioning complete. Chrome will open the Dashboard.' -ForegroundColor Green
+$arcMapInstaller = Join-Path $root 'setup\Install-ArcMapIntegration.ps1'
+if (Test-Path -LiteralPath $arcMapInstaller -PathType Leaf) {
+    try {
+        & $arcMapInstaller -InstallRoot $root -RetireProduction | Out-Host
+        Write-Host 'ArcMap Multi Platform Add-In prepared for automatic startup.' -ForegroundColor Green
+    }
+    catch {
+        Write-Warning ('ArcMap integration deferred (ArcMap may still be running): ' + $_.Exception.Message)
+    }
+}

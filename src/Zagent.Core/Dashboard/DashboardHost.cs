@@ -189,7 +189,7 @@ public static class DashboardHost
             return await Accept(operations, ctx, "approval.resolve", request);
         }).RequireAuthorization("Administrator").RequireRateLimiting("commands");
         app.MapPost(api + "/connections/actions", async (ManagerIntegrationActionRequest request, HttpContext ctx, ManagementOperations operations) => {
-            if (request.Action is not ("chrome.check" or "arcmap.check")) return Results.BadRequest();
+            if (request.Action is not ("chrome.check" or "arcmap.check" or "arcmap.open_setup" or "arcmap.repair_bridge")) return Results.BadRequest();
             return await Accept(operations, ctx, "integrations.action", request);
         }).RequireAuthorization("Operator").RequireRateLimiting("commands");
     }

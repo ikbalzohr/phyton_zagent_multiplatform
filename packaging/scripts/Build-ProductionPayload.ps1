@@ -113,7 +113,7 @@ Copy-Item -LiteralPath $launcher -Destination (Join-Path $OutputRoot "Zagent.Lau
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "FirstRun-ZagentMultiPlatform.ps1") -Destination $OutputRoot
 $setupScripts = Join-Path $OutputRoot "setup"
 New-Item -ItemType Directory -Force -Path $setupScripts | Out-Null
-foreach ($helper in @("Provision-WindowsDashboard.ps1", "WindowsDashboard-Provisioning.ps1")) {
+foreach ($helper in @("Provision-WindowsDashboard.ps1", "WindowsDashboard-Provisioning.ps1", "Install-ArcMapIntegration.ps1")) {
   Copy-Item -LiteralPath (Join-Path $PSScriptRoot $helper) -Destination $setupScripts
 }
 Copy-Item -LiteralPath (Join-Path $Root "component-manifest.json") -Destination $OutputRoot
@@ -210,7 +210,7 @@ if (-not $ffmpegDir) {
 
 Copy-Tree $ffmpegDir.FullName (Join-Path $browserDestination $ffmpegDir.Name)
 
-& (Join-Path $PSScriptRoot "Build-ArcMapAddIn.ps1") | Out-Null
+& (Join-Path $PSScriptRoot "Build-ArcMapAddIn.ps1") -Overwrite | Out-Null
 # ArcMap
 $arcOut = Join-Path $agentsOut "arcmap"
 $arcEngine = Join-Path $arcOut "engine"

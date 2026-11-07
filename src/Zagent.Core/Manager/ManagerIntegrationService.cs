@@ -129,12 +129,20 @@ public sealed class ManagerIntegrationService
                 ? "Detected - ArcMap 10.6.1"
                 : "Not detected";
 
-        var addIn = FindFirstFile(
-            Path.Combine(
-                _zagentRoot,
-                "agents",
-                "arcmap"),
-            "*.esriaddin");
+        var addIn = Path.Combine(
+            _zagentRoot,
+            "agents",
+            "arcmap",
+            "artifacts",
+            "Zagent.MultiPlatform.ArcMap.esriaddin");
+
+        var installedAddIn = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "ArcGIS",
+            "AddIns",
+            "Desktop10.6",
+            "{6A9B7E2C-541F-4693-AB20-78D6E2C02111}",
+            "Zagent.MultiPlatform.ArcMap.esriaddin");
 
         var toolbox = Path.Combine(
             _zagentRoot,
@@ -174,9 +182,11 @@ public sealed class ManagerIntegrationService
             ArcMapDesktopStatus:
                 arcMapDesktopStatus,
             ArcMapAddInStatus:
-                addIn is null
-                    ? "Add-In package missing"
-                    : "Packaged",
+                File.Exists(installedAddIn)
+                    ? "Installed - restart ArcMap to load"
+                    : File.Exists(addIn)
+                        ? "Packaged - setup available"
+                        : "Add-In package missing",
             ArcMapToolsStatus:
                 File.Exists(toolbox)
                     ? "ArcMapAgent.pyt Ready"
@@ -547,41 +557,79 @@ public sealed class ManagerIntegrationService
     private string PrepareArcMapSetup()
     {
         EnsureArcMapRuntimeLocator();
+        return InstallArcMapAddIn();
+    }
 
-        var toolbox = Path.Combine(
+    private string InstallArcMapAddIn()
+    {
+        var script = Path.Combine(
             _zagentRoot,
-            "agents",
-            "arcmap",
-            "engine",
-            "arcmap_bridge",
-            "ArcMapAgent.pyt");
+            "setup",
+            "Install-ArcMapIntegration.ps1");
 
-        if (!File.Exists(toolbox))
+        if (!File.Exists(script))
         {
             throw new FileNotFoundException(
-                "ArcMapAgent.pyt was not found.",
-                toolbox);
+                "Multi Platform ArcMap installer is missing.",
+                script);
         }
 
-        Process.Start(
-            new ProcessStartInfo
-            {
-                FileName = "explorer.exe",
-                Arguments = $"/select,\"{toolbox}\"",
-                UseShellExecute = true
-            });
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
 
-        return "ArcMap runtime locator prepared. Install the packaged Zagent ArcMap Add-In and reopen ArcMap to attach automatically.";
+        foreach (var argument in new[]
+        {
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy", "Bypass",
+            "-File", script,
+            "-InstallRoot", _zagentRoot,
+            "-RetireProduction"
+        })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo) ??
+            throw new InvalidOperationException(
+                "Unable to launch ArcMap integration installer.");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+
+        if (!process.WaitForExit(45000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException(
+                "ArcMap integration setup timed out.");
+        }
+
+        Task.WaitAll(stdout, stderr);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                "ArcMap integration install failed: " + stderr.Result);
+        }
+
+        return "Multi Platform ArcMap Add-In and toolbox installed for the current Windows user. " +
+            "Legacy Production Add-In registration was retired where present; restart ArcMap to activate. " +
+            stdout.Result.Trim();
     }
 
     private async Task<string> RepairArcMapAsync(
         CancellationToken cancellationToken)
     {
         EnsureArcMapRuntimeLocator();
+        var installed = InstallArcMapAddIn();
 
         return await RestartAgentAsync(
             ArcMapAgentManifestFactory.AgentId,
-            "ArcMap MCP restarted and runtime locator repaired. External ArcMap remains open.",
+            "ArcMap MCP restarted; " + installed,
             cancellationToken);
     }
 

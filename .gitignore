@@ -9,7 +9,8 @@
 /packaging/staging/
 /packaging/runtime/
 /agents/arcmap/artifacts/
-/agents/arcmap/addin/Install/
+# The ArcMap Add-In Python source under addin/Install is tracked.
+# Compiled .esriaddin packages remain ignored under agents/arcmap/artifacts/.
 /agents/arcmap/engine/vendor27/
 /agents/tunnel/transport/
 /agents/web/engine/artifacts/
