@@ -66,6 +66,78 @@ def _page_mm(mxd):
     raise ValueError('NOT_A4_LANDSCAPE: native_page=%s,%s' % (w, h))
 
 
+def _normalize_template_layout(mxd):
+    """Tidy source-template text and page border on the disposable MXD only."""
+    arcpy = engine._arcpy()
+    elements = list(arcpy.mapping.ListLayoutElements(mxd))
+    changes = []
+    keys = [e for e in elements if e.type == 'TEXT_ELEMENT'
+            and 'Coordinate System' in (e.text or '')
+            and 'Projection' in (e.text or '')]
+    values = [e for e in elements if e.type == 'TEXT_ELEMENT'
+              and ': WGS 1984 UTM Zone 51N' in (e.text or '')
+              and ': Transverse' in (e.text or '')]
+    if keys or values:
+        if len(keys) != 1 or len(values) != 1:
+            raise ValueError('CRS_COLUMN_AMBIGUOUS')
+        key, value = keys[0], values[0]
+        minimum_x = float(key.elementPositionX) + float(key.elementWidth) + 0.35
+        if float(value.elementPositionX) < minimum_x:
+            if minimum_x + float(value.elementWidth) > float(mxd.pageSize.width) - 0.3:
+                raise ValueError('CRS_COLUMN_NO_ROOM')
+            value.elementPositionX = minimum_x
+            changes.append('CRS_VALUE_COLUMN_SEPARATED')
+    for element in elements:
+        if element.type == 'TEXT_ELEMENT' and 'Transverse Mecrator' in (element.text or ''):
+            element.text = element.text.replace('Transverse Mecrator', 'Transverse Mercator')
+            changes.append('CRS_PROJECTION_TYPO_CORRECTED')
+    width = float(mxd.pageSize.width)
+    height = float(mxd.pageSize.height)
+    outer = [e for e in elements if e.type == 'GRAPHIC_ELEMENT'
+             and float(e.elementWidth) > width * 0.96
+             and float(e.elementHeight) > height * 0.96]
+    if len(outer) > 1:
+        raise ValueError('PAGE_BORDER_NOT_UNIQUE')
+    if outer:
+        e = outer[0]
+        if (float(e.elementPositionX) < 0.49 or
+                float(e.elementPositionY) < 0.49 or
+                width-float(e.elementPositionX)-float(e.elementWidth) < 0.49 or
+                height-float(e.elementPositionY)-float(e.elementHeight) < 0.49):
+            e.elementPositionX = 0.5
+            e.elementPositionY = 0.5
+            e.elementWidth = width - 1.0
+            e.elementHeight = height - 1.0
+            changes.append('PAGE_BORDER_5MM_SAFE_MARGIN')
+    # Graticule labels extend beyond the main data-frame neatline.
+    # Preserve actual scale while reserving space for printed edge labels.
+    main_boxes = [e for e in elements if e.type == 'DATAFRAME_ELEMENT'
+                  and e.name == 'Layers'
+                  and float(e.elementWidth) > width * 0.5
+                  and float(e.elementHeight) > height * 0.5]
+    if len(main_boxes) > 1:
+        raise ValueError('MAIN_LAYOUT_FRAME_NOT_UNIQUE')
+    if main_boxes:
+        box = main_boxes[0]
+        right = float(box.elementPositionX) + float(box.elementWidth)
+        bottom = float(box.elementPositionY)
+        top = bottom + float(box.elementHeight)
+        px = 10.0 / _page_mm(mxd)['mm_per_native_unit']
+        new_x = max(float(box.elementPositionX), 1.55 * px)
+        new_y = max(bottom, 1.25 * px)
+        new_top = min(top, height - 1.45 * px)
+        if new_top - new_y < 17.0 * px or right - new_x < 17.5 * px:
+            raise ValueError('MAIN_FRAME_PRINT_CLEARANCE_NO_ROOM')
+        if (new_x != float(box.elementPositionX) or
+                new_y != bottom or new_top != top):
+            box.elementPositionX = new_x
+            box.elementPositionY = new_y
+            box.elementWidth = right - new_x
+            box.elementHeight = new_top - new_y
+            changes.append('MAIN_FRAME_GRID_LABEL_CLEARANCE')
+    return changes
+
+
 def _layout_qa(mxd, main_name, expected_scale, expected_crs, minimum_font_pt=6.0):
     arcpy = engine._arcpy()
     frames = list(arcpy.mapping.ListDataFrames(mxd))
@@ -102,6 +174,23 @@ def _layout_qa(mxd, main_name, expected_scale, expected_crs, minimum_font_pt=6.0
         raise ValueError('ELEMENTS_OUTSIDE_PAGE: ' + repr(outside))
     if low_font:
         raise ValueError('FONT_TOO_SMALL: ' + repr(low_font))
+    keys = [e for e in elements if e.type == 'TEXT_ELEMENT'
+            and 'Coordinate System' in (e.text or '') and 'Projection' in (e.text or '')]
+    values = [e for e in elements if e.type == 'TEXT_ELEMENT'
+              and ': WGS 1984 UTM Zone 51N' in (e.text or '')]
+    if keys or values:
+        if len(keys) != 1 or len(values) != 1:
+            raise ValueError('CRS_COLUMN_AMBIGUOUS')
+        if (float(values[0].elementPositionX) - float(keys[0].elementPositionX)
+                - float(keys[0].elementWidth) < 0.24):
+            raise ValueError('CRS_TEXT_COLUMNS_OVERLAP')
+    for e in elements:
+        if (e.type == 'GRAPHIC_ELEMENT' and float(e.elementWidth) > width * 0.9
+                and float(e.elementHeight) > height * 0.9):
+            if min(float(e.elementPositionX), float(e.elementPositionY),
+                   width-float(e.elementPositionX)-float(e.elementWidth),
+                   height-float(e.elementPositionY)-float(e.elementHeight)) < 0.49:
+                raise ValueError('PRINTER_SAFE_MARGIN_NOT_MET')
     text_blob = '\n'.join(texts).upper()
     for required in ('PETA ADMINISTRASI', 'PT BUOL AGRI LESTARI',
                      'SUMBER DATA', 'WGS 1984 UTM'):
@@ -197,9 +286,8 @@ def build(template_mxd, data_root, output_root, scale=70000,
         if len(main) != 1:
             raise ValueError('MAIN_FRAME_NOT_UNIQUE')
         main[0].scale = float(scale)
-        for element in arcpy.mapping.ListLayoutElements(mxd, 'TEXT_ELEMENT'):
-            if 'Transverse Mecrator' in element.text:
-                element.text = element.text.replace('Transverse Mecrator', 'Transverse Mercator')
+        layout_adjustments = _normalize_template_layout(mxd)
+        main[0].scale = float(scale)  # Resizing a frame can change scale.
         mxd.save()  # Working copy only.
         qa = _layout_qa(mxd, main_frame, scale, expected_crs)
         exported = engine.export_map(
@@ -219,7 +307,8 @@ def build(template_mxd, data_root, output_root, scale=70000,
     report = {'ok': True, 'print_ready_accepted': False, 'job_id': job_id,
               'execution_mode': 'headless', 'working_mxd': working,
               'original_mxd': template_mxd, 'original_sha256': before,
-              'original_unchanged': True, 'source_bindings': replaced,
+              'original_unchanged': True, 'layout_adjustments': layout_adjustments,
+              'source_bindings': replaced,
               'removed_unmatched_hidden_layers': removed_hidden,
               'qa': qa, 'exports': files, 'dpi_requested': int(dpi),
               'pending': ['PDF page-box and raster dimensions independent validation',

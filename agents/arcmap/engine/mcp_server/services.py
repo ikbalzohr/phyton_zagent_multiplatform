@@ -148,7 +148,7 @@ class AgentServices:
                 raise PermissionError('WRITE_SCOPE_REQUIRED')
             if self.upstream_read_only:
                 return {'ok': False, 'code': 'DEV_UPSTREAM_READ_ONLY'}
-            for required_kind in ('save', 'export'):
+            for required_kind in ('headless_print_ready', 'export'):
                 blocked = self.safety.guard(required_kind)
                 if blocked:
                     return blocked

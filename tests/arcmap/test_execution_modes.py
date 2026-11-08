@@ -530,7 +530,7 @@ class Routing(unittest.TestCase):
                                      raw_context(effective_access='write'))
             self.assertTrue(result['ok'], result)
             self.assertFalse(result['print_ready_accepted'])
-            self.assertEqual(['save','export'],[x.args[0] for x in guard.call_args_list])
+            self.assertEqual(['headless_print_ready','export'],[x.args[0] for x in guard.call_args_list])
             factory.assert_called_once_with(ENGINE, timeout_seconds=300)
         self.assertEqual('C:/template.mxd', records[0]['template_mxd'])
         self.assertEqual(1,len(records))

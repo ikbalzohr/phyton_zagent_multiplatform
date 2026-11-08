@@ -2,6 +2,7 @@
   "safe_mode": true,
   "allow_live_write": false,
   "allow_save": false,
+  "allow_headless_print_ready": false,
   "allow_destructive_operations": false,
   "allow_geoprocessing": false,
   "allow_export": true,

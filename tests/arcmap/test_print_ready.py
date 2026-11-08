@@ -42,7 +42,8 @@ class LayoutFixture:
             element('Double Alternating Scale Bar','MAPSURROUND_ELEMENT'),
             element('Title','TEXT_ELEMENT',text='PETA ADMINISTRASI PT BUOL AGRI LESTARI'),
             element('Source','TEXT_ELEMENT',text='SUMBER DATA'),
-            element('CRS','TEXT_ELEMENT',text='WGS 1984 UTM Zone 51N'),
+            element('CRS','TEXT_ELEMENT',text=': WGS 1984 UTM Zone 51N\n: Transverse Mercator', x=24.75,y=8.354,w=3.545,h=1.289),
+            element('CRS-Keys','TEXT_ELEMENT',text='Coordinate System\nProjection\nDatum\nUnits', x=22.0,y=8.354,w=2.4,h=1.289),
         ]
         self.mxd=NS(pageSize=NS(width=29.6968927,height=20.9973753))
     def fake_arcpy(self):
@@ -98,6 +99,55 @@ class PrintReadyTests(unittest.TestCase):
         self.assertEqual(len(qa['frames']),3)
         self.assertEqual(qa['legend_items'],['PT BUOL AGRI LESTARI'])
         self.assertEqual(qa['grid'],'NOT_INDEPENDENTLY_VERIFIED')
+
+    def test_crs_text_overlap_rejected(self):
+        f=LayoutFixture()
+        f.elements[8].elementPositionX=24.1
+        with self.assertRaisesRegex(ValueError,'CRS_TEXT_COLUMNS_OVERLAP'):
+            f.evaluate()
+
+    def test_outer_border_requires_5mm_printer_margin(self):
+        f=LayoutFixture()
+        f.elements.append(element('Outer','GRAPHIC_ELEMENT',x=0.183,y=0.085,
+                                  w=29.342,h=20.807))
+        with self.assertRaisesRegex(ValueError,'PRINTER_SAFE_MARGIN_NOT_MET'):
+            f.evaluate()
+
+    def test_disposable_template_corrects_crs_columns_and_page_margin(self):
+        f=LayoutFixture()
+        f.elements[8].elementPositionX=24.1
+        f.elements[8].text=f.elements[8].text.replace('Mercator','Mecrator')
+        border=element('Outer','GRAPHIC_ELEMENT',x=0.183,y=0.085,
+                       w=29.342,h=20.807)
+        f.elements.append(border)
+        with patch.object(print_ready.engine,'_arcpy',return_value=f.fake_arcpy()):
+            changes=print_ready._normalize_template_layout(f.mxd)
+        self.assertIn('CRS_VALUE_COLUMN_SEPARATED',changes)
+        self.assertIn('CRS_PROJECTION_TYPO_CORRECTED',changes)
+        self.assertIn('PAGE_BORDER_5MM_SAFE_MARGIN',changes)
+        self.assertGreaterEqual(f.elements[8].elementPositionX,24.75)
+        self.assertAlmostEqual(border.elementPositionX,0.5)
+        self.assertAlmostEqual(border.elementPositionY,0.5)
+        self.assertAlmostEqual(border.elementWidth, f.mxd.pageSize.width - 1.0)
+        self.assertIn('Mercator',f.elements[8].text)
+        self.assertEqual(f.evaluate()['outside_page'],[])
+
+    def test_main_frame_reserves_print_clearance_for_graticules(self):
+        f=LayoutFixture()
+        main_element=f.elements[0]
+        main_element.elementPositionX=1.112
+        main_element.elementPositionY=0.801
+        main_element.elementWidth=19.454
+        main_element.elementHeight=19.399
+        old_right=main_element.elementPositionX+main_element.elementWidth
+        with patch.object(print_ready.engine,'_arcpy',return_value=f.fake_arcpy()):
+            actions=print_ready._normalize_template_layout(f.mxd)
+        self.assertIn('MAIN_FRAME_GRID_LABEL_CLEARANCE',actions)
+        self.assertGreaterEqual(main_element.elementPositionX,1.55)
+        self.assertGreaterEqual(main_element.elementPositionY,1.25)
+        self.assertLessEqual(main_element.elementPositionY+main_element.elementHeight,19.55)
+        self.assertAlmostEqual(main_element.elementPositionX+main_element.elementWidth,old_right)
+        self.assertEqual(f.evaluate()['main_frame'],'Layers')
 
     def test_legend_overflow_is_failure(self):
         f=LayoutFixture()
