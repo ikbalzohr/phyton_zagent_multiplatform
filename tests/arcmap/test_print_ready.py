@@ -176,7 +176,7 @@ class PrintReadyTests(unittest.TestCase):
     def test_missing_source_attribution_is_failure(self):
         f=LayoutFixture()
         f.elements[7].text='NO ATTRIBUTION'
-        with self.assertRaisesRegex(ValueError,'REQUIRED_TEXT_MISSING'):
+        with self.assertRaisesRegex(ValueError,'SOURCE_ATTRIBUTION_MISSING'):
             f.evaluate()
 
     def test_legend_must_be_subset_of_visible_layers(self):
@@ -195,7 +195,7 @@ class PrintReadyTests(unittest.TestCase):
         client._call=lambda op,arguments,timeout=None: calls.append((op,arguments,timeout)) or {'ok':True,'exports':{'PDF':{'path':'C:/out/a.pdf'},'PNG':{'path':'C:/out/a.png'}}}
         with patch('orchestrator.validators.pdf_export.validate_pdf_png',
                    return_value={'ok':True,'structural_qa_pass':True}) as verifier:
-            response=client.print_ready_template(template_mxd='C:/in.mxd',data_root='C:/data',output_root='C:/out')
+            response=client.print_ready_template(template_mxd='C:/in.mxd',data_root='C:/data',output_root='C:/out', resolved_rules={'rules':{'scale':{'mode':'auto'}}})
         self.assertTrue(response['ok'])
         self.assertTrue(response['structural_qa']['structural_qa_pass'])
         self.assertFalse(response['print_ready_accepted'])

@@ -138,7 +138,7 @@ class AgentServices:
             return worker.inspect_mxd(mxd_path=mxd_path)
 
     def print_ready_template(self, *, template_mxd, data_root, output_root,
-                             scale=70000, dpi=400, main_frame='Layers',
+                             scale=0, dpi=400, main_frame='Layers',
                              expected_crs='WGS_1984_UTM_Zone_51N'):
         """Authenticated headless/disk export; never contacts the CURRENT bridge."""
         from orchestrator.adapters.file_worker.arcgis_process import ArcGISProcessFileWorker
@@ -152,11 +152,24 @@ class AgentServices:
                 blocked = self.safety.guard(required_kind)
                 if blocked:
                     return blocked
+            from orchestrator.cartographic_rules import resolve_rules, CartographicRuleError
+            if int(dpi) != 400:
+                return {'ok': False, 'code': 'CARTOGRAPHIC_FIXED_DPI_400'}
+            try:
+                resolved = resolve_rules(
+                    Path(__file__).resolve().parents[1], data_root,
+                    scale_override=scale)
+            except (CartographicRuleError, OSError, ValueError) as exc:
+                return {'ok': False, 'code': 'CARTOGRAPHIC_RULES_INVALID',
+                        'message': str(exc)}
+            selected_scale = float(
+                resolved['rules']['scale'].get('requested', 0))
             worker = ArcGISProcessFileWorker(Path(__file__).resolve().parents[1], timeout_seconds=300)
             return worker.print_ready_template(
                 template_mxd=template_mxd, data_root=data_root,
-                output_root=output_root, scale=scale, dpi=dpi,
-                main_frame=main_frame, expected_crs=expected_crs)
+                output_root=output_root, scale=selected_scale, dpi=dpi,
+                main_frame=main_frame, expected_crs=expected_crs,
+                resolved_rules=resolved)
 
     def call(self, action, kind="read", **payload):
         # One UI-bound ArcMap owner; context expiry is rechecked under lock.

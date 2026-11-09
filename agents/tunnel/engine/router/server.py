@@ -38,7 +38,7 @@ from .registry import MCPRegistry
 from .workflow_domain import WorkflowDomainJournal
 from .workflow_runtime import WorkflowRuntimeService
 from .workflow_security import execution_authority
-from . import task_recovery, allowlist_access
+from . import task_recovery, arcmap_probe_recovery, allowlist_access
 
 SERVER_INFO = {"name": "Zagent Tunnel", "version": "1.0.0"}
 PROTOCOL = "2025-11-25"  # candidate; client conformance NOT_RUN
@@ -370,7 +370,9 @@ def _management_tools():
         "description": "Explicit owner-only enablement of four native allowlist memberships on your existing grant. Plan first; apply requires exact revision and plan. No other grant or policy changes.",
         "inputSchema": allowlist_access.SCHEMA}, {"name": task_recovery.TOOL,
         "description": "Immediate owned orphaned read-only Files search recovery. Plan first; apply with expected_plan. Never replays the search or returns a durable receipt.",
-        "inputSchema": task_recovery.SCHEMA},
+        "inputSchema": task_recovery.SCHEMA}, {"name": arcmap_probe_recovery.TOOL,
+        "description": "Immediate owner-only recovery of interrupted no-effect ArcMap Stage 3 health probes. Plan/apply with audit; never replays or deletes a task.",
+        "inputSchema": arcmap_probe_recovery.SCHEMA},
         _tool("zagent_access_status"), _tool("zagent_capabilities"),
         _tool("zagent_reconciliation_status", {"limit":{"type":"integer","minimum":1,"maximum":100}}),
         _tool("zagent_task_submit", {"tool_name":string,"arguments":{"type":"object"},"idempotency_key":string}, ("tool_name",)),
@@ -407,6 +409,9 @@ def _visible(auth: AuthContext):
                 tools.append(tool); continue
             if name == task_recovery.TOOL:
                 task_recovery.require_available(auth, authorizer(), _policy)
+                tools.append(tool); continue
+            if name == arcmap_probe_recovery.TOOL:
+                arcmap_probe_recovery.require_available(auth, authorizer, _policy)
                 tools.append(tool); continue
             policy = _policy(name)
             _require_tool(auth, policy["scope"], name)
@@ -489,6 +494,9 @@ async def _dispatch(name: str, arguments: dict[str, Any], auth: AuthContext, bea
     if name == task_recovery.TOOL:
         return _text(await task_recovery.recover(orchestrator, arguments, auth, placement,
                                                 authorizer, _policy))
+    if name == arcmap_probe_recovery.TOOL:
+        return _text(await arcmap_probe_recovery.recover(
+            orchestrator, arguments, auth, placement, authorizer, _policy))
     if name == "zagent_reconciliation_status":
         # Authenticated owner-only diagnosis. No Files backend/catalog dependency,
         # no executor or resource-lock mutation, no visibility into other owners.
@@ -625,7 +633,7 @@ async def mcp(request: Request):
             name, arguments = params.get("name"), params.get("arguments", {})
             if not isinstance(name, str) or not isinstance(arguments, dict):
                 raise ValueError("INVALID_TOOL_ARGUMENTS")
-            if name == task_recovery.TOOL and set(params) - {'name', 'arguments'}:
+            if name in {task_recovery.TOOL, arcmap_probe_recovery.TOOL} and set(params) - {'name', 'arguments'}:
                 raise ValueError('CLIENT_AUTHORITY_NOT_ALLOWED')
             target = arguments.get('tool_name') if name == 'zagent_task_submit' else name
             if isinstance(target, str) and target in PROFILE_ADMIN_SCOPES:

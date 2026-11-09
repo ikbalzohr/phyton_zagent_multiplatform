@@ -10,13 +10,16 @@ def register(mcp, s):
               meta={'zagent.mode_worker_timeout_seconds': {'headless': 300}})
     def arcmap_print_ready_template(mode: str, template_mxd: str,
                                     data_root: str, output_root: str,
-                                    scale: float = 70000, dpi: int = 400,
+                                    scale: float = 0, dpi: int = 400,
                                     main_frame: str = 'Layers',
                                     expected_crs: str = 'WGS_1984_UTM_Zone_51N'):
         """Use a disk MXD copy and local GIS data to export A4 landscape PDF+PNG.
 
-        Requires authenticated ArcMap write authority and export/save policy.
-        Result is a candidate; independent PDF and visual QA remain required.
+        Scale=0 selects automatic scale from global/project ZAGENT.md;
+        a positive scale is a one-job override.
+        Requires authenticated ArcMap write authority plus headless-print and export
+        permissions; does not grant CURRENT MXD save or live write.
+        Export is a candidate; independent PDF and visual QA remain required.
         """
         if mode != 'headless':
             return {'ok': False, 'code': 'HEADLESS_MODE_REQUIRED',

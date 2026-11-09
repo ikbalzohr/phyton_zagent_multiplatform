@@ -52,8 +52,10 @@ def inspect(job_dir: Path, dpi=400, visual_reviewed=False):
     if not original.is_file() or _sha256(original) != report.get("original_sha256"):
         errors.append("ORIGINAL_MXD_HASH_CHANGED")
     qa = report.get("qa") or {}
-    if int(round(float(qa.get("scale", 0)))) != 70000:
-        errors.append("MAP_SCALE_NOT_70000")
+    chosen = float(report.get("selected_scale") or qa.get("scale") or 0)
+    if chosen < 1000 or abs(float(qa.get("scale", 0)) - chosen) > 0.05:
+        errors.append("MAP_SCALE_NOT_MATCHING_RESOLVED_RULES")
+    metrics["selected_scale"] = chosen
     if qa.get("crs") != "WGS_1984_UTM_Zone_51N":
         errors.append("MAIN_CRS_MISMATCH")
     frames = qa.get("frames") or []
@@ -75,25 +77,58 @@ def inspect(job_dir: Path, dpi=400, visual_reviewed=False):
             words = page.get_text("words")
             text_content = page.get_text("text")
             metrics["word_count"] = len(words)
-            required = ("PETA ADMINISTRASI", "PT BUOL AGRI LESTARI",
-                        "Transverse Mercator", "Sumber Data dan Riwayat Peta",
-                        "LEGENDA", "SKALA 1 : 3.500.000",
-                        "SKALA 1 : 23.000.000")
+            required = ("PETA", "Sumber Data", "LEGENDA", "INSET PETA")
             for token in required:
                 if token not in text_content:
                     errors.append("PDF_TEXT_MISSING: " + token)
             if text_content.count("INSET PETA") != 2:
                 errors.append("INSET_TITLES_NOT_TWO")
+            main_scale_text = re.search(r"(?i)Skala\s+1\s*:\s*([0-9][0-9.]*)", text_content)
+            if not main_scale_text:
+                errors.append("MAIN_SCALE_LABEL_MISSING")
+            else:
+                try:
+                    rendered_scale = int(main_scale_text.group(1).replace(".", ""))
+                    metrics["main_scale_label"] = rendered_scale
+                    if abs(rendered_scale - chosen) > 0.5:
+                        errors.append("MAIN_SCALE_LABEL_MISMATCH")
+                except ValueError:
+                    errors.append("MAIN_SCALE_LABEL_INVALID")
+            scale_labels = []
+            for token in re.findall(r"(?i)Skala\s+1\s*:\s*([0-9][0-9.]*)", text_content):
+                try:
+                    scale_labels.append(int(token.replace(".", "")))
+                except ValueError:
+                    errors.append("SCALE_LABEL_INVALID")
+            expected_labels = [int(round(float(item["scale"]))) for item in frames]
+            metrics["pdf_scale_labels"] = scale_labels
+            metrics["expected_frame_scales"] = expected_labels
+            if sorted(scale_labels) != sorted(expected_labels):
+                errors.append("MAIN_OR_INSET_SCALE_LABELS_DO_NOT_MATCH_FRAMES")
 
-            for name, pattern, lower, upper in (
-                ("longitude", r"121\u00b0(\d{1,2})'0\"E", 20, 35),
-                ("latitude", r"1\u00b0(\d{1,2})'0\"N", 1, 15),
-            ):
-                series = sorted({int(t) for t in re.findall(pattern, text_content)
-                                 if lower <= int(t) <= upper})
-                metrics["main_grid_" + name + "_minutes"] = series
-                if len(series) < 5 or any((b-a) != 1 for a, b in zip(series, series[1:])):
-                    errors.append("GRID_NUMERIC_INTERVAL_INVALID_" + name.upper())
+            # Read coordinate words within the main map panel, rather than
+            # hard-coding the original project's longitude/latitude.
+            grid_pattern = re.compile(r"""^(\d{1,3})°(\d{1,2})'(\d{1,2})"([EWNS])$""")
+            for name, directions in (("longitude", "EW"), ("latitude", "NS")):
+                series = []
+                for word in words:
+                    if word[0] > page.rect.width * 0.71:
+                        continue  # Inset labels belong to a different scale.
+                    parsed = grid_pattern.match(word[4])
+                    if parsed is None or parsed.group(4) not in directions:
+                        continue
+                    seconds = (int(parsed.group(1)) * 3600 +
+                               int(parsed.group(2)) * 60 +
+                               int(parsed.group(3)))
+                    series.append(seconds)
+                series = sorted(set(series))
+                metrics["main_grid_" + name + "_seconds"] = series
+                if len(series) >= 3:
+                    intervals = [b-a for a,b in zip(series,series[1:])]
+                    if any(x != intervals[0] or x <= 0 for x in intervals):
+                        errors.append("GRID_NUMERIC_INTERVAL_INVALID_" + name.upper())
+                else:
+                    warnings.append("GRID_LABELS_INSUFFICIENT_FOR_INDEPENDENT_" + name.upper())
 
             if words:
                 margins = [min(w[0], w[1], page.rect.width - w[2],
@@ -125,6 +160,9 @@ def inspect(job_dir: Path, dpi=400, visual_reviewed=False):
             metrics["embedded_fonts"] = embedded
             if not embedded or any(font["bytes"] < 1024 for font in embedded):
                 errors.append("FONT_NOT_EMBEDDED")
+            if any(("arial" not in f["name"].lower() and
+                    "esrinorth" not in f["name"].lower()) for f in embedded):
+                errors.append("NON_ARIAL_TEXT_FONT_DETECTED")
 
             factor = 1.8
             out = job_dir / "independent_pdf_render.png"

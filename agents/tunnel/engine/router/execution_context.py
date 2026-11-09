@@ -108,6 +108,9 @@ def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
     effective_access = "write"
     if _kind_from_scope(scope) == "files" or tool.startswith("files_"):
         effective_access = validate_files_tool_scope(tool, scope, auth.scopes)
+    elif tool == "arcmap_stage3_health" and scope in ("arcmap:inspect", "arcmap:execute"):
+        # Canonically audited no-effect Stage 3 health probe.
+        effective_access = "read"
     resources = policy_resources(auth, placement, scope, resource_authorizer,
                                  selected_profile_id=selected_profile_id, catalog=catalog)
     return {"context_version": 1, "principal_id": auth.principal_id,
@@ -124,11 +127,12 @@ def new_context(auth: AuthContext, placement: Placement, scope: str, tool: str,
 
 
 def scheduler_meta(context: dict[str, Any], owner: str, key: str = "", arguments: Any = None) -> dict[str, Any]:
-    # Trusted Files read scopes may share a reader lease. Effectful commands
-    # keep the installation-wide writer lease until their resource footprints
-    # can be proven disjoint; never infer access from client arguments.
-    read_only = (context.get("required_scope") == "files:read"
-                 and context.get("effective_access") == "read")
+    # Only explicit reviewed read-only tools share the installation reader
+    # lease. Never infer a tool's effect type from its name or client args.
+    read_only = (context.get("effective_access") == "read" and (
+        context.get("required_scope") == "files:read"
+        or (context.get("public_tool") == "arcmap_stage3_health"
+            and context.get("required_scope") in ("arcmap:inspect", "arcmap:execute"))))
     return {"session_id": owner, "request_id": context["request_id"],
         "trace_id": context["trace_id"], "task_id": context["task_id"],
         "target_device_id": context["device_id"], "executed_on": context["device_id"],
@@ -176,6 +180,11 @@ def validate_context(value: Any, placement: Placement) -> dict[str, Any]:
             value["required_scope"], value["scopes"])
         if not all(r["kind"] == "files" for r in resources):
             raise AuthorizationError("CONTEXT_INVALID", 403)
+    elif (value["public_tool"] == "arcmap_stage3_health"
+          and value["required_scope"] in ("arcmap:inspect", "arcmap:execute")
+          and len(resources) == 1 and resources[0]["kind"] == "arcmap"
+          and resources[0]["resource_id"] == "installation:" + value["installation_id"]):
+        effective_access = "read"
     if value.get("effective_access") != effective_access:
         raise AuthorizationError("CONTEXT_INVALID", 403)
     return dict(value)

@@ -356,9 +356,10 @@ def main():
         from stage2 import print_ready
         result=print_ready.build(
             args["template_mxd"],args["data_root"],args["output_root"],
-            scale=args.get("scale",70000),dpi=args.get("dpi",400),
+            scale=args.get("scale",0),dpi=args.get("dpi",400),
             main_frame=args.get("main_frame","Layers"),
-            expected_crs=args.get("expected_crs","WGS_1984_UTM_Zone_51N"))
+            expected_crs=args.get("expected_crs","WGS_1984_UTM_Zone_51N"),
+            resolved_rules=args.get("resolved_rules"))
     elif op=="render_staging":
         working=args["working_mxd"]
         staging=args["staging_dir"]
@@ -398,7 +399,9 @@ if __name__=="__main__":
         try:
             _write(sys.argv[2],{
                 "ok":False,
-                "code":"FILE_WORKER_FAILED",
+                "code":("DATASET_CRS_METADATA_INCONSISTENT"
+                        if "DATASET_CRS_METADATA_INCONSISTENT" in repr(exc)
+                        else "FILE_WORKER_FAILED"),
                 "error":repr(exc),
                 "traceback":traceback.format_exc(),
             })

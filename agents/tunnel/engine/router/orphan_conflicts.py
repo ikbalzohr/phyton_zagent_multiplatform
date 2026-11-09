@@ -27,11 +27,13 @@ _SAFE_PROBES = {
     ("zagent_arcmap", "arcmap_ping"): (frozenset({"arcmap:inspect", "arcmap:execute"}), "arcmap"),
     ("zagent_arcmap", "arcmap_execution_capabilities"): (
         frozenset({"arcmap:inspect", "arcmap:execute"}), "arcmap"),
+    ("zagent_arcmap", "arcmap_stage3_health"): (
+        frozenset({"arcmap:inspect", "arcmap:execute"}), "arcmap"),
 }
 
 
 def nonblocking_probe(row: Mapping[str, Any]) -> bool:
-    """True only for a canonically identified no-effect ArcMap ping."""
+    """True only for a canonically identified, reviewed no-effect probe."""
     expected = _SAFE_PROBES.get((row.get("service_id"), row.get("tool_name")))
     if not expected:
         return False
@@ -129,7 +131,7 @@ def safe_read_target(service: str, tool: str, context: Mapping[str, Any]) -> boo
             and isinstance(resource.get("profile_id"), str)
             and bool(resource["profile_id"])
         )
-    if service == "zagent_arcmap" and tool in {"arcmap_ping", "arcmap_execution_capabilities"}:
+    if service == "zagent_arcmap" and tool in {"arcmap_ping", "arcmap_execution_capabilities", "arcmap_stage3_health"}:
         return (
             context.get("required_scope") in {"arcmap:inspect", "arcmap:execute"}
             and resource == {

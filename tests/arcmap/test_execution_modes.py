@@ -523,7 +523,9 @@ class Routing(unittest.TestCase):
             records.append(kwargs)
             return {'ok': True, 'execution_mode': 'headless',
                     'print_ready_accepted': False}
-        with patch.object(worker_module, 'ArcGISProcessFileWorker',
+        with patch('orchestrator.cartographic_rules.resolve_rules',
+                   return_value={'rules':{'scale':{'requested':0}}, 'sources':[]}), \
+             patch.object(worker_module, 'ArcGISProcessFileWorker',
                           return_value=SimpleNamespace(print_ready_template=print_disk)) as factory:
             with patch.object(server.services.safety, 'guard', return_value=None) as guard:
                 result = self.invoke('arcmap_print_ready_template', args,

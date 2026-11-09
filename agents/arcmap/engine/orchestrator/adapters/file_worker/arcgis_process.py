@@ -105,14 +105,18 @@ class ArcGISProcessFileWorker:
         })
 
     def print_ready_template(self, *, template_mxd, data_root, output_root,
-                             scale=70000, dpi=400, main_frame='Layers',
-                             expected_crs='WGS_1984_UTM_Zone_51N'):
+                             scale=0, dpi=400, main_frame='Layers',
+                             expected_crs='WGS_1984_UTM_Zone_51N', resolved_rules=None):
         """Isolated Python2/ArcPy disk-only print job, never CURRENT."""
+        if resolved_rules is None:
+            from orchestrator.cartographic_rules import resolve_rules
+            resolved_rules = resolve_rules(self.engine_root, data_root,
+                                           scale_override=scale)
         result = self._call('print_ready_template', {
             'template_mxd': template_mxd, 'data_root': data_root,
             'output_root': output_root, 'scale': float(scale),
             'dpi': int(dpi), 'main_frame': main_frame,
-            'expected_crs': expected_crs,
+            'expected_crs': expected_crs, 'resolved_rules': resolved_rules,
         }, timeout=300)
         if not result.get('ok'):
             return result
